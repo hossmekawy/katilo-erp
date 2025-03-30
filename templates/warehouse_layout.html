@@ -1,0 +1,789 @@
+{% extends "base.html" %}
+
+{% block title %}تخطيط المستودع - كاتيلو{% endblock %}
+
+{% block content %}
+<div x-data="warehouseLayoutManager()">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">تخطيط المستودع</h1>
+        <div class="flex space-x-2 rtl:space-x-reverse">
+            <button @click="showWarehouseModal = true; editWarehouseMode = false;" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-plus ml-2"></i> إضافة مستودع
+            </button>
+            <button @click="showSectionModal = true; editSectionMode = false;" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-plus ml-2"></i> إضافة قسم
+            </button>
+            <button @click="showSlotModal = true; editSlotMode = false;" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-plus ml-2"></i> إضافة عنصر 
+            </button>
+        </div>
+    </div>    
+    <!-- اختيار المستودع -->
+    <div class="bg-white p-4 rounded-lg shadow mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">اختر المستودع</label>
+                <select x-model="selectedWarehouseId" @change="loadWarehouseLayout" class="w-full border rounded-lg px-3 py-2">
+                    <option value="">اختر مستودعًا</option>
+                    <template x-for="warehouse in warehouses" :key="warehouse.id">
+                        <option :value="warehouse.id" x-text="warehouse.name"></option>
+                    </template>
+                </select>
+            </div>
+            <div x-show="selectedWarehouseId">
+                <label class="block text-sm font-medium text-gray-700 mb-1">اختر القسم</label>
+                <select x-model="selectedSectionId" @change="loadSectionSlots" class="w-full border rounded-lg px-3 py-2">
+                    <option value="">جميع الأقسام</option>
+                    <template x-for="section in sections" :key="section.id">
+                        <option :value="section.id" x-text="section.section_name"></option>
+                    </template>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- قائمة الأقسام -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white rounded-lg shadow" x-show="selectedWarehouseId">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">أقسام المستودع</h3>
+            </div>
+            <div class="p-4">
+                <template x-if="sections.length === 0">
+                    <p class="text-gray-500 text-center py-4">لم يتم العثور على أقسام</p>
+                </template>
+                
+                <div class="space-y-2">
+                    <template x-for="section in sections" :key="section.id">
+                        <div class="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                             :class="{'bg-blue-50 border-blue-300': selectedSectionId == section.id}"
+                             @click="selectedSectionId = section.id; loadSectionSlots()">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-medium" x-text="section.section_name"></h4>
+                                <div class="flex space-x-2">
+                                    <button @click.stop="editSection(section)" class="text-blue-600 hover:text-blue-800">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button @click.stop="confirmDeleteSection(section)" class="text-red-600 hover:text-red-800">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-500 mt-1">
+                                <span x-text="`${section.row_count} صفوف × ${section.column_count} أعمدة`"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+        
+        <!-- شبكة الفتحات -->
+        <div class="bg-white rounded-lg shadow lg:col-span-2" x-show="selectedSectionId">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold" x-text="currentSection ? currentSection.section_name : 'الفتحات'"></h3>
+                <div class="text-sm text-gray-500" x-show="currentSection">
+                    <span x-text="`${currentSection.row_count} صفوف × ${currentSection.column_count} أعمدة`"></span>
+                </div>
+            </div>
+            <div class="p-4 overflow-x-auto">
+                <template x-if="!currentSection || slots.length === 0">
+                    <p class="text-gray-500 text-center py-4">لم يتم العثور على فتحات</p>
+                </template>
+                
+                <template x-if="currentSection && slots.length > 0">
+                    <div>
+                        <!-- رأس الشبكة (أرقام الأعمدة) -->
+                        <div class="flex mb-2">
+                            <div class="w-12"></div> <!-- خلية الزاوية الفارغة -->
+                            <template x-for="col in Array.from({length: currentSection.column_count}, (_, i) => i + 1)" :key="col">
+                                <div class="w-24 text-center font-medium text-gray-700" x-text="col"></div>
+                            </template>
+                        </div>
+                        
+                        <!-- صفوف الشبكة -->
+                        <template x-for="row in Array.from({length: currentSection.row_count}, (_, i) => i + 1)" :key="row">
+                            <div class="flex mb-2">
+                                <!-- رأس الصف (أرقام الصفوف) -->
+                                <div class="w-12 flex items-center justify-center font-medium text-gray-700" x-text="row"></div>
+                                
+                                <!-- الفتحات في هذا الصف -->
+                                <template x-for="col in Array.from({length: currentSection.column_count}, (_, i) => i + 1)" :key="col">
+                                    <div class="w-24 h-24 border rounded-lg p-2 mx-1 flex flex-col justify-between"
+                                         :class="getSlotClass(row, col)">
+                                        <div class="text-xs text-right">
+                                            <span x-text="`ص${row}ع${col}`"></span>
+                                        </div>
+                                        
+                                        <div class="flex-1 flex flex-col items-center justify-center">
+                                            <template x-if="getSlot(row, col)?.item_id">
+                                                <div class="text-center">
+                                                    <div class="font-medium text-sm" x-text="getItemName(getSlot(row, col)?.item_id)"></div>
+                                                    <div class="text-lg font-bold" x-text="getSlot(row, col)?.quantity"></div>
+                                                </div>
+                                            </template>
+                                            
+                                            <template x-if="!getSlot(row, col)?.item_id">
+                                                <div class="text-gray-400 text-center">فارغ</div>
+                                            </template>
+                                        </div>
+                                        
+                                        <div class="flex justify-center space-x-1">
+                                            <button @click="editSlot(getSlot(row, col))" class="text-xs text-blue-600 hover:text-blue-800">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة القسم -->
+    <div x-show="showSectionModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showSectionModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold" x-text="editSectionMode ? 'تعديل القسم' : 'إضافة قسم'"></h3>
+                <button @click="showSectionModal = false" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <form @submit.prevent="saveSection">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+                        <select x-model="sectionForm.warehouse_id" required class="w-full border rounded-lg px-3 py-2"
+                                :disabled="editSectionMode">
+                            <option value="">اختر المستودع</option>
+                            <template x-for="warehouse in warehouses" :key="warehouse.id">
+                                <option :value="warehouse.id" x-text="warehouse.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم القسم</label>
+                        <input type="text" x-model="sectionForm.section_name" required
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الصفوف</label>
+                            <input type="number" x-model="sectionForm.row_count" min="1" max="20" required
+                                   class="w-full border rounded-lg px-3 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الأعمدة</label>
+                            <input type="number" x-model="sectionForm.column_count" min="1" max="20" required
+                                   class="w-full border rounded-lg px-3 py-2">
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" @click="showSectionModal = false" 
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2">
+                            إلغاء
+                        </button>
+                        <button type="submit" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                            حفظ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة الفتحة -->
+    <div x-show="showSlotModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showSlotModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold" x-text="editSlotMode ? 'تعديل الفتحة' : 'إضافة فتحة'"></h3>
+                <button @click="showSlotModal = false" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <form @submit.prevent="saveSlot">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">القسم</label>
+                        <select x-model="slotForm.section_id" required class="w-full border rounded-lg px-3 py-2"
+                                :disabled="editSlotMode">
+                            <option value="">اختر القسم</option>
+                            <template x-for="section in sections" :key="section.id">
+                                <option :value="section.id" x-text="section.section_name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الصف</label>
+                            <input type="number" x-model="slotForm.row_number" min="1" required
+                                   class="w-full border rounded-lg px-3 py-2"
+                                   :disabled="editSlotMode">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">العمود</label>
+                            <input type="number" x-model="slotForm.column_number" min="1" required
+                                   class="w-full border rounded-lg px-3 py-2"
+                                   :disabled="editSlotMode">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">العنصر (اختياري)</label>
+                        <select x-model="slotForm.item_id" class="w-full border rounded-lg px-3 py-2">
+                            <option value="">لا يوجد عنصر</option>
+                            <template x-for="item in items" :key="item.id">
+                                <option :value="item.id" x-text="item.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4" x-show="slotForm.item_id">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الكمية</label>
+                        <input type="number" x-model="slotForm.quantity" min="0"
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" @click="showSlotModal = false" 
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2">
+                            إلغاء
+                        </button>
+                        <button type="submit" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                            حفظ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة المستودع -->
+    <div x-show="showWarehouseModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showWarehouseModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold" x-text="editWarehouseMode ? 'تعديل المستودع' : 'إضافة مستودع'"></h3>
+                <button @click="showWarehouseModal = false" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <form @submit.prevent="saveWarehouse">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم المستودع</label>
+                        <input type="text" x-model="warehouseForm.name" required
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الموقع</label>
+                        <input type="text" x-model="warehouseForm.location" required
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">السعة</label>
+                        <input type="number" x-model="warehouseForm.capacity" min="1" required
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">معلومات الاتصال</label>
+                        <input type="text" x-model="warehouseForm.contact_info"
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" @click="showWarehouseModal = false" 
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2">
+                            إلغاء
+                        </button>
+                        <button type="submit" 
+                                class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">
+                            حفظ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تأكيد الحذف -->
+    <div x-show="showDeleteModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showDeleteModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold text-red-600">تأكيد الحذف</h3>
+            </div>
+            
+            <div class="p-6">
+                <p class="mb-4" x-text="deleteMessage"></p>
+                
+                <div class="flex justify-end">
+                    <button @click="showDeleteModal = false" 
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2">
+                        إلغاء
+                    </button>
+                    <button @click="confirmDelete()" 
+                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
+                        حذف
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- NEW SECTION: Tips and Tutorial -->
+<div class="mt-10 bg-white rounded-lg shadow-md overflow-hidden">
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4">
+        <h2 class="text-xl font-bold text-white flex items-center">
+            <i class="fas fa-lightbulb mr-2"></i> نصائح وإرشادات استخدام تخطيط المستودع
+        </h2>
+    </div>
+    
+    <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="border rounded-lg p-4 bg-blue-50 hover:bg-blue-100 transition-colors">
+                <h3 class="text-lg font-semibold text-blue-800 mb-2 flex items-center">
+                    <i class="fas fa-warehouse mr-2"></i> إدارة المستودعات
+                </h3>
+                <ul class="space-y-2 text-gray-700">
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                        <span>أضف مستودعًا جديدًا بالنقر على زر "إضافة مستودع" في الأعلى.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                        <span>حدد المستودع من القائمة المنسدلة لعرض أقسامه.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                        <span>يمكنك تعديل أو حذف المستودع من خلال الأزرار المخصصة.</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="border rounded-lg p-4 bg-teal-50 hover:bg-teal-100 transition-colors">
+                <h3 class="text-lg font-semibold text-teal-800 mb-2 flex items-center">
+                    <i class="fas fa-th-large mr-2"></i> إدارة الأقسام
+                </h3>
+                <ul class="space-y-2 text-gray-700">
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                        <span>أضف قسمًا جديدًا بالنقر على زر "إضافة قسم" في الأعلى.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                        <span>حدد عدد الصفوف والأعمدة حسب حجم القسم الفعلي في المستودع.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                        <span>انقر على أي قسم في القائمة لعرض فتحاته وتفاصيله.</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="border rounded-lg p-4 bg-emerald-50 hover:bg-emerald-100 transition-colors">
+                <h3 class="text-lg font-semibold text-emerald-800 mb-2 flex items-center">
+                    <i class="fas fa-cubes mr-2"></i> إدارة الفتحات والعناصر
+                </h3>
+                <ul class="space-y-2 text-gray-700">
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                        <span>أضف فتحة جديدة بالنقر على زر "إضافة عنصر" في الأعلى.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                        <span>انقر على أيقونة التعديل في أي فتحة لتغيير العنصر أو الكمية.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                        <span>الفتحات الفارغة تظهر باللون الرمادي، والفتحات التي تحتوي على عناصر تظهر باللون الأزرق.</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="border rounded-lg p-4 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+                <h3 class="text-lg font-semibold text-indigo-800 mb-2 flex items-center">
+                    <i class="fas fa-question-circle mr-2"></i> أسئلة شائعة
+                </h3>
+                <ul class="space-y-2 text-gray-700">
+                    <li class="flex items-start">
+                        <i class="fas fa-question text-indigo-500 mt-1 mr-2"></i>
+                        <div>
+                            <span class="font-medium">كيف أنظم المستودع بشكل فعال؟</span>
+                            <p class="text-sm mt-1">قسّم المستودع إلى أقسام منطقية حسب نوع المنتج أو معدل الدوران.</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-question text-indigo-500 mt-1 mr-2"></i>
+                        <div>
+                            <span class="font-medium">هل يمكنني نقل العناصر بين الفتحات؟</span>
+                            <p class="text-sm mt-1">نعم، قم بتعديل الفتحة المصدر لإزالة العنصر ثم أضفه إلى الفتحة الهدف.</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- نصائح متقدمة -->
+        <div class="mt-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-star mr-2 text-yellow-500"></i> نصائح متقدمة
+            </h3>
+            
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <ul class="space-y-3">
+                    <li class="flex items-start">
+                        <i class="fas fa-lightbulb text-yellow-600 mt-1 mr-2"></i>
+                        <span>ضع العناصر سريعة الدوران في مواقع يسهل الوصول إليها لتحسين كفاءة العمل.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-lightbulb text-yellow-600 mt-1 mr-2"></i>
+                        <span>استخدم نظام ترميز لوني أو تسمية واضحة للأقسام لتسهيل العثور على العناصر.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-lightbulb text-yellow-600 mt-1 mr-2"></i>
+                        <span>قم بمراجعة تخطيط المستودع دوريًا وتحديثه بناءً على تغيرات المخزون واحتياجات العمل.</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{% block scripts %}
+<script>
+    function warehouseLayoutManager() {
+        return {
+            warehouses: [],
+            sections: [],
+            slots: [],
+            items: [],
+            
+            selectedWarehouseId: '',
+            selectedSectionId: '',
+            currentSection: null,
+            
+            showWarehouseModal: false,
+            showSectionModal: false,
+            showSlotModal: false,
+            showDeleteModal: false,
+            
+            editWarehouseMode: false,
+            editSectionMode: false,
+            editSlotMode: false,
+            
+            deleteType: '',
+            deleteId: null,
+            deleteMessage: '',
+            
+            warehouseForm: {
+                id: null,
+                name: '',
+                location: '',
+                capacity: 1000,
+                contact_info: ''
+            },
+            
+            sectionForm: {
+                id: null,
+                warehouse_id: '',
+                section_name: '',
+                row_count: 10,
+                column_count: 10
+            },
+            
+            slotForm: {
+                id: null,
+                section_id: '',
+                row_number: 1,
+                column_number: 1,
+                item_id: '',
+                quantity: 0
+            },
+            
+            async init() {
+                try {
+                    // تحميل المستودعات والعناصر
+                    const [warehousesData, itemsData] = await Promise.all([
+                        fetchAPI('/api/warehouses'),
+                        fetchAPI('/api/items')
+                    ]);
+                    
+                    this.warehouses = warehousesData;
+                    this.items = itemsData;
+                } catch (error) {
+                    console.error('خطأ في تحميل بيانات المستودع:', error);
+                }
+            },
+            
+            async loadWarehouseLayout() {
+                if (!this.selectedWarehouseId) {
+                    this.sections = [];
+                    this.slots = [];
+                    this.selectedSectionId = '';
+                    this.currentSection = null;
+                    return;
+                }
+                
+                try {
+                    const layoutData = await fetchAPI(`/api/warehouses/${this.selectedWarehouseId}/sections`);
+                    this.sections = layoutData;
+                    
+                    // مسح القسم المحدد
+                    this.selectedSectionId = '';
+                    this.slots = [];
+                    this.currentSection = null;
+                } catch (error) {
+                    console.error('خطأ في تحميل تخطيط المستودع:', error);
+                }
+            },
+            
+            async loadSectionSlots() {
+                if (!this.selectedSectionId) {
+                    this.slots = [];
+                    this.currentSection = null;
+                    return;
+                }
+                
+                try {
+                    const section = this.sections.find(s => s.id == this.selectedSectionId);
+                    if (!section) return;
+                    
+                    this.currentSection = section;
+                    this.slots = section.slots || [];
+                } catch (error) {
+                    console.error('خطأ في تحميل فتحات القسم:', error);
+                }
+            },
+            
+            getSlot(row, col) {
+                return this.slots.find(s => s.row_number == row && s.column_number == col);
+            },
+            
+            getSlotClass(row, col) {
+                const slot = this.getSlot(row, col);
+                
+                if (!slot) {
+                    return 'bg-gray-100';
+                }
+                
+                if (!slot.item_id) {
+                    return 'bg-white';
+                }
+                
+                // إذا كانت الفتحة تحتوي على عنصر
+                return 'bg-blue-50 border-blue-200';
+            },
+            
+            getItemName(itemId) {
+                if (!itemId) return '';
+                const item = this.items.find(i => i.id === itemId);
+                return item ? item.name : `عنصر #${itemId}`;
+            },
+            
+            resetWarehouseForm() {
+                this.warehouseForm = {
+                    id: null,
+                    name: '',
+                    location: '',
+                    capacity: 1000,
+                    contact_info: ''
+                };
+            },
+            
+            resetSectionForm() {
+                this.sectionForm = {
+                    id: null,
+                    warehouse_id: this.selectedWarehouseId || '',
+                    section_name: '',
+                    row_count: 10,
+                    column_count: 10
+                };
+            },
+            
+            resetSlotForm() {
+                this.slotForm = {
+                    id: null,
+                    section_id: this.selectedSectionId || '',
+                    row_number: 1,
+                    column_number: 1,
+                    item_id: '',
+                    quantity: 0
+                };
+            },
+            
+            editWarehouse(warehouse) {
+                this.editWarehouseMode = true;
+                this.warehouseForm = {
+                    id: warehouse.id,
+                    name: warehouse.name,
+                    location: warehouse.location,
+                    capacity: warehouse.capacity,
+                    contact_info: warehouse.contact_info
+                };
+                this.showWarehouseModal = true;
+            },
+            
+            editSection(section) {
+                this.editSectionMode = true;
+                this.sectionForm = {
+                    id: section.id,
+                    warehouse_id: section.warehouse_id,
+                    section_name: section.section_name,
+                    row_count: section.row_count,
+                    column_count: section.column_count
+                };
+                this.showSectionModal = true;
+            },
+            
+            editSlot(slot) {
+                if (!slot) return;
+                
+                this.editSlotMode = true;
+                this.slotForm = {
+                    id: slot.id,
+                    section_id: slot.section_id,
+                    row_number: slot.row_number,
+                    column_number: slot.column_number,
+                    item_id: slot.item_id || '',
+                    quantity: slot.quantity || 0
+                };
+                this.showSlotModal = true;
+            },
+            
+            confirmDeleteWarehouse(warehouse) {
+                this.deleteType = 'warehouse';
+                this.deleteId = warehouse.id;
+                this.deleteMessage = `هل أنت متأكد من حذف المستودع "${warehouse.name}"؟ سيؤدي هذا أيضًا إلى حذف جميع الأقسام والفتحات في هذا المستودع.`;
+                this.showDeleteModal = true;
+            },
+            
+            confirmDeleteSection(section) {
+                this.deleteType = 'section';
+                this.deleteId = section.id;
+                this.deleteMessage = `هل أنت متأكد من حذف القسم "${section.section_name}"؟ سيؤدي هذا أيضًا إلى حذف جميع الفتحات في هذا القسم.`;
+                this.showDeleteModal = true;
+            },
+            
+            async confirmDelete() {
+                try {
+                    if (this.deleteType === 'warehouse') {
+                        await fetchAPI(`/api/warehouses/${this.deleteId}`, 'DELETE');
+                        showNotification('تم حذف المستودع بنجاح');
+                        
+                        // تحديث المستودعات
+                        if (this.selectedWarehouseId == this.deleteId) {
+                            this.selectedWarehouseId = '';
+                            this.sections = [];
+                            this.slots = [];
+                            this.currentSection = null;
+                        }
+                        
+                        const warehousesData = await fetchAPI('/warehouses');
+                        this.warehouses = warehousesData;
+                    } else if (this.deleteType === 'section') {
+                        await fetchAPI(`/api/warehouse-sections/${this.deleteId}`, 'DELETE');
+                        showNotification('تم حذف القسم بنجاح');
+                        
+                        // تحديث الأقسام
+                        if (this.selectedSectionId == this.deleteId) {
+                            this.selectedSectionId = '';
+                            this.slots = [];
+                            this.currentSection = null;
+                        }
+                        
+                        await this.loadWarehouseLayout();
+                    }
+                    
+                    this.showDeleteModal = false;
+                } catch (error) {
+                    console.error('خطأ في حذف العنصر:', error);
+                }
+            },
+            
+            async saveWarehouse() {
+                try {
+                    if (this.editWarehouseMode) {
+                        // تحديث المستودع الحالي
+                        await fetchAPI(`/api/warehouses/${this.warehouseForm.id}`, 'PUT', this.warehouseForm);
+                        showNotification('تم تحديث المستودع بنجاح');
+                    } else {
+                        // إنشاء مستودع جديد
+                        await fetchAPI('/api/warehouses', 'POST', this.warehouseForm);
+                        showNotification('تم إنشاء المستودع بنجاح');
+                    }
+                    
+                    // تحديث المستودعات
+                    const warehousesData = await fetchAPI('/api/warehouses');
+                    this.warehouses = warehousesData;
+                    
+                    this.showWarehouseModal = false;
+                    this.resetWarehouseForm();
+                } catch (error) {
+                    console.error('خطأ في حفظ المستودع:', error);
+                }
+            },
+            
+            async saveSection() {
+                try {
+                    if (this.editSectionMode) {
+                        // تحديث القسم الحالي
+                        await fetchAPI(`/api/warehouse-sections/${this.sectionForm.id}`, 'PUT', this.sectionForm);
+                        showNotification('تم تحديث القسم بنجاح');
+                    } else {
+                        // إنشاء قسم جديد
+                        await fetchAPI('/api/warehouse-sections', 'POST', this.sectionForm);
+                        showNotification('تم إنشاء القسم بنجاح');
+                    }
+                    
+                    // تحديث الأقسام
+                    await this.loadWarehouseLayout();
+                    this.showSectionModal = false;
+                    this.resetSectionForm();
+                } catch (error) {
+                    console.error('خطأ في حفظ القسم:', error);
+                }
+            },
+            
+            async saveSlot() {
+                try {
+                    if (this.editSlotMode) {
+                        // تحديث الفتحة الحالية
+                        await fetchAPI(`/api/warehouse-slots/${this.slotForm.id}`, 'PUT', this.slotForm);
+                        showNotification('تم تحديث الفتحة بنجاح');
+                    } else {
+                        // إنشاء فتحة جديدة
+                        await fetchAPI('/api/warehouse-slots', 'POST', this.slotForm);
+                        showNotification('تم إنشاء الفتحة بنجاح');
+                    }
+                    
+                    // تحديث الفتحات
+                    await this.loadWarehouseLayout();
+                    if (this.selectedSectionId) {
+                        await this.loadSectionSlots();
+                    }
+                    
+                    this.showSlotModal = false;
+                    this.resetSlotForm();
+                } catch (error) {
+                    console.error('خطأ في حفظ الفتحة:', error);
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}
+{% endblock %}

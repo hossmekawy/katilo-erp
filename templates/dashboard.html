@@ -1,0 +1,971 @@
+{% extends "base.html" %}
+
+{% block title %}لوحة التحكم - كاتيلو{% endblock %}
+
+{% block content %}
+<div x-data="dashboardData()">
+    <h1 class="text-2xl font-bold mb-6">لوحة التحكم</h1>
+    
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+                    <i class="fas fa-cubes text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500">إجمالي العناصر</p>
+                    <h3 class="text-2xl font-bold" x-text="stats.totalItems || 0"></h3>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                    <i class="fas fa-warehouse text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500">المستودعات</p>
+                    <h3 class="text-2xl font-bold" x-text="stats.totalWarehouses || 0"></h3>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
+                    <i class="fas fa-tags text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500">الفئات</p>
+                    <h3 class="text-2xl font-bold" x-text="stats.totalCategories || 0"></h3>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
+                    <i class="fas fa-exchange-alt text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500">المعاملات</p>
+                    <h3 class="text-2xl font-bold" x-text="stats.totalTransactions || 0"></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Chart 1: Inventory by Category -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">المخزون حسب الفئة</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="inventoryByCategoryChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+        
+        <!-- Chart 2: Transactions Over Time -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">المعاملات عبر الزمن</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="transactionsOverTimeChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Chart 3: Top Items by Quantity -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">أعلى العناصر من حيث الكمية</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="topItemsChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+        
+        <!-- Chart 4: Transaction Types Distribution -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">توزيع أنواع المعاملات</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="transactionTypesChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Chart 5: Warehouse Capacity Utilization -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">استخدام سعة المستودع</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="warehouseCapacityChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+        
+        <!-- Chart 6: Low Stock Items -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">العناصر منخفضة المخزون</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="lowStockItemsChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Chart 7: Inventory Value by Warehouse -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">قيمة المخزون حسب المستودع</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="inventoryValueChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+        
+        <!-- Chart 8: Monthly Transaction Trends -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">اتجاهات المعاملات الشهرية</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="monthlyTrendsChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Chart 9: Item Price vs Cost Analysis -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">تحليل سعر العنصر مقابل التكلفة</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="priceCostAnalysisChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+        
+        <!-- Chart 10: Warehouse Section Distribution -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">توزيع أقسام المستودع</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="warehouseSectionsChart" class="w-full h-64"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Transactions and Low Stock Items -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent Transactions -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">المعاملات الأخيرة</h3>
+            </div>
+            <div class="p-6">
+                <template x-if="recentTransactions.length === 0">
+                    <p class="text-gray-500 text-center py-4">لا توجد معاملات حديثة</p>
+                </template>
+                
+                <template x-for="transaction in recentTransactions" :key="transaction.id">
+                    <div class="border-b last:border-0 py-3">
+                        <div class="flex justify-between">
+                            <div>
+                                <span x-text="transaction.item_name || 'عنصر #' + transaction.item_id" class="font-medium"></span>
+                                <span class="text-sm text-gray-500 mr-2" x-text="formatDate(transaction.transaction_date)"></span>
+                            </div>
+                            <div>
+                                <span class="font-medium" :class="transaction.transaction_type === 'IN' ? 'text-green-600' : 'text-red-600'">
+                                    <span x-text="transaction.transaction_type === 'IN' ? '+' : '-'"></span>
+                                    <span x-text="transaction.quantity"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        
+        <!-- Low Stock Items -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold">العناصر منخفضة المخزون</h3>
+            </div>
+            <div class="p-6">
+                <template x-if="lowStockItems.length === 0">
+                    <p class="text-gray-500 text-center py-4">لا توجد عناصر منخفضة المخزون</p>
+                </template>
+                
+                <template x-for="item in lowStockItems" :key="item.id">
+                    <div class="border-b last:border-0 py-3">
+                        <div class="flex justify-between">
+                            <div>
+                                <span x-text="item.name" class="font-medium"></span>
+                            </div>
+                            <div>
+                                <span class="text-amber-600 font-medium" x-text="item.quantity + ' / ' + item.reorder_level"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+function dashboardData() {
+    return {
+        stats: {
+            totalItems: 0,
+            totalWarehouses: 0,
+            totalCategories: 0,
+            totalTransactions: 0
+        },
+        recentTransactions: [],
+        lowStockItems: [],
+        items: [],
+        categories: [],
+        warehouses: [],
+        inventory: [],
+        transactions: [],
+        warehouseSections: [],
+        
+        async init() {
+            try {
+                // Fetch all required data
+                const [items, warehouses, categories, inventory, transactions, sections] = await Promise.all([
+                    fetchAPI('/api/items'),
+                    fetchAPI('/api/warehouses'),
+                    fetchAPI('/api/categories'),
+                    fetchAPI('/api/inventory'),
+                    fetchAPI('/api/transactions'),
+                    fetchAPI('/api/warehouse-sections')
+                ]);
+                
+                this.items = items;
+                this.warehouses = warehouses;
+                this.categories = categories;
+                this.inventory = inventory;
+                this.transactions = transactions;
+                this.warehouseSections = sections;
+                
+                // Set stats
+                this.stats.totalItems = items.length;
+                this.stats.totalWarehouses = warehouses.length;
+                this.stats.totalCategories = categories.length;
+                this.stats.totalTransactions = transactions.length;
+                
+                // Get recent transactions
+                this.recentTransactions = this.prepareRecentTransactions();
+                
+                // Get low stock items
+                this.lowStockItems = this.prepareLowStockItems();
+                
+                // Initialize charts
+                this.initCharts();
+                
+            } catch (error) {
+                console.error('خطأ في جلب بيانات لوحة التحكم:', error);
+            }
+        },
+        
+        prepareRecentTransactions() {
+            // Sort transactions by date (newest first) and take the first 5
+            const sortedTransactions = [...this.transactions]
+                .sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date))
+                .slice(0, 5);
+            
+            // Add item names to transactions
+            return sortedTransactions.map(txn => {
+                const item = this.items.find(i => i.id === txn.item_id);
+                return {
+                    ...txn,
+                    item_name: item ? item.name : null
+                };
+            });
+        },
+        
+        prepareLowStockItems() {
+            // Create a map of item quantities
+            const itemQuantities = {};
+            this.inventory.forEach(inv => {
+                if (!itemQuantities[inv.item_id]) {
+                    itemQuantities[inv.item_id] = 0;
+                }
+                itemQuantities[inv.item_id] += inv.quantity;
+            });
+            
+            // Find items with quantity below reorder level
+            return this.items
+                .filter(item => {
+                    const quantity = itemQuantities[item.id] || 0;
+                    return quantity <= item.reorder_level;
+                })
+                .map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    quantity: itemQuantities[item.id] || 0,
+                    reorder_level: item.reorder_level
+                }))
+                .slice(0, 5); // Take only the first 5
+        },
+        
+        initCharts() {
+            // Initialize all charts
+            this.initInventoryByCategoryChart();
+            this.initTransactionsOverTimeChart();
+            this.initTopItemsChart();
+            this.initTransactionTypesChart();
+            this.initWarehouseCapacityChart();
+            this.initLowStockItemsChart();
+            this.initInventoryValueChart();
+            this.initMonthlyTrendsChart();
+            this.initPriceCostAnalysisChart();
+            this.initWarehouseSectionsChart();
+        },
+        
+        formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ar-EG');
+        },
+        
+        initInventoryByCategoryChart() {
+            // Group inventory by category
+            const categoryTotals = {};
+            
+            // First, get total quantity for each item
+            const itemQuantities = {};
+            this.inventory.forEach(inv => {
+                if (!itemQuantities[inv.item_id]) {
+                    itemQuantities[inv.item_id] = 0;
+                }
+                itemQuantities[inv.item_id] += inv.quantity;
+            });
+            
+            // Then, group by category
+            this.items.forEach(item => {
+                const categoryId = item.category_id;
+                const quantity = itemQuantities[item.id] || 0;
+                
+                if (!categoryTotals[categoryId]) {
+                    categoryTotals[categoryId] = 0;
+                }
+                categoryTotals[categoryId] += quantity;
+            });
+            
+            // Prepare chart data
+            const labels = [];
+            const data = [];
+            const backgroundColors = [];
+            
+            // Generate colors
+            const colorPalette = [
+                'rgba(54, 162, 235, 0.7)',
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(153, 102, 255, 0.7)',
+                'rgba(255, 159, 64, 0.7)',
+                'rgba(199, 199, 199, 0.7)',
+                'rgba(83, 102, 255, 0.7)',
+                'rgba(40, 159, 64, 0.7)',
+                'rgba(210, 199, 199, 0.7)'
+            ];
+            
+            // Populate chart data
+            let colorIndex = 0;
+            for (const categoryId in categoryTotals) {
+                const category = this.categories.find(c => c.id == categoryId);
+                labels.push(category ? category.name : `فئة #${categoryId}`);
+                data.push(categoryTotals[categoryId]);
+                backgroundColors.push(colorPalette[colorIndex % colorPalette.length]);
+                colorIndex++;
+            }
+            
+            // Create chart
+            const ctx = document.getElementById('inventoryByCategoryChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+        },
+        
+        initTransactionsOverTimeChart() {
+            // Group transactions by date
+            const transactionsByDate = {};
+            const dates = [];
+            
+            // Get last 30 days
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toISOString().split('T')[0];
+                dates.push(dateStr);
+                transactionsByDate[dateStr] = { in: 0, out: 0 };
+            }
+            
+            // Count transactions by type and date
+            this.transactions.forEach(txn => {
+                const date = new Date(txn.transaction_date).toISOString().split('T')[0];
+                if (transactionsByDate[date]) {
+                    if (txn.transaction_type === 'IN') {
+                        transactionsByDate[date].in += txn.quantity;
+                    } else if (txn.transaction_type === 'OUT') {
+                        transactionsByDate[date].out += txn.quantity;
+                    }
+                }
+            });
+            
+            // Prepare chart data
+            const inData = dates.map(date => transactionsByDate[date].in);
+            const outData = dates.map(date => transactionsByDate[date].out);
+            
+            // Format dates for display
+            const formattedDates = dates.map(date => {
+                const [year, month, day] = date.split('-');
+                return `${day}/${month}`;
+            });
+            
+            // Create chart
+            const ctx = document.getElementById('transactionsOverTimeChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: formattedDates,
+                    datasets: [
+                        {
+                            label: 'إدخال',
+                            data: inData,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'إخراج',
+                            data: outData,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        },
+        
+        initTopItemsChart() {
+            // Calculate total quantity for each item
+            const itemQuantities = {};
+            this.inventory.forEach(inv => {
+                if (!itemQuantities[inv.item_id]) {
+                    itemQuantities[inv.item_id] = 0;
+                }
+                itemQuantities[inv.item_id] += inv.quantity;
+            });
+            
+            // Convert to array and sort by quantity
+            const sortedItems = Object.keys(itemQuantities)
+                .map(itemId => {
+                    const item = this.items.find(i => i.id == itemId);
+                    return {
+                        id: itemId,
+                        name: item ? item.name : `عنصر #${itemId}`,
+                        quantity: itemQuantities[itemId]
+                    };
+                })
+                .sort((a, b) => b.quantity - a.quantity)
+                .slice(0, 10); // Get top 10
+            
+            // Prepare chart data
+            const labels = sortedItems.map(item => item.name);
+            const data = sortedItems.map(item => item.quantity);
+            
+            // Create chart
+            const ctx = document.getElementById('topItemsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'الكمية',
+                        data: data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        },
+        
+        initTransactionTypesChart() {
+            // Count transactions by type
+            const transactionCounts = {
+                'IN': 0,
+                'OUT': 0,
+                'TRANSFER': 0
+            };
+            
+            this.transactions.forEach(txn => {
+                if (transactionCounts[txn.transaction_type] !== undefined) {
+                    transactionCounts[txn.transaction_type]++;
+                }
+            });
+            
+            // Prepare chart data
+            const labels = ['إدخال', 'إخراج', 'نقل'];
+            const data = [transactionCounts['IN'], transactionCounts['OUT'], transactionCounts['TRANSFER']];
+            const backgroundColors = [
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(54, 162, 235, 0.7)'
+            ];
+            
+            // Create chart
+            const ctx = document.getElementById('transactionTypesChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        },
+        
+        initWarehouseCapacityChart() {
+            // Calculate used capacity for each warehouse
+            const warehouseUsage = this.warehouses.map(warehouse => {
+                // Sum inventory in this warehouse
+                const totalItems = this.inventory
+                    .filter(inv => inv.warehouse_id === warehouse.id)
+                    .reduce((sum, inv) => sum + inv.quantity, 0);
+                
+                // Calculate percentage if capacity is available
+                const capacityPercentage = warehouse.capacity 
+                    ? Math.min(100, Math.round((totalItems / warehouse.capacity) * 100))
+                    : 0;
+                
+                return {
+                    id: warehouse.id,
+                    name: warehouse.name,
+                    used: totalItems,
+                    capacity: warehouse.capacity || 0,
+                    percentage: capacityPercentage
+                };
+            });
+            
+            // Prepare chart data
+            const labels = warehouseUsage.map(w => w.name);
+            const usedData = warehouseUsage.map(w => w.used);
+            const remainingData = warehouseUsage.map(w => Math.max(0, w.capacity - w.used));
+            
+            // Create chart
+            const ctx = document.getElementById('warehouseCapacityChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'المستخدم',
+                            data: usedData,
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'المتبقي',
+                            data: remainingData,
+                            backgroundColor: 'rgba(211, 211, 211, 0.7)',
+                            borderColor: 'rgba(211, 211, 211, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        },
+        
+        initLowStockItemsChart() {
+            // Get items with quantity below reorder level
+            const itemQuantities = {};
+            this.inventory.forEach(inv => {
+                if (!itemQuantities[inv.item_id]) {
+                    itemQuantities[inv.item_id] = 0;
+                }
+                itemQuantities[inv.item_id] += inv.quantity;
+            });
+            
+            const lowStockItems = this.items
+                .filter(item => {
+                    const quantity = itemQuantities[item.id] || 0;
+                    return quantity <= item.reorder_level;
+                })
+                .slice(0, 10); // Take only the first 10
+            
+            // Prepare chart data
+            const labels = lowStockItems.map(item => item.name);
+            const currentData = lowStockItems.map(item => itemQuantities[item.id] || 0);
+            const reorderData = lowStockItems.map(item => item.reorder_level);
+            
+            // Create chart
+            const ctx = document.getElementById('lowStockItemsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'الكمية الحالية',
+                            data: currentData,
+                            backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'مستوى إعادة الطلب',
+                            data: reorderData,
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        },
+        
+        initInventoryValueChart() {
+            // Calculate inventory value for each warehouse
+            const warehouseValues = {};
+            
+            this.inventory.forEach(inv => {
+                const item = this.items.find(i => i.id === inv.item_id);
+                if (item) {
+                    const value = inv.quantity * item.cost;
+                    
+                    if (!warehouseValues[inv.warehouse_id]) {
+                        warehouseValues[inv.warehouse_id] = 0;
+                    }
+                    warehouseValues[inv.warehouse_id] += value;
+                }
+            });
+            
+            // Prepare chart data
+            const labels = [];
+            const data = [];
+            const backgroundColors = [
+                'rgba(54, 162, 235, 0.7)',
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(153, 102, 255, 0.7)'
+            ];
+            
+            let colorIndex = 0;
+            for (const warehouseId in warehouseValues) {
+                const warehouse = this.warehouses.find(w => w.id == warehouseId);
+                labels.push(warehouse ? warehouse.name : `مستودع #${warehouseId}`);
+                data.push(warehouseValues[warehouseId].toFixed(2));
+                colorIndex++;
+            }
+            
+                        // Create chart
+                        const ctx = document.getElementById('inventoryValueChart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'pie',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    data: data,
+                                    backgroundColor: backgroundColors.slice(0, labels.length),
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                return `${context.label}: ${context.raw} ريال`;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    },
+                    
+                    initMonthlyTrendsChart() {
+                        // Group transactions by month
+                        const monthlyData = {};
+                        
+                        // Initialize last 12 months
+                        for (let i = 11; i >= 0; i--) {
+                            const date = new Date();
+                            date.setMonth(date.getMonth() - i);
+                            const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
+                            monthlyData[monthYear] = { in: 0, out: 0 };
+                        }
+                        
+                        // Count transactions by type and month
+                        this.transactions.forEach(txn => {
+                            const date = new Date(txn.transaction_date);
+                            const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
+                            
+                            if (monthlyData[monthYear]) {
+                                if (txn.transaction_type === 'IN') {
+                                    monthlyData[monthYear].in += txn.quantity;
+                                } else if (txn.transaction_type === 'OUT') {
+                                    monthlyData[monthYear].out += txn.quantity;
+                                }
+                            }
+                        });
+                        
+                        // Prepare chart data
+                        const labels = Object.keys(monthlyData);
+                        const inData = labels.map(month => monthlyData[month].in);
+                        const outData = labels.map(month => monthlyData[month].out);
+                        
+                        // Format month labels
+                        const monthNames = ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+                        const formattedLabels = labels.map(monthYear => {
+                            const [month, year] = monthYear.split('/');
+                            return `${monthNames[parseInt(month) - 1]} ${year}`;
+                        });
+                        
+                        // Create chart
+                        const ctx = document.getElementById('monthlyTrendsChart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: formattedLabels,
+                                datasets: [
+                                    {
+                                        label: 'إدخال',
+                                        data: inData,
+                                        borderColor: 'rgba(75, 192, 192, 1)',
+                                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                        tension: 0.4,
+                                        fill: true
+                                    },
+                                    {
+                                        label: 'إخراج',
+                                        data: outData,
+                                        borderColor: 'rgba(255, 99, 132, 1)',
+                                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                        tension: 0.4,
+                                        fill: true
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    },
+                    
+                    initPriceCostAnalysisChart() {
+                        // Get top 10 items by price-cost margin
+                        const itemsWithMargin = this.items
+                            .map(item => ({
+                                id: item.id,
+                                name: item.name,
+                                cost: item.cost,
+                                price: item.price,
+                                margin: item.price - item.cost,
+                                marginPercentage: ((item.price - item.cost) / item.cost * 100).toFixed(2)
+                            }))
+                            .sort((a, b) => b.margin - a.margin)
+                            .slice(0, 10);
+                        
+                        // Prepare chart data
+                        const labels = itemsWithMargin.map(item => item.name);
+                        const costData = itemsWithMargin.map(item => item.cost);
+                        const priceData = itemsWithMargin.map(item => item.price);
+                        
+                        // Create chart
+                        const ctx = document.getElementById('priceCostAnalysisChart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [
+                                    {
+                                        label: 'التكلفة',
+                                        data: costData,
+                                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                                        borderColor: 'rgba(255, 99, 132, 1)',
+                                        borderWidth: 1
+                                    },
+                                    {
+                                        label: 'السعر',
+                                        data: priceData,
+                                        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                                        borderColor: 'rgba(54, 162, 235, 1)',
+                                        borderWidth: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    },
+                    
+                    initWarehouseSectionsChart() {
+                        // Group sections by warehouse
+                        const warehouseSectionCounts = {};
+                        
+                        this.warehouseSections.forEach(section => {
+                            if (!warehouseSectionCounts[section.warehouse_id]) {
+                                warehouseSectionCounts[section.warehouse_id] = 0;
+                            }
+                            warehouseSectionCounts[section.warehouse_id]++;
+                        });
+                        
+                        // Prepare chart data
+                        const labels = [];
+                        const data = [];
+                        const backgroundColors = [
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)',
+                            'rgba(255, 159, 64, 0.7)'
+                        ];
+                        
+                        let colorIndex = 0;
+                        for (const warehouseId in warehouseSectionCounts) {
+                            const warehouse = this.warehouses.find(w => w.id == warehouseId);
+                            labels.push(warehouse ? warehouse.name : `مستودع #${warehouseId}`);
+                            data.push(warehouseSectionCounts[warehouseId]);
+                            colorIndex++;
+                        }
+                        
+                        // Create chart
+                        const ctx = document.getElementById('warehouseSectionsChart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'polarArea',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    data: data,
+                                    backgroundColor: backgroundColors.slice(0, labels.length),
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    r: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+                };
+            }
+            </script>
+            {% endblock %}
+            {% endblock %}
+            
+

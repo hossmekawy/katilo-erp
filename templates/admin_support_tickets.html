@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة تذاكر الدعم - كاتيلو{% endblock %}
+
+{% block page_header %}إدارة تذاكر الدعم{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600">إدارة تذاكر الدعم</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="adminTickets()" class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">إدارة تذاكر الدعم</h1>
+        <div class="flex space-x-2 space-x-reverse">
+            <button @click="refreshTickets()" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                <i class="fas fa-sync-alt ml-2"></i>
+                <span>تحديث</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Filter Controls -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+        <div class="flex flex-wrap gap-4">
+            <div>
+                <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">تصفية حسب الحالة</label>
+                <select id="status-filter" x-model="filters.status" @change="applyFilters()"
+                        class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">جميع الحالات</option>
+                    <option value="open">مفتوحة</option>
+                    <option value="in_progress">قيد المعالجة</option>
+                    <option value="closed">مغلقة</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="type-filter" class="block text-sm font-medium text-gray-700 mb-1">تصفية حسب النوع</label>
+                <select id="type-filter" x-model="filters.type" @change="applyFilters()"
+                        class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">جميع الأنواع</option>
+                    <option value="general">استفسار عام</option>
+                    <option value="technical">مشكلة فنية</option>
+                    <option value="billing">استفسار عن الفواتير</option>
+                    <option value="feature">اقتراح ميزة جديدة</option>
+                    <option value="other">أخرى</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="priority-filter" class="block text-sm font-medium text-gray-700 mb-1">تصفية حسب الأولوية</label>
+                <select id="priority-filter" x-model="filters.priority" @change="applyFilters()"
+                        class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">جميع الأولويات</option>
+                    <option value="low">منخفضة</option>
+                    <option value="medium">متوسطة</option>
+                    <option value="high">عالية</option>
+                    <option value="urgent">عاجلة</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tickets Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+            <div class="flex items-center">
+                <div class="bg-blue-100 text-blue-600 p-3 rounded-lg">
+                    <i class="fas fa-ticket-alt text-xl"></i>
+                </div>
+                <div class="mr-4">
+                    <div class="text-sm text-gray-500">إجمالي التذاكر</div>
+                    <div class="text-2xl font-bold" x-text="tickets.length"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+            <div class="flex items-center">
+                <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg">
+                    <i class="fas fa-door-open text-xl"></i>
+                </div>
+                <div class="mr-4">
+                    <div class="text-sm text-gray-500">تذاكر مفتوحة</div>
+                    <div class="text-2xl font-bold" x-text="getTicketCountByStatus('open')"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+            <div class="flex items-center">
+                <div class="bg-blue-100 text-blue-600 p-3 rounded-lg">
+                    <i class="fas fa-spinner text-xl"></i>
+                </div>
+                <div class="mr-4">
+                    <div class="text-sm text-gray-500">قيد المعالجة</div>
+                    <div class="text-2xl font-bold" x-text="getTicketCountByStatus('in_progress')"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+            <div class="flex items-center">
+                <div class="bg-gray-100 text-gray-600 p-3 rounded-lg">
+                    <i class="fas fa-check-circle text-xl"></i>
+                </div>
+                <div class="mr-4">
+                    <div class="text-sm text-gray-500">تذاكر مغلقة</div>
+                    <div class="text-2xl font-bold" x-text="getTicketCountByStatus('closed')"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tickets List -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رقم التذكرة</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الموضوع</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المستخدم</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النوع</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الأولوية</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ الإنشاء</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الردود</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="isLoading">
+                        <tr>
+                            <td colspan="9" class="px-6 py-4 text-center">
+                                <div class="flex justify-center">
+                                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                </div>
+                                <p class="mt-2 text-gray-500">جاري تحميل التذاكر...</p>
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-if="!isLoading && filteredTickets.length === 0">
+                        <tr>
+                            <td colspan="9" class="px-6 py-4 text-center text-gray-500">
+                                <div class="py-8">
+                                    <i class="fas fa-ticket-alt text-gray-300 text-5xl mb-4"></i>
+                                    <p>لا توجد تذاكر دعم تطابق معايير التصفية</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-for="ticket in filteredTickets" :key="ticket.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="text-gray-900" x-text="'#' + ticket.id"></span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-medium text-gray-900" x-text="ticket.subject"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                                        <i class="fas fa-user text-gray-400"></i>
+                                    </div>
+                                    <div class="mr-3">
+                                        <div class="text-sm font-medium text-gray-900" x-text="ticket.user ? ticket.user.username : 'غير معروف'"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                :class="getTicketTypeClass(ticket.ticket_type)"
+                                x-text="getTicketTypeName(ticket.ticket_type)"></span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap">
+                          <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                :class="getStatusClass(ticket.status)"
+                                x-text="getStatusName(ticket.status)"></span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap">
+                          <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                :class="getPriorityClass(ticket.priority)"
+                                x-text="getPriorityName(ticket.priority)"></span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap">
+                          <span class="text-sm text-gray-500" x-text="formatDate(ticket.created_at)"></span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-center">
+                          <span class="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
+                                x-text="ticket.responses_count"></span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-left">
+                          <div class="flex space-x-2 space-x-reverse">
+                              <a :href="'/ticket/' + ticket.id" class="text-blue-600 hover:text-blue-900" title="عرض التذكرة">
+                                  <i class="fas fa-eye"></i>
+                              </a>
+                              <button @click="openStatusModal(ticket)" class="text-green-600 hover:text-green-900" title="تغيير الحالة">
+                                  <i class="fas fa-edit"></i>
+                              </button>
+                          </div>
+                      </td>
+                  </tr>
+              </template>
+          </tbody>
+      </table>
+  </div>
+</div>
+
+<!-- Status Update Modal -->
+<div x-show="showStatusModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+  <div @click.away="showStatusModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+      <div class="border-b px-6 py-4 flex justify-between items-center">
+          <h3 class="text-lg font-semibold">تحديث حالة التذكرة #<span x-text="selectedTicket?.id"></span></h3>
+          <button @click="showStatusModal = false" class="text-gray-400 hover:text-gray-600">
+              <i class="fas fa-times"></i>
+          </button>
+      </div>
+      
+      <div class="p-6">
+          <form @submit.prevent="updateTicketStatus">
+              <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">الموضوع</label>
+                  <div class="text-gray-900 font-medium" x-text="selectedTicket?.subject"></div>
+              </div>
+              
+              <div class="mb-4">
+                  <label for="status" class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                  <select id="status" x-model="statusForm.status" required
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                      <option value="open">مفتوحة</option>
+                      <option value="in_progress">قيد المعالجة</option>
+                      <option value="closed">مغلقة</option>
+                  </select>
+              </div>
+              
+              <div class="mb-4">
+                  <label for="priority" class="block text-sm font-medium text-gray-700 mb-1">الأولوية</label>
+                  <select id="priority" x-model="statusForm.priority" required
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                      <option value="low">منخفضة</option>
+                      <option value="medium">متوسطة</option>
+                      <option value="high">عالية</option>
+                      <option value="urgent">عاجلة</option>
+                  </select>
+              </div>
+              
+              <div class="flex justify-end">
+                  <button type="button" @click="showStatusModal = false" 
+                          class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg ml-2">
+                      إلغاء
+                  </button>
+                  <button type="submit" 
+                          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                          :disabled="isSubmitting"
+                          :class="{'opacity-75 cursor-not-allowed': isSubmitting}">
+                      <span x-show="isSubmitting" class="ml-2">
+                          <i class="fas fa-spinner fa-spin"></i>
+                      </span>
+                      <span>حفظ التغييرات</span>
+                  </button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+</div>
+
+{% block scripts %}
+<script>
+function adminTickets() {
+return {
+  tickets: [],
+  filteredTickets: [],
+  isLoading: true,
+  isSubmitting: false,
+  showStatusModal: false,
+  selectedTicket: null,
+  statusForm: {
+      status: '',
+      priority: ''
+  },
+  filters: {
+      status: '',
+      type: '',
+      priority: ''
+  },
+  
+  async init() {
+      await this.loadTickets();
+  },
+  
+  async loadTickets() {
+      this.isLoading = true;
+      
+      try {
+          const response = await fetch('/api/admin/support-tickets', {
+              method: 'GET',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-Requested-With': 'XMLHttpRequest'
+              },
+              credentials: 'same-origin'
+          });
+          
+          if (!response.ok) {
+              throw new Error('فشل في تحميل التذاكر');
+          }
+          
+          this.tickets = await response.json();
+          this.applyFilters();
+      } catch (error) {
+          console.error('Error loading tickets:', error);
+          showNotification(error.message || 'حدث خطأ أثناء تحميل التذاكر', 'error');
+      } finally {
+          this.isLoading = false;
+      }
+  },
+  
+  async refreshTickets() {
+      await this.loadTickets();
+      showNotification('تم تحديث قائمة التذاكر بنجاح');
+  },
+  
+  applyFilters() {
+      this.filteredTickets = this.tickets.filter(ticket => {
+          // Apply status filter
+          if (this.filters.status && ticket.status !== this.filters.status) {
+              return false;
+          }
+          
+          // Apply type filter
+          if (this.filters.type && ticket.ticket_type !== this.filters.type) {
+              return false;
+          }
+          
+          // Apply priority filter
+          if (this.filters.priority && ticket.priority !== this.filters.priority) {
+              return false;
+          }
+          
+          return true;
+      });
+  },
+  
+  openStatusModal(ticket) {
+      this.selectedTicket = ticket;
+      this.statusForm = {
+          status: ticket.status,
+          priority: ticket.priority
+      };
+      this.showStatusModal = true;
+  },
+  
+  async updateTicketStatus() {
+      this.isSubmitting = true;
+      
+      try {
+          const response = await fetch(`/api/admin/support-tickets/${this.selectedTicket.id}`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-Requested-With': 'XMLHttpRequest'
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify(this.statusForm)
+          });
+          
+          if (!response.ok) {
+              throw new Error('فشل في تحديث حالة التذكرة');
+          }
+          
+          const result = await response.json();
+          
+          // Update ticket in the list
+          const index = this.tickets.findIndex(t => t.id === this.selectedTicket.id);
+          if (index !== -1) {
+              this.tickets[index].status = result.status;
+              this.tickets[index].priority = result.priority;
+              this.tickets[index].updated_at = result.updated_at;
+          }
+          
+          // Apply filters again
+          this.applyFilters();
+          
+          // Close modal
+          this.showStatusModal = false;
+          this.selectedTicket = null;
+          
+          // Show success message
+          showNotification('تم تحديث حالة التذكرة بنجاح');
+          
+      } catch (error) {
+          console.error('Error updating ticket status:', error);
+          showNotification(error.message || 'حدث خطأ أثناء تحديث حالة التذكرة', 'error');
+      } finally {
+          this.isSubmitting = false;
+      }
+  },
+  
+  getTicketCountByStatus(status) {
+      return this.tickets.filter(ticket => ticket.status === status).length;
+  },
+  
+  getStatusName(status) {
+      const statusMap = {
+          'open': 'مفتوحة',
+          'in_progress': 'قيد المعالجة',
+          'closed': 'مغلقة'
+      };
+      return statusMap[status] || status;
+  },
+  
+  getStatusClass(status) {
+      const classMap = {
+          'open': 'bg-yellow-100 text-yellow-800',
+          'in_progress': 'bg-blue-100 text-blue-800',
+          'closed': 'bg-gray-100 text-gray-800'
+      };
+      return classMap[status] || 'bg-gray-100 text-gray-800';
+  },
+  
+  getTicketTypeName(type) {
+      const typeMap = {
+          'general': 'استفسار عام',
+          'technical': 'مشكلة فنية',
+          'billing': 'استفسار عن الفواتير',
+          'feature': 'اقتراح ميزة',
+          'other': 'أخرى'
+      };
+      return typeMap[type] || type;
+  },
+  
+  getTicketTypeClass(type) {
+      const classMap = {
+          'general': 'bg-green-100 text-green-800',
+          'technical': 'bg-red-100 text-red-800',
+          'billing': 'bg-purple-100 text-purple-800',
+          'feature': 'bg-blue-100 text-blue-800',
+          'other': 'bg-gray-100 text-gray-800'
+      };
+      return classMap[type] || 'bg-gray-100 text-gray-800';
+  },
+  
+  getPriorityName(priority) {
+      const priorityMap = {
+          'low': 'منخفضة',
+          'medium': 'متوسطة',
+          'high': 'عالية',
+          'urgent': 'عاجلة'
+      };
+      return priorityMap[priority] || priority;
+  },
+  
+  getPriorityClass(priority) {
+      const classMap = {
+          'low': 'bg-green-100 text-green-800',
+          'medium': 'bg-blue-100 text-blue-800',
+          'high': 'bg-orange-100 text-orange-800',
+          'urgent': 'bg-red-100 text-red-800'
+      };
+      return classMap[priority] || 'bg-gray-100 text-gray-800';
+  },
+  
+  formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('ar-EG', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+      });
+  }
+};
+}
+</script>
+{% endblock %}
+{% endblock %}

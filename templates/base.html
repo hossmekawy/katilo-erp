@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}نظام كاتيلو للمخزون{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+        
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --secondary: #6366f1;
+            --accent: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1e293b;
+            --light: #f8fafc;
+            --gray: #64748b;
+        }
+        
+        * {
+            font-family: 'Tajawal', sans-serif;
+        }
+        
+        [x-cloak] { display: none !important; }
+        
+        body {
+            background-color: #f1f5f9;
+        }
+        
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.2s ease;
+            border-right: 3px solid transparent;
+        }
+        
+        .sidebar-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-right-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .sidebar-item.active {
+            background-color: rgba(255, 255, 255, 0.15);
+            border-right-color: #fff;
+            font-weight: 500;
+        }
+        
+        .sidebar-item i {
+            width: 20px;
+            text-align: center;
+        }
+        
+        .mobile-menu {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(100%);
+        }
+        
+        .mobile-menu.show {
+            transform: translateX(0);
+        }
+        
+        .dropdown-menu {
+            transition: all 0.2s ease;
+        }
+        
+        .btn {
+            @apply px-4 py-2 rounded-lg transition duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-offset-2;
+        }
+        
+        .btn-primary {
+            @apply bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500;
+        }
+        
+        .btn-outline {
+            @apply border border-white text-white hover:bg-white/10 focus:ring-white;
+        }
+        
+        .card {
+            @apply bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden;
+        }
+        
+        .toast {
+            animation: toast-in 0.3s ease-in-out, toast-out 0.3s ease-in-out 2.7s forwards;
+        }
+        
+        @keyframes toast-in {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes toast-out {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(20px); opacity: 0; }
+        }
+    </style>
+    {% block styles %}{% endblock %}
+</head>
+
+<body class="min-h-screen">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        {% if current_user.is_authenticated %}
+        <aside class="bg-gradient-to-b from-blue-800 to-indigo-900 text-white w-64 flex-shrink-0 hidden md:flex md:flex-col shadow-lg z-20">
+            <div class="p-6">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white/20 w-10 h-10 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-boxes-stacked text-white"></i>
+                    </div>
+                    <h1 class="font-bold text-xl tracking-wide">نظام كاتيلو</h1>
+                </div>
+            </div>
+            
+            <nav class="flex-1 overflow-y-auto py-4 px-3">
+                <div class="space-y-1.5">
+                    <a href="/dashboard" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/dashboard' %}active{% endif %}">
+                        <i class="fas fa-tachometer-alt"></i> 
+                        <span>لوحة التحكم</span>
+                    </a>
+                    
+                    <a href="/inventory-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/inventory-management' %}active{% endif %}">
+                        <i class="fas fa-boxes"></i> 
+                        <span>المخزون</span>
+                    </a>
+                    
+                    <a href="/warehouse-layout" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/warehouse-layout' %}active{% endif %}">
+                        <i class="fas fa-warehouse"></i> 
+                        <span>تخطيط المستودع</span>
+                    </a>
+                    
+                    <a href="/categories-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/categories-management' %}active{% endif %}">
+                        <i class="fas fa-tags"></i> 
+                        <span>التصنيفات</span>
+                    </a>
+                    
+                    <a href="/items-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/items-management' %}active{% endif %}">
+                        <i class="fas fa-cubes"></i> 
+                        <span>العناصر</span>
+                    </a>
+                    
+                    <a href="/transactions-history" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/transactions-history' %}active{% endif %}">
+                        <i class="fas fa-exchange-alt"></i> 
+                        <span>المعاملات</span>
+                    </a>
+
+                    
+                </div>
+                
+                {% if current_user.role and current_user.role.name == 'admin' %}
+                <div class="mt-6 pt-6 border-t border-white/10">
+                    <h3 class="px-4 text-xs font-semibold text-blue-200 uppercase tracking-wider mb-3">
+                        إدارة النظام
+                    </h3>
+                    <div class="space-y-1.5">
+                        <a href="/admin/users" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/users' %}active{% endif %}">
+                            <i class="fas fa-users"></i> 
+                            <span>المستخدمين</span>
+                        </a>
+                        
+                        <a href="/admin/roles" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/roles' %}active{% endif %}">
+                            <i class="fas fa-user-tag"></i> 
+                            <span>الأدوار</span>
+                        </a>
+                        <a href="/admin/support-tickets" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/support-tickets' %}active{% endif %}">
+                            <i class="fas fa-ticket-alt"></i> 
+                            <span>تذاكر الدعم</span>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </nav>
+            
+            <div class="p-4 border-t border-white/10">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-semibold">
+                        {{ current_user.username[0].upper() }}
+                    </div>
+                    <div>
+                        <div class="font-medium">{{ current_user.username }}</div>
+                        <a href="/api/auth/logout" class="text-xs text-blue-200 hover:text-white flex items-center mt-1">
+                            <i class="fas fa-sign-out-alt mr-1"></i> تسجيل الخروج
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        {% endif %}
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Top Navbar -->
+            <header class="bg-white shadow-sm z-10">
+                <div class="flex items-center justify-between px-4 py-3">
+                    {% if current_user.is_authenticated %}
+                    <!-- Hamburger Menu -->
+                    <button class="md:hidden text-gray-700 hover:text-blue-600 transition-colors"
+                            x-data="{ open: false }"
+                            @click="open = !open; document.querySelector('.mobile-menu').classList.toggle('show')"
+                            aria-label="فتح القائمة">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                    
+                    <!-- Page Title (visible on mobile) -->
+                    <div class="md:hidden font-semibold text-gray-800">
+                        {% block page_title %}نظام كاتيلو{% endblock %}
+                    </div>
+
+                    <!-- Live Time and Weather -->
+                    <div x-data="clockWeather()" class="hidden md:flex items-center space-x-4">
+                        <!-- Live Clock -->
+                        <div class="flex items-center space-x-2 text-gray-600">
+                            <i class="fas fa-clock text-blue-500"></i>
+                            <span x-text="time" class="text-sm font-medium"></span>
+                        </div>
+                        
+                        <!-- Weather Info -->
+                        <div class="flex items-center space-x-2 text-gray-600" x-show="weather">
+                            <span x-html="weatherIcon"></span>
+                            <span x-text="weather.temp + '°C'" class="text-sm font-medium"></span>
+                            <span x-text="weather.city" class="text-sm"></span>
+                        </div>
+                    </div>
+
+                    <!-- User Menu -->
+                    <div x-data="{ open: false }" class="relative">
+                        <button @click="open = !open" class="flex items-center space-x-2 focus:outline-none group">
+                            <div class="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm font-semibold transition-transform group-hover:scale-105">
+                                {{ current_user.username[0].upper() }}
+                            </div>
+                            <div class="hidden md:block text-right">
+                                <div class="text-sm font-medium text-gray-700">{{ current_user.username }}</div>
+                                <div class="text-xs text-gray-500">
+                                    {% if current_user.role %}{{ current_user.role.name }}{% else %}مستخدم{% endif %}
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div x-show="open"
+                             @click.away="open = false"
+                             class="dropdown-menu absolute top-full right-0 mt-1 w-48 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-100"
+                             x-transition:enter="transition ease-out duration-100"
+                             x-transition:enter-start="opacity-0 scale-95"
+                             x-transition:enter-end="opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-75"
+                             x-transition:leave-start="opacity-100 scale-100"
+                             x-transition:leave-end="opacity-0 scale-95"
+                             x-cloak>
+                            <a href="/user-profile" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                                <i class="fas fa-user-circle w-5 text-gray-400"></i>
+                                <span>الملف الشخصي</span>
+                            </a>
+                            <a href="/settings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                                <i class="fas fa-cog w-5 text-gray-400"></i>
+                                <span>الإعدادات</span>
+                            </a>
+                            <div class="border-t border-gray-100 my-1"></div>
+                            <a href="/api/auth/logout" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center">
+                                <i class="fas fa-sign-out-alt w-5"></i>
+                                <span>تسجيل الخروج</span>
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Unauthenticated State -->
+                    <div class="text-xl font-bold text-blue-600">نظام كاتيلو للمخزون</div>
+                    <div class="flex space-x-3">
+                        <a href="/login" class="btn btn-primary">تسجيل الدخول</a>
+                        
+                    </div>
+                    {% endif %}
+                </div>
+            </header>
+
+            <!-- Mobile Menu -->
+            {% if current_user.is_authenticated %}
+            <div class="mobile-menu fixed inset-y-0 right-0 w-72 bg-gradient-to-b from-blue-800 to-indigo-900 text-white shadow-lg md:hidden z-50">
+                <div class="flex flex-col h-full">
+                    <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="bg-white/20 w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-boxes-stacked text-white"></i>
+                            </div>
+                            <h1 class="font-bold text-xl tracking-wide">نظام كاتيلو</h1>
+                        </div>
+                        <button @click="document.querySelector('.mobile-menu').classList.remove('show')" class="text-white/80 hover:text-white">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- User Info in Mobile Menu -->
+                    <div class="p-4 bg-white/5 flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-semibold">
+                            {{ current_user.username[0].upper() }}
+                        </div>
+                        <div>
+                            <div class="font-medium">{{ current_user.username }}</div>
+                            <div class="text-xs text-blue-200">
+                                {% if current_user.role %}{{ current_user.role.name }}{% else %}مستخدم{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Mobile Navigation -->
+                    <nav class="flex-1 overflow-y-auto py-4 px-3">
+                        <div class="space-y-1.5">
+                            <a href="/dashboard" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/dashboard' %}active{% endif %}">
+                                <i class="fas fa-tachometer-alt"></i> 
+                                <span>لوحة التحكم</span>
+                            </a>
+                            
+                            <a href="/inventory-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/inventory-management' %}active{% endif %}">
+                                <i class="fas fa-boxes"></i> 
+                                <span>المخزون</span>
+                            </a>
+                            
+                            <a href="/warehouse-layout" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/warehouse-layout' %}active{% endif %}">
+                                <i class="fas fa-warehouse"></i> 
+                                <span>تخطيط المستودع</span>
+                            </a>
+                            
+                            <a href="/categories-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/categories-management' %}active{% endif %}">
+                                <i class="fas fa-tags"></i> 
+                                <span>التصنيفات</span>
+                            </a>
+                            
+                            <a href="/items-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/items-management' %}active{% endif %}">
+                                <i class="fas fa-cubes"></i> 
+                                <span>العناصر</span>
+                            </a>
+                            
+                            <a href="/transactions-history" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/transactions-history' %}active{% endif %}">
+                                <i class="fas fa-exchange-alt"></i> 
+                                <span>المعاملات</span>
+                            </a>
+                        </div>
+                        
+                        {% if current_user.role and current_user.role.name == 'admin' %}
+                        <div class="mt-6 pt-6 border-t border-white/10">
+                            <h3 class="px-4 text-xs font-semibold text-blue-200 uppercase tracking-wider mb-3">
+                                إدارة النظام
+                            </h3>
+                            <div class="space-y-1.5">
+                                <a href="/admin/users" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/users' %}active{% endif %}">
+                                    <i class="fas fa-users"></i> 
+                                    <span>المستخدمين</span>
+                                </a>
+                                
+                                <a href="/admin/roles" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/roles' %}active{% endif %}">
+                                    <i class="fas fa-user-tag"></i> 
+                                    <span>الأدوار</span>
+                                </a>
+                                <a href="/admin/support-tickets" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/support-tickets' %}active{% endif %}">
+                                    <i class="fas fa-ticket-alt"></i> 
+                                    <span>تذاكر الدعم</span>
+                                </a>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Mobile Menu Footer -->
+                        <div class="mt-6 pt-6 border-t border-white/10">
+                            <a href="/user-profile" class="sidebar-item block py-2.5 px-4 rounded-lg">
+                                <i class="fas fa-user-circle"></i> 
+                                <span>الملف الشخصي</span>
+                            </a>
+                            <a href="/settings" class="sidebar-item block py-2.5 px-4 rounded-lg">
+                                <i class="fas fa-cog"></i> 
+                                <span>الإعدادات</span>
+                            </a>
+                            <a href="/api/auth/logout" class="sidebar-item block py-2.5 px-4 rounded-lg text-red-300 hover:text-red-200">
+                                <i class="fas fa-sign-out-alt"></i> 
+                                <span>تسجيل الخروج</span>
+                            </a>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Page Content Container -->
+            <main class="flex-1 overflow-y-auto bg-gray-50">
+                <!-- Page Header -->
+                <div class="bg-white border-b border-gray-200 px-6 py-4 hidden md:block">
+                    <div class="flex justify-between items-center">
+                        <h1 class="text-xl font-semibold text-gray-800">
+                            {% block page_header %}{% endblock %}
+                        </h1>
+                        <!-- Breadcrumbs -->
+<nav class="text-sm mr-auto" aria-label="Breadcrumb" x-data="breadcrumbs()">
+    <ol class="flex items-center space-x-reverse space-x-2">
+        <li>
+            <a href="/dashboard" class="text-blue-600 hover:text-blue-800">
+                <i class="fas fa-home"></i>
+            </a>
+        </li>
+        {% block breadcrumbs %}
+        <template x-for="(crumb, index) in crumbs" :key="index">
+            <li class="flex items-center">
+                <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+                <a :href="crumb.url" 
+                   :class="index === crumbs.length - 1 ? 'text-gray-600 font-medium pointer-events-none' : 'text-blue-600 hover:text-blue-800'"
+                   x-text="crumb.label"></a>
+            </li>
+        </template>
+        {% endblock %}
+    </ol>
+</nav>
+
+
+                        
+                    </div>
+                </div>
+                
+                <!-- Page Content -->
+                <div class="p-6">
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" 
+         x-data="{ show: false, message: '', type: 'success' }"
+         x-show="show"
+         x-transition
+         x-cloak
+         @notify.window="show = true; message = $event.detail.message; type = $event.detail.type || 'success'; setTimeout(() => show = false, 3000)"
+         class="fixed bottom-4 left-4 px-4 py-3 rounded-lg shadow-lg toast flex items-center"
+         :class="type === 'success' ? 'bg-green-600 text-white' : type === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'">
+        <span :class="type === 'success' ? 'fas fa-check-circle' : type === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-info-circle'" class="mr-2"></span>
+        <span x-text="message"></span>
+        <button @click="show = false" class="ml-3 text-white/80 hover:text-white">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+
+
+    <script>
+        // Common utility functions
+        async function fetchAPI(url, method = 'GET', data = null) {
+            // Show loading
+            window.dispatchEvent(new CustomEvent('loading', {
+                detail: { show: true, message: 'جاري معالجة الطلب...' }
+            }));
+            
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            };
+            
+            if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+                options.body = JSON.stringify(data);
+            }
+            
+            try {
+                const response = await fetch(url, options);
+                
+                // Hide loading
+                window.dispatchEvent(new CustomEvent('loading', {
+                    detail: { show: false }
+                }));
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'حدث خطأ غير معروف' }));
+                    throw new Error(errorData.message || 'حدث خطأ في الاتصال بالخادم');
+                }
+                
+                if (response.status === 204) {
+                    return null; // No content
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                
+                // Hide loading
+                window.dispatchEvent(new CustomEvent('loading', {
+                    detail: { show: false }
+                }));
+                
+                showNotification(error.message || 'حدث خطأ في الاتصال بالخادم', 'error');
+                throw error;
+            }
+        }
+        
+        function showNotification(message, type = 'success') {
+            window.dispatchEvent(new CustomEvent('notify', {
+                detail: { message, type }
+            }));
+        }
+
+        // Clock and Weather Component
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('clockWeather', () => ({
+                time: '',
+                weather: null,
+                isDay: true,
+                weatherIcon: '',
+                
+                init() {
+                    this.updateTime();
+                    setInterval(() => this.updateTime(), 1000);
+                    this.fetchWeather();
+                },
+                
+                updateTime() {
+                    const now = new Date();
+                    this.time = now.toLocaleTimeString('ar-EG', { hour12: true });
+                    const hours = now.getHours();
+                    this.isDay = hours >= 6 && hours < 18; // Daytime between 6 AM and 6 PM
+                },
+                
+                async fetchWeather() {
+                    try {
+                        // Check if we have cached weather data
+                        const cachedWeather = localStorage.getItem('weatherData');
+                        const cachedTime = localStorage.getItem('weatherTime');
+                        
+                        // Use cached data if it's less than 30 minutes old
+                        if (cachedWeather && cachedTime) {
+                            const now = new Date().getTime();
+                            const cacheAge = now - parseInt(cachedTime);
+                            
+                            if (cacheAge < 30 * 60 * 1000) { // 30 minutes
+                                this.weather = JSON.parse(cachedWeather);
+                                this.weatherIcon = `<img src='https://openweathermap.org/img/wn/${this.weather.icon}.png' alt='Weather Icon' class='w-6 h-6'>`;
+                                return;
+                            }
+                        }
+                        
+                        const position = await new Promise((resolve, reject) => {
+                            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                                timeout: 5000,
+                                maximumAge: 60 * 60 * 1000 // 1 hour
+                            });
+                        });
+                        
+                        const { latitude, longitude } = position.coords;
+                        const apiKey = '34740ce11245a9bce443e0642b37bf38'; // Replace with your OpenWeatherMap API key
+                        const response = await fetch(
+                            `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric&lang=ar`
+                        );
+                        
+                        const data = await response.json();
+                        this.weather = {
+                            temp: Math.round(data.main.temp),
+                            city: data.name,
+                            icon: data.weather[0].icon,
+                            description: data.weather[0].description
+                        };
+                        
+                        // Cache the weather data
+                        localStorage.setItem('weatherData', JSON.stringify(this.weather));
+                        localStorage.setItem('weatherTime', new Date().getTime().toString());
+                        
+                        this.weatherIcon = `<img src='https://openweathermap.org/img/wn/${this.weather.icon}.png' alt='Weather Icon' class='w-6 h-6'>`;
+                    } catch (error) {
+                        console.error('Weather fetch error:', error);
+                        // Don't show notification for weather errors as it's not critical
+                    }
+                }
+            }));
+        });
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('breadcrumbs', () => ({
+                crumbs: [],
+                init() {
+                    this.generateBreadcrumbs();
+                },
+                generateBreadcrumbs() {
+                    // Get current path
+                    const path = window.location.pathname;
+                    
+                    // Skip for dashboard or home page
+                    if (path === '/' || path === '/dashboard') {
+                        this.crumbs = [];
+                        return;
+                    }
+                    
+                    // Split the path into segments
+                    const segments = path.split('/').filter(segment => segment !== '');
+                    
+                    // Create breadcrumb array
+                    let currentPath = '';
+                    this.crumbs = segments.map((segment, index) => {
+                        currentPath += `/${segment}`;
+                        
+                        // Format the label (replace hyphens with spaces and capitalize)
+                        const label = segment
+                            .replace(/-/g, ' ')
+                            .replace(/\b\w/g, char => char.toUpperCase());
+                        
+                        // Map specific paths to Arabic labels
+                        const arabicLabels = {
+                            'dashboard': 'لوحة التحكم',
+                            'inventory-management': 'المخزون',
+                            'warehouse-layout': 'تخطيط المستودع',
+                            'categories-management': 'التصنيفات',
+                            'items-management': 'العناصر',
+                            'transactions-history': 'المعاملات',
+                            'admin': 'المشرف',
+                            'users': 'المستخدمين',
+                            'roles': 'الأدوار',
+                            'user-profile': 'الملف الشخصي',
+                            'settings': 'الإعدادات',
+                            'create': 'إنشاء',
+                            'edit': 'تعديل',
+                            'view': 'عرض',
+                            'delete': 'حذف'
+                        };
+                        
+                        return {
+                            label: arabicLabels[segment] || label,
+                            url: currentPath
+                        };
+                    });
+                }
+            }));
+        });
+        
+        
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (event) => {
+            const mobileMenu = document.querySelector('.mobile-menu');
+            const hamburgerBtn = document.querySelector('.hamburger-btn');
+            
+            if (mobileMenu && hamburgerBtn) {
+                if (!mobileMenu.contains(event.target) && !hamburgerBtn.contains(event.target)) {
+                    mobileMenu.classList.remove('show');
+                }
+            }
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+    
+</body>
+</html>

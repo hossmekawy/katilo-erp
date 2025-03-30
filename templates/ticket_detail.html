@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}تفاصيل التذكرة - كاتيلو{% endblock %}
+
+{% block page_header %}تفاصيل التذكرة{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/my-tickets" class="text-blue-600 hover:text-blue-800">تذاكر الدعم الخاصة بي</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600">تفاصيل التذكرة #{{ ticket_id }}</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="ticketDetail({{ ticket_id }})" class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold flex items-center">
+            <span>تذكرة #{{ ticket_id }}:</span>
+            <span x-text="ticket.subject" class="mr-2"></span>
+        </h1>
+        <a href="/my-tickets" class="text-blue-600 hover:text-blue-800 flex items-center">
+            <i class="fas fa-arrow-right ml-2"></i>
+            <span>العودة إلى التذاكر</span>
+        </a>
+    </div>
+    
+    <!-- Loading State -->
+    <template x-if="isLoading">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-8 text-center">
+            <div class="flex justify-center">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+            </div>
+            <p class="mt-4 text-gray-500">جاري تحميل تفاصيل التذكرة...</p>
+        </div>
+    </template>
+    
+    <template x-if="!isLoading && ticket">
+        <div class="space-y-6">
+            <!-- Ticket Details Card -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 text-white">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-semibold">معلومات التذكرة</h2>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold"
+                              :class="getStatusClass(ticket.status)"
+                              x-text="getStatusName(ticket.status)"></span>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <div class="text-sm text-gray-500 mb-1">الموضوع</div>
+                            <div class="font-medium" x-text="ticket.subject"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="text-sm text-gray-500 mb-1">النوع</div>
+                            <div>
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="getTicketTypeClass(ticket.ticket_type)"
+                                      x-text="getTicketTypeName(ticket.ticket_type)"></span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="text-sm text-gray-500 mb-1">الأولوية</div>
+                            <div>
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="getPriorityClass(ticket.priority)"
+                                      x-text="getPriorityName(ticket.priority)"></span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="text-sm text-gray-500 mb-1">تاريخ الإنشاء</div>
+                            <div class="font-medium" x-text="formatDate(ticket.created_at)"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="text-sm text-gray-500 mb-1">آخر تحديث</div>
+                            <div class="font-medium" x-text="formatDate(ticket.updated_at)"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="text-sm text-gray-500 mb-1">المستخدم</div>
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center mr-2">
+                                    <template x-if="ticket.user && ticket.user.profile_image">
+                                        <img :src="ticket.user.profile_image" alt="صورة المستخدم" class="w-8 h-8 rounded-full">
+                                    </template>
+                                    <template x-if="!ticket.user || !ticket.user.profile_image">
+                                        <i class="fas fa-user text-gray-400"></i>
+                                    </template>
+                                </div>
+                                <span class="font-medium" x-text="ticket.user ? ticket.user.username : 'غير معروف'"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 pt-6 border-t border-gray-100">
+                        <div class="text-sm text-gray-500 mb-2">الرسالة</div>
+                        <div class="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap" x-text="ticket.message"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Responses Section -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                <div class="bg-gray-50 p-4 border-b border-gray-100">
+                    <h2 class="text-lg font-semibold">الردود</h2>
+                </div>
+                
+                <div class="p-6">
+                    <template x-if="ticket.responses && ticket.responses.length === 0">
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-comments text-gray-300 text-4xl mb-3"></i>
+                            <p>لا توجد ردود على هذه التذكرة حتى الآن</p>
+                        </div>
+                    </template>
+                    
+                    <div class="space-y-6">
+                        <template x-for="response in ticket.responses" :key="response.id">
+                            <div class="bg-gray-50 rounded-lg p-4"
+                                 :class="{'border-r-4 border-blue-500': !response.is_staff_response, 'border-r-4 border-green-500': response.is_staff_response}">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                                            <template x-if="response.user && response.user.profile_image">
+                                                <img :src="response.user.profile_image" alt="صورة المستخدم" class="w-8 h-8 rounded-full">
+                                            </template>
+                                            <template x-if="!response.user || !response.user.profile_image">
+                                                <i class="fas fa-user text-gray-400"></i>
+                                            </template>
+                                        </div>
+                                        <div class="mr-3">
+                                            <div class="font-medium" x-text="response.user ? response.user.username : 'غير معروف'"></div>
+                                            <div class="text-xs text-gray-500" x-text="formatDate(response.created_at)"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span class="px-2 py-1 text-xs rounded-full"
+                                              :class="response.is_staff_response ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'"
+                                              x-text="response.is_staff_response ? 'فريق الدعم' : 'المستخدم'"></span>
+                                    </div>
+                                </div>
+                                <div class="mt-3 whitespace-pre-wrap" x-text="response.message"></div>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <!-- Reply Form -->
+                    <template x-if="ticket.status !== 'closed'">
+                        <div class="mt-8 pt-6 border-t border-gray-100">
+                            <h3 class="text-lg font-medium mb-4">إضافة رد</h3>
+                            <form @submit.prevent="submitResponse">
+                                <div class="mb-4">
+                                    <textarea x-model="responseForm.message" rows="4" required
+                                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                              placeholder="اكتب ردك هنا..."></textarea>
+                                </div>
+                                
+                                <!-- Admin-only status update -->
+                                <template x-if="isAdmin">
+                                    <div class="mb-4">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="update-status" x-model="responseForm.update_status" class="ml-2">
+                                            <label for="update-status" class="text-sm font-medium text-gray-700">تحديث حالة التذكرة</label>
+                                        </div>
+                                        
+                                        <div x-show="responseForm.update_status" class="mt-2">
+                                            <select x-model="responseForm.status" class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                                <option value="open">مفتوحة</option>
+                                                <option value="in_progress">قيد المعالجة</option>
+                                                <option value="closed">مغلقة</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </template>
+                                
+                                <div class="flex justify-end">
+                                    <button type="submit" 
+                                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+                                            :disabled="isSubmitting"
+                                            :class="{'opacity-75 cursor-not-allowed': isSubmitting}">
+                                        <span x-show="isSubmitting" class="ml-2">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                        </span>
+                                        <span x-text="isSubmitting ? 'جاري الإرسال...' : 'إرسال الرد'"></span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </template>
+                    
+                    <!-- Ticket Closed Message -->
+                    <template x-if="ticket.status === 'closed'">
+                        <div class="mt-8 pt-6 border-t border-gray-100 text-center">
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <i class="fas fa-lock text-gray-400 text-xl mb-2"></i>
+                                <p class="text-gray-600">تم إغلاق هذه التذكرة ولا يمكن إضافة ردود جديدة.</p>
+                                <p class="mt-2">
+                                    <a href="/contact-support" class="text-blue-600 hover:text-blue-800">
+                                        إنشاء تذكرة جديدة
+                                    </a>
+                                </p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+
+{% block scripts %}
+<script>
+function ticketDetail(ticketId) {
+    return {
+        ticket: {},
+        isLoading: true,
+        isSubmitting: false,
+        isAdmin: {{ 'true' if current_user.role and current_user.role.name == 'admin' else 'false' }},
+        responseForm: {
+            message: '',
+            update_status: false,
+            status: 'in_progress'
+        },
+        
+        async init() {
+            try {
+                const response = await fetch(`/api/tickets/${ticketId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('فشل في تحميل تفاصيل التذكرة');
+                }
+                
+                this.ticket = await response.json();
+            } catch (error) {
+                console.error('Error loading ticket details:', error);
+                showNotification(error.message || 'حدث خطأ أثناء تحميل تفاصيل التذكرة', 'error');
+            } finally {
+                this.isLoading = false;
+            }
+        },
+        
+        async submitResponse() {
+            this.isSubmitting = true;
+            
+            try {
+                const response = await fetch(`/api/tickets/${ticketId}/respond`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(this.responseForm)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('فشل في إرسال الرد');
+                }
+                
+                const result = await response.json();
+                
+                // Add the new response to the ticket
+                this.ticket.responses.push(result);
+                
+                                // Update ticket status if admin changed it
+                                if (this.isAdmin && this.responseForm.update_status) {
+                                    this.ticket.status = this.responseForm.status;
+                                }
+                                
+                                // Reset form
+                                this.responseForm = {
+                                    message: '',
+                                    update_status: false,
+                                    status: 'in_progress'
+                                };
+                                
+                                // Show success message
+                                showNotification('تم إرسال الرد بنجاح');
+                                
+                            } catch (error) {
+                                console.error('Error submitting response:', error);
+                                showNotification(error.message || 'حدث خطأ أثناء إرسال الرد', 'error');
+                            } finally {
+                                this.isSubmitting = false;
+                            }
+                        },
+                        
+                        getStatusName(status) {
+                            const statusMap = {
+                                'open': 'مفتوحة',
+                                'in_progress': 'قيد المعالجة',
+                                'closed': 'مغلقة'
+                            };
+                            return statusMap[status] || status;
+                        },
+                        
+                        getStatusClass(status) {
+                            const classMap = {
+                                'open': 'bg-yellow-100 text-yellow-800',
+                                'in_progress': 'bg-blue-100 text-blue-800',
+                                'closed': 'bg-gray-100 text-gray-800'
+                            };
+                            return classMap[status] || 'bg-gray-100 text-gray-800';
+                        },
+                        
+                        getTicketTypeName(type) {
+                            const typeMap = {
+                                'general': 'استفسار عام',
+                                'technical': 'مشكلة فنية',
+                                'billing': 'استفسار عن الفواتير',
+                                'feature': 'اقتراح ميزة',
+                                'other': 'أخرى'
+                            };
+                            return typeMap[type] || type;
+                        },
+                        
+                        getTicketTypeClass(type) {
+                            const classMap = {
+                                'general': 'bg-green-100 text-green-800',
+                                'technical': 'bg-red-100 text-red-800',
+                                'billing': 'bg-purple-100 text-purple-800',
+                                'feature': 'bg-blue-100 text-blue-800',
+                                'other': 'bg-gray-100 text-gray-800'
+                            };
+                            return classMap[type] || 'bg-gray-100 text-gray-800';
+                        },
+                        
+                        getPriorityName(priority) {
+                            const priorityMap = {
+                                'low': 'منخفضة',
+                                'medium': 'متوسطة',
+                                'high': 'عالية',
+                                'urgent': 'عاجلة'
+                            };
+                            return priorityMap[priority] || priority;
+                        },
+                        
+                        getPriorityClass(priority) {
+                            const classMap = {
+                                'low': 'bg-green-100 text-green-800',
+                                'medium': 'bg-blue-100 text-blue-800',
+                                'high': 'bg-orange-100 text-orange-800',
+                                'urgent': 'bg-red-100 text-red-800'
+                            };
+                            return classMap[priority] || 'bg-gray-100 text-gray-800';
+                        },
+                        
+                        formatDate(dateString) {
+                            const date = new Date(dateString);
+                            return date.toLocaleDateString('ar-EG', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                        }
+                    };
+                }
+                </script>
+                {% endblock %}
+                {% endblock %}
+                

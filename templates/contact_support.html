@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}اتصل بالدعم - كاتيلو{% endblock %}
+
+{% block page_header %}اتصل بالدعم{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600">اتصل بالدعم</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="contactSupport()" class="max-w-3xl mx-auto">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white">
+            <h1 class="text-2xl font-bold">كيف يمكننا مساعدتك؟</h1>
+            <p class="mt-2 text-blue-100">فريق الدعم الفني متواجد لمساعدتك في أي استفسار أو مشكلة تواجهك.</p>
+        </div>
+        
+        <div class="p-6">
+            <form @submit.prevent="submitTicket" class="space-y-6">
+                <div>
+                    <label for="subject" class="block text-sm font-medium text-gray-700 mb-1">الموضوع</label>
+                    <input type="text" id="subject" x-model="formData.subject" required
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <div>
+                    <label for="ticket_type" class="block text-sm font-medium text-gray-700 mb-1">نوع التذكرة</label>
+                    <select id="ticket_type" x-model="formData.ticket_type"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="general">استفسار عام</option>
+                        <option value="technical">مشكلة فنية</option>
+                        <option value="billing">استفسار عن الفواتير</option>
+                        <option value="feature">اقتراح ميزة جديدة</option>
+                        <option value="other">أخرى</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="priority" class="block text-sm font-medium text-gray-700 mb-1">الأولوية</label>
+                    <select id="priority" x-model="formData.priority"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="low">منخفضة</option>
+                        <option value="medium">متوسطة</option>
+                        <option value="high">عالية</option>
+                        <option value="urgent">عاجلة</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="message" class="block text-sm font-medium text-gray-700 mb-1">الرسالة</label>
+                    <textarea id="message" x-model="formData.message" rows="6" required
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                
+                <div>
+                    <label for="attachment" class="block text-sm font-medium text-gray-700 mb-1">إرفاق ملف (اختياري)</label>
+                    <input type="file" id="attachment" @change="handleFileChange"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <p class="mt-1 text-sm text-gray-500">الملفات المدعومة: PDF, PNG, JPG, JPEG, DOC, DOCX, TXT</p>
+                </div>
+                
+                <div class="flex justify-end pt-4">
+                    <button type="submit" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center"
+                            :disabled="isSubmitting"
+                            :class="{'opacity-75 cursor-not-allowed': isSubmitting}">
+                        <span x-show="isSubmitting" class="ml-2">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </span>
+                        <span x-text="isSubmitting ? 'جاري الإرسال...' : 'إرسال التذكرة'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-6">
+            <h2 class="text-lg font-semibold mb-4">طرق أخرى للتواصل</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="flex items-start">
+                    <div class="bg-blue-100 text-blue-600 p-3 rounded-lg">
+                        <i class="fas fa-envelope text-xl"></i>
+                    </div>
+                    <div class="mr-4">
+                        <h3 class="font-medium">البريد الإلكتروني</h3>
+                        <p class="text-gray-600 mt-1">support@katilo.com</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start">
+                    <div class="bg-green-100 text-green-600 p-3 rounded-lg">
+                        <i class="fas fa-phone text-xl"></i>
+                    </div>
+                    <div class="mr-4">
+                        <h3 class="font-medium">الهاتف</h3>
+                        <p class="text-gray-600 mt-1">+966 12 345 6789</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function contactSupport() {
+    return {
+        formData: {
+            subject: '',
+            ticket_type: 'general',
+            priority: 'medium',
+            message: ''
+        },
+        attachment: null,
+        isSubmitting: false,
+        
+        handleFileChange(event) {
+            this.attachment = event.target.files[0];
+        },
+        
+        async submitTicket() {
+            this.isSubmitting = true;
+            
+            try {
+                // Create FormData object for file upload
+                const formData = new FormData();
+                formData.append('subject', this.formData.subject);
+                formData.append('ticket_type', this.formData.ticket_type);
+                formData.append('priority', this.formData.priority);
+                formData.append('message', this.formData.message);
+                
+                if (this.attachment) {
+                    formData.append('attachment', this.attachment);
+                }
+                
+                const response = await fetch('/api/support-tickets', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+                
+                if (response.status === 401) {
+                    // User is not authenticated
+                    showNotification('يرجى تسجيل الدخول أولاً لإرسال تذكرة دعم', 'error');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    return;
+                }
+                
+                if (!response.ok) {
+                    throw new Error('فشل في إرسال التذكرة');
+                }
+                
+                // Show success message
+                showNotification('تم إرسال تذكرة الدعم بنجاح');
+                
+                // Reset form
+                this.formData = {
+                    subject: '',
+                    ticket_type: 'general',
+                    priority: 'medium',
+                    message: ''
+                };
+                this.attachment = null;
+                document.getElementById('attachment').value = '';
+                
+                // Redirect to my tickets page
+                window.location.href = '/my-tickets';
+                
+            } catch (error) {
+                console.error('Error submitting ticket:', error);
+                showNotification(error.message || 'حدث خطأ أثناء إرسال التذكرة', 'error');
+            } finally {
+                this.isSubmitting = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}
+{% endblock %}

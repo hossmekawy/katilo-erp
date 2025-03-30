@@ -1,0 +1,56 @@
+✅Category
+✅Item
+✅Warehouse
+✅### layout warehouse 
+    ✅WarehouseSection
+    ✅WarehouseSlot
+✅# INVENTORY & TRANSACTIONS
+    ✅Inventory
+    ✅InventoryTransaction
+# MANUFACTURING (BOM)
+    BOM ---> BOMDetail
+# SUPPLIER MANAGEMENT
+    Supplier
+    SupplierItem
+# PURCHASE ORDERS (PO)
+    PurchaseOrder
+    PurchaseOrderDetail
+# SALES ORDERS AND CUSTOMER MANAGEMENT
+    Customer
+    SalesOrder
+    SalesOrderDetail
+# LOT/BATCH TRACKING AND EXPIRY MANAGEMENT
+    Batch
+    BatchSlot
+# QUALITY CONTROL (QC) & INSPECTIONS
+    QualityCheck
+    QualityCheckResult
+    QCParameter
+# EQUIPMENT & MAINTENANCE
+    Equipment
+    MaintenanceLog
+# SHIPPING AND LOGISTICS
+    Shipment ---> ShipmentDetail
+# ADVANCED USER PERMISSIONS (RBAC)
+    Permission ---> RolePermission
+# DOCUMENT MANAGEMENT
+    Document 
+# PRODUCTION PLANNING & SCHEDULING
+    ProductionRun ---> ProductionRunDetail
+
+# SYSTEM SETTINGS, ROLES, AND USER MANAGEMENT
+    SystemSettings
+    ✅Role
+    ✅User
+
+#  Customer & Distributor Relationship Management (CRM)
+    CustomerInteraction
+    DiscountPromotion
+
+#  Returns & Refunds Management
+    ProductReturn
+
+#  Advanced Inventory Forecasting & Demand Planning
+    DemandForecast
+    InventoryReplenishmentPlan
+

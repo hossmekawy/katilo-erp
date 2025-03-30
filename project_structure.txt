@@ -1,0 +1,12 @@
+katilo-system/
+├── static/
+│   ├── css/
+│   │   └── tailwind.css
+│   └── js/
+│       └── dashboard.js
+├── templates/
+│   ├── base.html
+│   ├── dashboard.html
+│   └── login.html
+├── app.py
+└── requirements.txt

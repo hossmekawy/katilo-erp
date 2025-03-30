@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}كاتيلو - الرئيسية{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[80vh]">
+    <div class="text-center">
+        <h1 class="text-4xl font-bold text-blue-800 mb-4">مرحباً بك في نظام كاتيلو لإدارة المخزون</h1>
+        <p class="text-xl text-gray-600 mb-8">حل فعال لإدارة المستودعات والمخزون</p>
+        
+        <div class="flex justify-center">
+            <a href="/login" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-all transform hover:scale-105 shadow-lg">
+                تسجيل الدخول
+            </a>
+        </div>
+    </div>
+    
+    <div class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
+        <div class="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+            <div class="text-blue-600 text-4xl mb-4">
+                <i class="fas fa-boxes"></i>
+            </div>
+            <h3 class="text-2xl font-semibold mb-3">إدارة المخزون</h3>
+            <p class="text-gray-600">تتبع وإدارة مخزونك مع تحديثات فورية وسجل تفصيلي.</p>
+        </div>
+        
+        <div class="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+            <div class="text-blue-600 text-4xl mb-4">
+                <i class="fas fa-warehouse"></i>
+            </div>
+            <h3 class="text-2xl font-semibold mb-3">تخطيط المستودع</h3>
+            <p class="text-gray-600">تحسين مساحة مستودعك مع إدارة التخطيط المرئي وتتبع المواقع.</p>
+        </div>
+        
+        <div class="bg-white p-8 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+            <div class="text-blue-600 text-4xl mb-4">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <h3 class="text-2xl font-semibold mb-3">التحليلات والتقارير</h3>
+            <p class="text-gray-600">احصل على رؤى مع تقارير شاملة وتحليل سجل المعاملات.</p>
+        </div>
+    </div>
+
+    <div class="mt-16 w-full max-w-6xl">
+        <h2 class="text-3xl font-bold text-center text-blue-800 mb-8">مميزات النظام</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-all">
+                <div class="text-blue-500 text-3xl mb-3">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h4 class="text-xl font-semibold mb-2">إدارة المستخدمين</h4>
+                <p class="text-gray-600">نظام متكامل لإدارة الصلاحيات والأدوار</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-all">
+                <div class="text-blue-500 text-3xl mb-3">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <h4 class="text-xl font-semibold mb-2">إدارة الطلبات</h4>
+                <p class="text-gray-600">إدارة طلبات المبيعات والمشتريات بكفاءة</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-all">
+                <div class="text-blue-500 text-3xl mb-3">
+                    <i class="fas fa-truck"></i>
+                </div>
+                <h4 class="text-xl font-semibold mb-2">إدارة الشحنات</h4>
+                <p class="text-gray-600">تتبع وإدارة عمليات الشحن والتسليم</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-all">
+                <div class="text-blue-500 text-3xl mb-3">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h4 class="text-xl font-semibold mb-2">ضبط الجودة</h4>
+                <p class="text-gray-600">نظام متكامل لفحص وضمان جودة المنتجات</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-all">
+                <div class="text-blue-500 text-3xl mb-3">
+                    <i class="fas fa-industry"></i>
+                </div>
+                <h4 class="text-xl font-semibold mb-2">إدارة الإنتاج</h4>
+                <p class="text-gray-600">تخطيط وتتبع عمليات الإنتاج والكفاءة</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-all">
+                <div class="text-blue-500 text-3xl mb-3">
+                    <i class="fas fa-handshake"></i>
+                </div>
+                <h4 class="text-xl font-semibold mb-2">إدارة الموردين</h4>
+                <p class="text-gray-600">إدارة العلاقات مع الموردين والمشتريات</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-all">
+                <div class="text-blue-500 text-3xl mb-3">
+                    <i class="fas fa-tools"></i>
+                </div>
+                <h4 class="text-xl font-semibold mb-2">صيانة المعدات</h4>
+                <p class="text-gray-600">جدولة وتتبع صيانة المعدات والآلات</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-all">
+                <div class="text-blue-500 text-3xl mb-3">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h4 class="text-xl font-semibold mb-2">التنبؤ بالطلب</h4>
+                <p class="text-gray-600">تحليل وتوقع احتياجات المخزون المستقبلية</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الأدوار - كاتيلو{% endblock %}
+
+{% block content %}
+<div x-data="roleManagement()">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">إدارة الأدوار</h1>
+        <button @click="showModal = true; editMode = false; resetForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+            <i class="fas fa-plus mr-2"></i> إضافة دور
+        </button>
+    </div>
+    
+    <!-- جدول الأدوار -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المعرف</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">اسم الدور</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">عدد المستخدمين</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الصلاحيات</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <template x-if="roles.length === 0">
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                            لم يتم العثور على أدوار
+                        </td>
+                    </tr>
+                </template>
+                
+                <template x-for="role in roles" :key="role.id">
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900" x-text="role.id"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900" x-text="role.name"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900" x-text="getUsersCount(role.id)"></div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-wrap gap-1">
+                                <template x-for="permission in getRolePermissions(role.id)" :key="permission.id">
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full" x-text="permission.permission_name"></span>
+                                </template>
+                                <template x-if="getRolePermissions(role.id).length === 0">
+                                    <span class="text-sm text-gray-500">لا توجد صلاحيات</span>
+                                </template>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                            <button @click="editRole(role)" class="text-blue-600 hover:text-blue-900 mr-3">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button @click="managePermissions(role)" class="text-green-600 hover:text-green-900 mr-3">
+                                <i class="fas fa-key"></i>
+                            </button>
+                            <button @click="confirmDelete(role)" class="text-red-600 hover:text-red-900"
+                                    :disabled="role.name === 'admin' || getUsersCount(role.id) > 0"
+                                    :class="{'opacity-50 cursor-not-allowed': role.name === 'admin' || getUsersCount(role.id) > 0}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- نافذة الدور -->
+    <div x-show="showModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold" x-text="editMode ? 'تعديل الدور' : 'إضافة دور'"></h3>
+                <button @click="showModal = false" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <form @submit.prevent="saveRole">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم الدور</label>
+                        <input type="text" x-model="formData.name" required
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" @click="showModal = false" 
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2">
+                            إلغاء
+                        </button>
+                        <button type="submit" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                            حفظ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة الصلاحيات -->
+    <div x-show="showPermissionsModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showPermissionsModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-2xl">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold">إدارة الصلاحيات لـ <span x-text="selectedRole?.name"></span></h3>
+                <button @click="showPermissionsModal = false" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <div class="mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <template x-for="permission in permissions" :key="permission.id">
+                            <div class="flex items-center">
+                                <input type="checkbox" :id="'perm-' + permission.id"
+                                       :checked="isPermissionAssigned(permission.id)"
+                                       @change="togglePermission(permission.id)"
+                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label :for="'perm-' + permission.id" class="mr-2 block text-sm text-gray-900" 
+                                       x-text="permission.permission_name"></label>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end mt-4">
+                    <button @click="showPermissionsModal = false" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                        تم
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة تأكيد الحذف -->
+    <div x-show="showDeleteModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showDeleteModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold text-red-600">تأكيد الحذف</h3>
+            </div>
+            
+            <div class="p-6">
+                <p class="mb-4">هل أنت متأكد من حذف الدور "<span x-text="roleToDelete?.name"></span>"؟</p>
+                
+                <div x-show="getUsersCount(roleToDelete?.id) > 0" class="mb-4 p-3 bg-yellow-50 text-yellow-800 rounded-lg">
+                    <p><i class="fas fa-exclamation-triangle mr-2"></i> هذا الدور مُخصص لـ <span x-text="getUsersCount(roleToDelete?.id)"></span> مستخدمين. لا يمكنك حذفه حتى تعيد تخصيص هؤلاء المستخدمين.</p>
+                </div>
+                
+                <div class="flex justify-end">
+                    <button @click="showDeleteModal = false" 
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2">
+                        إلغاء
+                    </button>
+                    <button @click="deleteRole()" 
+                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+                            :disabled="getUsersCount(roleToDelete?.id) > 0"
+                            :class="{'opacity-50 cursor-not-allowed': getUsersCount(roleToDelete?.id) > 0}">
+                        حذف
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function roleManagement() {
+    return {
+        roles: [],
+        users: [],
+        permissions: [],
+        rolePermissions: [],
+        showModal: false,
+        showPermissionsModal: false,
+        showDeleteModal: false,
+        editMode: false,
+        roleToDelete: null,
+        selectedRole: null,
+        
+        formData: {
+            id: null,
+            name: ''
+        },
+        
+        // تهيئة البيانات
+        async init() {
+            try {
+                const [rolesData, usersData, permissionsData, rolePermissionsData] = await Promise.all([
+                    fetchAPI('/api/roles'),
+                    fetchAPI('/api/admin/users'),
+                    fetchAPI('/api/permissions'),
+                    fetchAPI('/api/admin/role-permissions')
+                ]);
+                
+                this.roles = rolesData;
+                this.users = usersData;
+                this.permissions = permissionsData;
+                this.rolePermissions = rolePermissionsData;
+            } catch (error) {
+                console.error('خطأ في تحميل بيانات الأدوار:', error);
+            }
+        },
+        
+        // الحصول على عدد المستخدمين لكل دور
+        getUsersCount(roleId) {
+            return this.users.filter(user => user.role_id === roleId).length;
+        },
+        
+        // الحصول على صلاحيات الدور
+        getRolePermissions(roleId) {
+            const permissionIds = this.rolePermissions
+                .filter(rp => rp.role_id === roleId)
+                .map(rp => rp.permission_id);
+                
+            return this.permissions.filter(p => permissionIds.includes(p.id));
+        },
+        
+        // التحقق مما إذا كانت الصلاحية مخصصة
+        isPermissionAssigned(permissionId) {
+            if (!this.selectedRole) return false;
+            
+            return this.rolePermissions.some(
+                rp => rp.role_id === this.selectedRole.id && rp.permission_id === permissionId
+            );
+        },
+        
+        // إعادة تعيين النموذج
+        resetForm() {
+            this.formData = {
+                id: null,
+                name: ''
+            };
+        },
+        
+        // تعديل دور
+        editRole(role) {
+            this.editMode = true;
+            this.formData = {
+                id: role.id,
+                name: role.name
+            };
+            this.showModal = true;
+        },
+        
+        // إدارة الصلاحيات
+        managePermissions(role) {
+            this.selectedRole = role;
+            this.showPermissionsModal = true;
+        },
+        
+        // تأكيد الحذف
+        confirmDelete(role) {
+            this.roleToDelete = role;
+            this.showDeleteModal = true;
+        },
+        
+        // تبديل الصلاحية
+        async togglePermission(permissionId) {
+            if (!this.selectedRole) return;
+            
+            const isAssigned = this.isPermissionAssigned(permissionId);
+            
+            try {
+                if (isAssigned) {
+                    // إزالة الصلاحية
+                    await fetchAPI(`/api/admin/roles/${this.selectedRole.id}/permissions/${permissionId}`, 'DELETE');
+                    
+                    // تحديث البيانات المحلية
+                    this.rolePermissions = this.rolePermissions.filter(
+                        rp => !(rp.role_id === this.selectedRole.id && rp.permission_id === permissionId)
+                    );
+                } else {
+                    // إضافة الصلاحية
+                    await fetchAPI(`/api/roles/${this.selectedRole.id}/permissions`, 'POST', {
+                        permission_id: permissionId
+                    });
+                    
+                    // تحديث البيانات المحلية
+                    this.rolePermissions.push({
+                        role_id: this.selectedRole.id,
+                        permission_id: permissionId
+                    });
+                }
+            } catch (error) {
+                console.error('خطأ في تحديث الصلاحية:', error);
+            }
+        },
+        
+        // حفظ الدور
+        async saveRole() {
+            try {
+                if (this.editMode) {
+                    // تحديث دور موجود
+                    await fetchAPI(`/api/admin/roles/${this.formData.id}`, 'PUT', this.formData);
+                    showNotification('تم تحديث الدور بنجاح');
+                } else {
+                    // إنشاء دور جديد
+                    await fetchAPI('/api/roles', 'POST', this.formData);
+                    showNotification('تم إنشاء الدور بنجاح');
+                }
+                
+                // تحديث قائمة الأدوار
+                const rolesData = await fetchAPI('/api/roles');
+                this.roles = rolesData;
+                
+                this.showModal = false;
+                this.resetForm();
+            } catch (error) {
+                console.error('خطأ في حفظ الدور:', error);
+            }
+        },
+        
+        // حذف الدور
+        async deleteRole() {
+            if (this.getUsersCount(this.roleToDelete.id) > 0) {
+                showNotification('لا يمكن حذف دور مُخصص لمستخدمين', 'error');
+                return;
+            }
+            
+            try {
+                await fetchAPI(`/api/admin/roles/${this.roleToDelete.id}`, 'DELETE');
+                showNotification('تم حذف الدور بنجاح');
+                
+                // تحديث قائمة الأدوار
+                const rolesData = await fetchAPI('/api/roles');
+                this.roles = rolesData;
+                
+                this.showDeleteModal = false;
+                this.roleToDelete = null;
+            } catch (error) {
+                console.error('خطأ في حذف الدور:', error);
+            }
+        }
+    };
+}
+</script>
+{% endblock %}
+{% endblock %}

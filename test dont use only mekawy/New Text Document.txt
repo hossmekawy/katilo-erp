@@ -1,0 +1,447 @@
+```
++----------------+      1..*        +-----------+
+| categories     |------------------| items     |
++----------------+                  +-----------+
+| CategoryID (PK)|(categorizes)     | ItemID (PK)|
+| CategoryName   |                  | CategoryID (FK)|
+| Description    |                  | SKU (unique)|
++----------------+                  | ItemName  |
+                                    | Description|
+                                    | UnitOfMeasure|
+                                    | Cost      |
+                                    | Price     |
+                                    | ReorderLevel|
+                                    | CreatedAt |
+                                    | UpdatedAt |
+                                    +-----------+
+                                         |
+                                         | 1..*     +---------------------+
+                                         +----------| inventory           |
+                                         |          +---------------------+
+                                         |          | InventoryID (PK)    |
+                                         |          | item_id (FK)        |
+                                         | 1..*     | warehouse_id (FK)   |
+                                         +---------(has_inventory)-------+
+                                         |          | quantity            |
+                                         |          | last_updated        |
+                                         |          +---------------------+
+                                         |          |
+                                         | 1..*     +-------------------------+
+                                         +----------| inventory_transactions  |
+                                         |          +-------------------------+
+                                         |          | TransactionID (PK)      |
+                                         |          | item_id (FK)          |
+                                         |          | warehouse_id (FK)     |
+                                         |          | transaction_type        |
+                                         |          | quantity              |
+                                         |          | transaction_date      |
+                                         |          | reference             |
+                                         |          +-------------------------+
+                                         |          |
+                                         | 1..*     +-----------------+
+                                         +----------| warehouse_slots |
+                                         |          +-----------------+
+                                         |          | id (PK)         |
+                                         |          | section_id (FK) |
+                                         |          | row_number      |
+                                         |          | column_number   |
+                                         |          | item_id (FK, Nullable)|
+                                         |          | quantity        |
+                                         |          +-----------------+
+                                         |          |
+                                         | 1..*     +------------+     1..*    +--------------+
+                                         +----------| bom        |---------------| bom_details  |
+                                         | (is_final)|          +------------+   (contains)     +--------------+
+                                         |          | BOMID (PK) |              | BOMDetailID (PK)|
+                                         |          | FinalProductID (FK)|       | bom_id (FK)    |
+                                         |          | Description|              | component_item_id (FK)|
+                                         |          | CreatedAt  |              | quantity_required|
+                                         |          | UpdatedAt  |              | unit_of_measure|
+                                         |          +------------+              +--------------+
+                                         |          |
+                                         | 1..*     +-----------------+
+                                         +----------| supplier_items  |
+                                         |          +-----------------+
+                                         |          | SupplierItemID (PK)|
+                                         |          | supplier_id (FK) |
+                                         |          | item_id (FK)     |
+                                         |          | SupplierSKU     |
+                                         |          | Cost            |
+                                         |          +-----------------+
+                                         |          |
+                                         | 1..*     +-----------------------+
+                                         +----------| sales_order_details   |
+                                         |          +-----------------------+
+                                         |          | SODetailID (PK)       |
+                                         |          | sales_order_id (FK)   |
+                                         |          | item_id (FK)          |
+                                         |          | quantity_ordered      |
+                                         |          | unit_price            |
+                                         |          | quantity_shipped      |
+                                         |          +-----------------------+
+                                         |          |
+                                         | 1..*     +-----------------+
+                                         +----------| product_returns |
+                                         |          +-----------------+
+                                         |          | id (PK)         |
+                                         |          | sales_order_id (FK)|
+                                         |          | item_id (FK)     |
+                                         |          | return_reason   |
+                                         |          | return_status   |
+                                         |          | refund_amount   |
+                                         |          | return_date     |
+                                         |          +-----------------+
+                                         |          |
+                                         | 1..*     +---------------------+
+                                         +----------| subscription_orders |
+                                         |          +---------------------+
+                                         |          | id (PK)             |
+                                         |          | customer_id (FK)    |
+                                         |          | item_id (FK)        |
+                                         |          | recurring_frequency |
+                                         |          | next_delivery_date  |
+                                         |          | status              |
+                                         |          | quantity_each_delivery|
+                                         |          +---------------------+
+                                         |          |
+                                         | 1..*     +--------------+
+                                         +----------| fraud_alerts |-------*---+-------------------------+
+                                                    +--------------+       |(triggers_alert)          |
+                                                    | id (PK)      |       | inventory_transactions  |
+                                                    | item_id (FK) |-------*-------------------------+
+                                                    | unusual_transaction_id (FK)|
+                                                    | alert_type   |
+                                                    | reviewed_by (FK)|
+                                                    | status       |
+                                                    | created_at   |
+                                                    +--------------+
+                                         |          |
+                                         | 1..*     +--------+
+                                         +----------| batch  |-------*---+-----------------+     1..*    +---------------+
+                                                    +--------+       |(stores_in)         |         +-----------------+
+                                                    | BatchID(PK)|       | batch_slots     |---------------| warehouse_slots |
+                                                    | item_id(FK)|-------*-----------------+               +---------------+
+                                                    | lot_number(unique)| | BatchSlotID (PK)|                 | id (PK)       |
+                                                    | production_date| | batch_id (FK)   |-----------------*| section_id (FK)|
+                                                    | expiry_date  | | slot_id (FK)    |                 | row_number    |
+                                                    | quantity     | | quantity_in_slot|                 | column_number |
+                                                    +--------+       +-----------------+                 | item_id (FK, Nullable)|
+                                                         |                                                 | quantity      |
+                                                         | 1..*     +-----------------+                 +---------------+
+                                                         +----------| quality_checks  |
+                                                         |          +-----------------+
+                                                         |          | QCID (PK)       |
+                                                         |          | batch_id (FK)   |
+                                                         |          | check_date      |
+                                                         |          | inspector_name  |
+                                                         |          | status          |
+                                                         |          +-----------------+
+                                                         |          |
+                                                         | 1..*     +-----------------+
+                                                         +----------| waste_tracking  |
+                                                                    +-----------------+
+                                                                    | id (PK)         |
+                                                                    | item_id (FK)     |
+                                                                    | batch_id (FK)   |
+                                                                    | quantity_wasted |
+                                                                    | waste_reason    |
+                                                                    | waste_date      |
+                                                                    | responsible_employee_id (FK)|
+                                                                    +-----------------+
+
+
++--------------------+      1..*        +--------------+      1..*        +-------------------+
+| warehouses         |------------------| inventory    |------------------| inventory_transactions|
++--------------------+                  +--------------+                  +-------------------+
+| WarehouseID (PK)   |(holds_inventory) |              |                  |                   |
+| WarehouseName      |                  |              |                  |                   |
+| Location           |                  |              |                  |                   |
+| Capacity           |                  |              |                  |                   |
+| ContactInfo        |                  +--------------+                  +-------------------+
+| ItemLocation       |                  |              |
++--------------------+                  | 1..*        +---------------------+
+                                         +------------------| warehouse_sections  |
+                                                            +---------------------+
+                                                            | id (PK)             |
+                                                            | warehouse_id (FK)   |
+                                                            | section_name        |
+                                                            | row_count           |
+                                                            | column_count        |
+                                                            +---------------------+
+                                                            |
+                                                            | 1..*        +-----------------+
+                                                            +------------------| warehouse_slots |
+                                                                               +-----------------+
+                                                                               | id (PK)         |
+                                                                               | section_id (FK) |
+                                                                               | row_number      |
+                                                                               | column_number   |
+                                                                               | item_id (FK, Nullable)|
+                                                                               | quantity        |
+                                                                               +-----------------+
+                                         |          |
+                                         | 1..*     +-----------------+
+                                         +----------| temperature_logs|
+                                         |          +-----------------+
+                                         |          | id (PK)         |
+                                         |          | warehouse_id (FK)|
+                                         |          | temperature     |
+                                         |          | recorded_at     |
+                                         |          +-----------------+
+                                         |          |
+                                         | 1..*     +-------------+
+                                         +----------| iot_devices |
+                                         |          +-------------+
+                                         |          | id (PK)     |
+                                         |          | device_type |
+                                         |          | warehouse_id (FK)|
+                                         |          | location_description|
+                                         |          +-------------+
+                                         |          |
+                                         | 1..*     +-----------------------+
+                                         +----------| smart_inventory_logs|
+                                                    +-----------------------+
+                                                    | id (PK)               |
+                                                    | item_id (FK)          |
+                                                    | warehouse_id (FK)     |
+                                                    | movement_type         |
+                                                    | device_id (FK)        |
+                                                    | timestamp             |
+                                                    +-----------------------+
+
+
++---------------+      1..*        +-------------------+      1..*        +-----------------------+
+| suppliers     |------------------| supplier_items    |------------------| purchase_orders       |
++---------------+                  +-------------------+                  +-----------------------+
+| SupplierID(PK)|(supplies_item)   |                   | (places_order)     | POID (PK)             |
+| SupplierName  |                  |                   |                  | supplier_id (FK)      |
+| ContactInfo   |                  |                   |                  | order_date            |
+| PaymentTerms  |                  |                   |                  | status                |
+| Rating        |                  |                   |                  | total_amount          |
++---------------+                  +-------------------+                  +-----------------------+
+                                   | SupplierItemID (PK)|                  |
+                                   | supplier_id (FK) |                  | 1..*        +-------------------------+
+                                   | item_id (FK)     |                  +------------------| purchase_order_details|
+                                   | SupplierSKU     |                                     +-------------------------+
+                                   | Cost            |                                     | PODetailID (PK)         |
+                                   +-------------------+                                     | po_id (FK)            |
+                                   |                                                        | item_id (FK)          |
+                                   | 1..*        +-------------------------------+          | quantity_ordered        |
+                                   +------------------| inventory_replenishment_plans |          | unit_price              |
+                                                      +-------------------------------+          | quantity_received       |
+                                                      | id (PK)                       |          +-------------------------+
+                                                      | item_id (FK)                  |
+                                                      | supplier_id (FK)              |
+                                                      | recommended_order_quantity    |
+                                                      | replenishment_date            |
+                                                      | status                        |
+                                                      +-------------------------------+
+                                   |                                                        |
+                                   | 1..*        +---------------------+                  | 1..*        +--------------------+
+                                   +------------------| supplier_performance|------------------| audit_records         |
+                                                      +---------------------+                  +--------------------+
+                                                      | id (PK)             |                  | id (PK)            |
+                                                      | supplier_id (FK)    |                  | auditor_name       |
+                                                      | delivery_time_rating|                  | audit_date         |
+                                                      | product_quality_rating|                  | compliance_status  |
+                                                      | communication_rating|                  | notes              |
+                                                      | notes               |                  | next_audit_date    |
+                                                      +---------------------+                  +--------------------+
+
+
++--------------------+      1..*        +-------------------+      1..*        +-----------------------+
+| customers          |------------------| sales_orders      |------------------| sales_order_details   |
++--------------------+                  +-------------------+                  +-----------------------+
+| CustomerID (PK)    |(places_order)     | SalesOrderID (PK) |(includes_detail) | SODetailID (PK)       |
+| CustomerName       |                  | customer_id (FK)  |                  | sales_order_id (FK)   |
+| ContactInfo        |                  | order_date        |                  | item_id (FK)          |
+| BillingAddress     |                  | status            |                  | quantity_ordered      |
+| ShippingAddress    |                  | total_amount      |                  | unit_price            |
++--------------------+                  +-------------------+                  | quantity_shipped      |
+                                         |                                      +-----------------------+
+                                         | 1..*        +-----------------+
+                                         +------------------| product_returns |
+                                                            +-----------------+
+                                                            | id (PK)         |
+                                                            | sales_order_id (FK)|
+                                                            | item_id (FK)     |
+                                                            | return_reason   |
+                                                            | return_status   |
+                                                            | refund_amount   |
+                                                            | return_date     |
+                                                            +-----------------+
+                                         |          |
+                                         | 1..*     +-------------------+
+                                         +------------------| shipments       |-------*---+-----------------------+
+                                         | (receives)      +-------------------+       |(includes_detail)        |
+                                         |                  | ShipmentID (PK)   |       | shipment_details      |
+                                         |                  | carrier_name      |-------*-----------------------+
+                                         |                  | tracking_number (unique)| | ShipmentDetailID (PK)   |
+                                         |                  | shipment_date     |       | shipment_id (FK)      |
+                                         |                  | estimated_arrival |       | item_id (FK)          |
+                                         |                  | customer_id (FK)  |       | quantity_shipped      |
+                                         |                  +-------------------+       +-----------------------+
+                                         |          |
+                                         | 1..*     +-----------------------+
+                                         +------------------| discount_promotions |
+                                         | (receives_discount) +-----------------------+
+                                         |                  | id (PK)               |
+                                         |                  | customer_id (FK) [Nullable]|
+                                         |                  | discount_percentage   |
+                                         |                  | start_date            |
+                                         |                  | end_date              |
+                                         |                  | min_order_quantity    |
+                                         |                  +-----------------------+
+                                         |          |
+                                         | 1..*     +-------------------------+
+                                         +------------------| customer_interactions |
+                                         |                  +-------------------------+
+                                         |                  | id (PK)                 |
+                                         |                  | customer_id (FK)        |
+                                         |                  | interaction_type        |
+                                         |                  | notes                   |
+                                         |                  | follow_up_date          |
+                                         |                  +-------------------------+
+                                         |          |
+                                         | 1..*     +---------------------+
+                                         +------------------| subscription_orders |
+                                                            +---------------------+
+                                                            | id (PK)             |
+                                                            | customer_id (FK)    |
+                                                            | item_id (FK)        |
+                                                            | recurring_frequency |
+                                                            | next_delivery_date  |
+                                                            | status              |
+                                                            | quantity_each_delivery|
+                                                            +---------------------+
+
+
++-----------+      1..*        +-----------+      1..*        +---------------------+      1..*        +-----------------------+
+| roles     |------------------| users     |------------------| employee_shifts     |------------------| production_efficiencies |
++-----------+                  +-----------+                  +---------------------+                  +-----------------------+
+| id (PK)   |(has_users)        | id (PK)   |(works_shift)     | id (PK)             | (measures_efficiency) | id (PK)               |
+| name(unique)|                  | username(unique)|          | user_id (FK)        |                  | user_id (FK)          |
++-----------+                  | email(unique)   |          | shift_start         |                  | production_run_id (FK)|
+                                 | password_hash   |          | shift_end           |                  | items_produced        |
+                                 | role_id (FK)    |          | role_during_shift   |                  | errors_made           |
+                                 | is_active       |          +---------------------+                  | efficiency_score      |
+                                 +-----------+                  |                                      +-----------------------+
+                                 |          |                  | 1..*        +-----------------+
+                                 | 1..*     +------------------+------------------| waste_tracking  |
+                                 +----------| documents       |                  +-----------------+
+                                            +------------------+                  | id (PK)         |
+                                            | DocumentID (PK)  |                  | item_id (FK)     |
+                                            | title            |                  | batch_id (FK)   |
+                                            | file_path        |                  | quantity_wasted |
+                                            | category         |                  | waste_reason    |
+                                            | uploaded_by (FK) |                  | waste_date      |
+                                            | upload_date      |                  | responsible_employee_id (FK)|
+                                            +------------------+                  +-----------------+
+                                 |          |                  | 1..*        +---------------+
+                                 | 1..*     +------------------+------------------| security_logs |
+                                 +----------| production_runs |                  +---------------+
+                                            +------------------+                  | id (PK)       |
+                                            | ProductionRunID(PK)|                  | user_id (FK)  |
+                                            | planned_start_date|                  | action_type   |
+                                            | planned_end_date  |                  | action_date   |
+                                            | status            |                  | ip_address    |
+                                            | responsible_user_id (FK)|          +---------------+
+                                            +------------------+                  |
+                                            |                                      | 1..*        +--------------+
+                                            | 1..*     +-------------------------+------------------| fraud_alerts |
+                                            +------------------| production_run_details|                  +--------------+
+                                                               +-------------------------+                  | id (PK)      |
+                                                               | RunDetailID (PK)        |                  | item_id (FK) |
+                                                               | production_run_id (FK)|                  | unusual_transaction_id (FK)|
+                                                               | item_id (FK)          |                  | alert_type   |
+                                                               | quantity_planned      |                  | reviewed_by (FK)|
+                                                               | bom_id (FK)           |                  | status       |
+                                                               +-------------------------+                  | created_at   |
+                                                               |                                            +--------------+
+                                                               | 1..*     +-----------------------+
+                                                               +------------------| production_efficiencies |
+                                                                                  +-----------------------+
+                                                                                  | id (PK)               |
+                                                                                  | user_id (FK)          |
+                                                                                  | production_run_id (FK)|
+                                                                                  | items_produced        |
+                                                                                  | errors_made           |
+                                                                                  | efficiency_score      |
+                                                                                  +-----------------------+
+
+
++---------------+      1..*        +--------------------+
+| permission    |------------------| role_permissions   |
++---------------+                  +--------------------+
+| PermissionID(PK)|(grants_to_role) |                    |
+| permission_name(unique)|         |                    |
++---------------+                  +--------------------+
+                                   | role_id (FK)       |-------*---+-----------+
+                                   | permission_id (FK) |       |(assigned_permission) |
+                                   | PRIMARY KEY(role_id, permission_id)|+-----------+
+                                   +--------------------+                   | roles     |
+                                                                              +-----------+
+                                                                              | id (PK)   |
+                                                                              | name(unique)|
+                                                                              +-----------+
+
++-------------------+
+| system_settings   |
++-------------------+
+| id (PK)           |
+| system_title      |
+| theme_color       |
+| background_color  |
+| etc.              |
++-------------------+
+
++-----------------+      1..*        +--------------------+
+| equipment       |------------------| maintenance_logs   |
++-----------------+                  +--------------------+
+| EquipmentID (PK)|(has_logs)         | MaintenanceLogID (PK)|
+| Name            |                  | equipment_id (FK)  |
+| SerialNumber(unique)|               | maintenance_date   |
+| Location        |                  | technician_name    |
+| LastMaintenanceDate|               | notes              |
+| MaintenanceInterval|               +--------------------+
++-----------------+
+
++-------------------+
+| qc_parameters     |
++-------------------+
+| QCParamID (PK)    |
+| param_name        |
+| reference_range   |
++-------------------+
+
++-------------------+      1..*        +-----------------------+
+| quality_checks  |------------------| quality_check_results |
++-------------------+                  +-----------------------+
+| QCID (PK)       |(has_results)      | id (PK)               |
+| batch_id (FK)   |                  | qc_id (FK)            |
+| check_date      |                  | param_name            |
+| inspector_name  |                  | param_value           |
+| status          |                  +-----------------------+
++-------------------+
+
++-------------------+      1..*        +---------------+
+| batch             |------------------| quality_checks|
++-------------------+                  +---------------+
+| BatchID(PK)       |(undergoes_checks) |               |
+| item_id(FK)       |                  |               |
+| lot_number(unique)|                  |               |
+| production_date |                  |               |
+| expiry_date     |                  |               |
+| quantity        |                  |               |
++-------------------+                  +---------------+
+
++-------------------+      1..*        +---------------+
+| demand_forecasts  |------------------| items         |
++-------------------+                  +---------------+
+| id (PK)           |(forecasts_demand) |               |
+| item_id (FK)      |                  |               |
+| forecasted_quantity|                  |               |
+| forecast_date     |                  |               |
+| accuracy_rate     |                  |               |
++-------------------+                  +---------------+
+```

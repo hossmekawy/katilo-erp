@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}الفئات - كاتيلو{% endblock %}
+
+{% block content %}
+<div x-data="categoriesManager()">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">إدارة الفئات</h1>
+        <button @click="showModal = true; editMode = false; resetForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+            <i class="fas fa-plus mr-2"></i> إضافة فئة
+        </button>
+    </div>
+    
+    <!-- جدول الفئات -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المعرف</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاسم</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الوصف</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">عدد العناصر</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <template x-if="categories.length === 0">
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                            لم يتم العثور على فئات
+                        </td>
+                    </tr>
+                </template>
+                
+                <template x-for="category in categories" :key="category.id">
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900" x-text="category.id"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900" x-text="category.name"></div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-500" x-text="category.description || '-'"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500" x-text="getItemsCount(category.id)"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                            <button @click="editCategory(category)" class="text-blue-600 hover:text-blue-900 mr-3">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button @click="confirmDelete(category)" class="text-red-600 hover:text-red-900">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- نافذة الفئة -->
+    <div x-show="showModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold" x-text="editMode ? 'تعديل الفئة' : 'إضافة فئة'"></h3>
+                <button @click="showModal = false" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <form @submit.prevent="saveCategory">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم الفئة</label>
+                        <input type="text" x-model="formData.name" required
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
+                        <textarea x-model="formData.description" rows="3"
+                                  class="w-full border rounded-lg px-3 py-2"></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" @click="showModal = false" 
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2">
+                            إلغاء
+                        </button>
+                        <button type="submit" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                            حفظ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة تأكيد الحذف -->
+    <div x-show="showDeleteModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showDeleteModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold text-red-600">تأكيد الحذف</h3>
+            </div>
+            
+            <div class="p-6">
+                <p class="mb-4">هل أنت متأكد من حذف الفئة "<span x-text="categoryToDelete?.name"></span>"؟</p>
+                
+                <div x-show="getItemsCount(categoryToDelete?.id) > 0" class="mb-4 p-3 bg-yellow-50 text-yellow-800 rounded-lg">
+                    <p><i class="fas fa-exclamation-triangle mr-2"></i> تحتوي هذه الفئة على <span x-text="getItemsCount(categoryToDelete?.id)"></span> عنصرًا. قد يؤثر حذفها على هذه العناصر.</p>
+                </div>
+                
+                <div class="flex justify-end">
+                    <button @click="showDeleteModal = false" 
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2">
+                        إلغاء
+                    </button>
+                    <button @click="deleteCategory()" 
+                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
+                        حذف
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function categoriesManager() {
+    return {
+        categories: [],
+        items: [],
+        showModal: false,
+        showDeleteModal: false,
+        editMode: false,
+        categoryToDelete: null,
+        
+        formData: {
+            id: null,
+            name: '',
+            description: ''
+        },
+        
+        async init() {
+            try {
+                const [categoriesData, itemsData] = await Promise.all([
+                    fetchAPI('/api/categories'),
+                    fetchAPI('/api/items')
+                ]);
+                
+                this.categories = categoriesData;
+                this.items = itemsData;
+            } catch (error) {
+                console.error('خطأ في تحميل الفئات:', error);
+            }
+        },
+        
+        getItemsCount(categoryId) {
+            return this.items.filter(item => item.category_id === categoryId).length;
+        },
+        
+        resetForm() {
+            this.formData = {
+                id: null,
+                name: '',
+                description: ''
+            };
+        },
+        
+        editCategory(category) {
+            this.editMode = true;
+            this.formData = {
+                id: category.id,
+                name: category.name,
+                description: category.description || ''
+            };
+            this.showModal = true;
+        },
+        
+        confirmDelete(category) {
+            this.categoryToDelete = category;
+            this.showDeleteModal = true;
+        },
+        
+        async saveCategory() {
+            try {
+                if (this.editMode) {
+                    // تحديث الفئة الحالية
+                    await fetchAPI(`/api/categories/${this.formData.id}`, 'PUT', this.formData);
+                    showNotification('تم تحديث الفئة بنجاح');
+                } else {
+                    // إنشاء فئة جديدة
+                    await fetchAPI('/api/categories', 'POST', this.formData);
+                    showNotification('تم إنشاء الفئة بنجاح');
+                }
+                
+                // تحديث الفئات
+                const categoriesData = await fetchAPI('/api/categories');
+                this.categories = categoriesData;
+                
+                this.showModal = false;
+                this.resetForm();
+            } catch (error) {
+                console.error('خطأ في حفظ الفئة:', error);
+            }
+        },
+        
+        async deleteCategory() {
+            try {
+                await fetchAPI(`/api/categories/${this.categoryToDelete.id}`, 'DELETE');
+                showNotification('تم حذف الفئة بنجاح');
+                
+                // تحديث الفئات
+                const categoriesData = await fetchAPI('/api/categories');
+                this.categories = categoriesData;
+                
+                // تحديث العناصر لتحديث الارتباطات بالفئات
+                const itemsData = await fetchAPI('/api/items');
+                this.items = itemsData;
+                
+                this.showDeleteModal = false;
+                this.categoryToDelete = null;
+            } catch (error) {
+                console.error('خطأ في حذف الفئة:', error);
+            }
+        }
+    };
+}
+</script>
+{% endblock %}
+{% endblock %}

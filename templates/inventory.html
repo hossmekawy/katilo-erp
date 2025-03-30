@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة المخزون - كاتيلو{% endblock %}
+
+{% block content %}
+<div x-data="inventoryManager()">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">إدارة المخزون</h1>
+        <button @click="showUpdateModal = true; resetForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+            <i class="fas fa-plus mr-2"></i> تحديث المخزون
+        </button>
+    </div>
+   
+    <!-- الفلاتر -->
+    <div class="bg-white p-4 rounded-lg shadow mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+                <select x-model="filters.warehouseId" class="w-full border rounded-lg px-3 py-2">
+                    <option value="">جميع المستودعات</option>
+                    <template x-for="warehouse in warehouses" :key="warehouse.id">
+                        <option :value="warehouse.id" x-text="warehouse.name"></option>
+                    </template>
+                </select>
+            </div>
+           
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">الفئة</label>
+                <select x-model="filters.categoryId" class="w-full border rounded-lg px-3 py-2">
+                    <option value="">جميع الفئات</option>
+                    <template x-for="category in categories" :key="category.id">
+                        <option :value="category.id" x-text="category.name"></option>
+                    </template>
+                </select>
+            </div>
+           
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">بحث</label>
+                <input type="text" x-model="filters.search" placeholder="البحث عن عناصر..."
+                       class="w-full border rounded-lg px-3 py-2">
+            </div>
+        </div>
+    </div>
+   
+    <!-- جدول المخزون -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">العنصر</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رمز SKU</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المستودع</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الكمية</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">آخر تحديث</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <template x-if="filteredInventory.length === 0">
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            لم يتم العثور على عناصر مخزون
+                        </td>
+                    </tr>
+                </template>
+               
+                <template x-for="inv in filteredInventory" :key="inv.id">
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900" x-text="getItemName(inv.item_id)"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500" x-text="getItemSku(inv.item_id)"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500" x-text="getWarehouseName(inv.warehouse_id)"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium"
+                                 :class="isLowStock(inv) ? 'text-red-600' : 'text-gray-900'"
+                                 x-text="inv.quantity"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500" x-text="formatDate(inv.last_updated)"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                            <button @click="editInventory(inv)" class="text-blue-600 hover:text-blue-900 mr-3">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button @click="viewTransactions(inv.item_id, inv.warehouse_id)" class="text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-history"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+   
+    <!-- نافذة تحديث المخزون -->
+    <div x-show="showUpdateModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showUpdateModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold" x-text="editMode ? 'تحديث المخزون' : 'إضافة مخزون'"></h3>
+                <button @click="showUpdateModal = false" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+           
+            <div class="p-6">
+                <form @submit.prevent="saveInventory">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">العنصر</label>
+                        <select x-model="formData.item_id" required class="w-full border rounded-lg px-3 py-2">
+                            <option value="">اختر العنصر</option>
+                            <template x-for="item in items" :key="item.id">
+                                <option :value="item.id" x-text="item.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">نوع المعاملة</label>
+                        <select x-model="formData.transaction_type" @change="handleTransactionTypeChange()" required class="w-full border rounded-lg px-3 py-2">
+                            <option value="IN">إدخال مخزون</option>
+                            <option value="OUT">إخراج مخزون</option>
+                            <option value="TRANSFER">نقل</option>
+                        </select>
+                    </div>
+
+                    <!-- Regular warehouse field (for IN/OUT transactions) -->
+                    <div class="mb-4" x-show="formData.transaction_type !== 'TRANSFER'">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+                        <select x-model="formData.warehouse_id" required class="w-full border rounded-lg px-3 py-2">
+                            <option value="">اختر المستودع</option>
+                            <template x-for="warehouse in warehouses" :key="warehouse.id">
+                                <option :value="warehouse.id" x-text="warehouse.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Source warehouse field (only for TRANSFER transactions) -->
+                    <div class="mb-4" x-show="formData.transaction_type === 'TRANSFER'">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">المستودع المصدر</label>
+                        <select x-model="formData.source_warehouse_id" required class="w-full border rounded-lg px-3 py-2">
+                            <option value="">اختر المستودع المصدر</option>
+                            <template x-for="warehouse in warehouses" :key="warehouse.id">
+                                <option :value="warehouse.id" x-text="warehouse.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Destination warehouse field (only for TRANSFER transactions) -->
+                    <div class="mb-4" x-show="formData.transaction_type === 'TRANSFER'">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">المستودع الوجهة</label>
+                        <select x-model="formData.warehouse_id" required class="w-full border rounded-lg px-3 py-2">
+                            <option value="">اختر المستودع الوجهة</option>
+                            <template x-for="warehouse in warehouses" :key="warehouse.id">
+                                <option :value="warehouse.id" x-text="warehouse.name" :disabled="warehouse.id == formData.source_warehouse_id"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الكمية</label>
+                        <input type="number" x-model.number="formData.quantity" min="1" required
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">المرجع (اختياري)</label>
+                        <input type="text" x-model="formData.reference" placeholder="رقم أمر الشراء، رقم أمر البيع، إلخ."
+                               class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                   
+                    <div class="flex justify-end">
+                        <button type="button" @click="showUpdateModal = false"
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2">
+                            إلغاء
+                        </button>
+                        <button type="button" @click="saveInventory()"
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                            حفظ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+   
+    <!-- نافذة سجل المعاملات -->
+    <div x-show="showTransactionsModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div @click.away="showTransactionsModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-3xl">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold">سجل المعاملات</h3>
+                <button @click="showTransactionsModal = false" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+           
+            <div class="p-6 max-h-96 overflow-y-auto">
+                <template x-if="itemTransactions.length === 0">
+                    <p class="text-gray-500 text-center py-4">لم يتم العثور على معاملات</p>
+                </template>
+               
+                <template x-if="itemTransactions.length > 0">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التاريخ</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النوع</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الكمية</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المرجع</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <template x-for="txn in itemTransactions" :key="txn.id">
+                                <tr>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500" x-text="formatDate(txn.transaction_date)"></td>
+                                    <td class="px-4 py-2 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                              :class="{
+                                                  'bg-green-100 text-green-800': txn.transaction_type === 'IN',
+                                                  'bg-red-100 text-red-800': txn.transaction_type === 'OUT',
+                                                  'bg-blue-100 text-blue-800': txn.transaction_type === 'TRANSFER'
+                                              }"
+                                              x-text="txn.transaction_type === 'IN' ? 'إدخال' : txn.transaction_type === 'OUT' ? 'إخراج' : 'نقل'"></span>
+                                            </td>
+                                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900" x-text="txn.quantity"></td>
+                                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500" x-text="txn.reference || '-'"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
+                    </div>
+                    
+                    <div class="border-t px-6 py-4">
+                        <button @click="showTransactionsModal = false" 
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">
+                            إغلاق
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% block scripts %}
+        <script>
+        function inventoryManager() {
+            return {
+                inventory: [],
+                items: [],
+                warehouses: [],
+                categories: [],
+                transactions: [],
+                
+                filters: {
+                    warehouseId: '',
+                    categoryId: '',
+                    search: ''
+                },
+                
+                showUpdateModal: false,
+                showTransactionsModal: false,
+                editMode: false,
+                itemTransactions: [],
+                
+                formData: {
+                    id: null,
+                    item_id: '',
+                    warehouse_id: '',
+                    source_warehouse_id: '',
+                    quantity: 1,
+                    transaction_type: 'IN',
+                    reference: ''
+                },
+                
+                async init() {
+                    try {
+                        console.log("Initializing inventory manager");
+                        // تحميل جميع البيانات المطلوبة
+                        const [inventoryData, itemsData, warehousesData, categoriesData, transactionsData] = await Promise.all([
+                            fetchAPI('/api/inventory'),
+                            fetchAPI('/api/items'),
+                            fetchAPI('/api/warehouses'),
+                            fetchAPI('/api/categories'),
+                            fetchAPI('/api/transactions')
+                        ]);
+                        
+                        this.inventory = inventoryData;
+                        this.items = itemsData;
+                        this.warehouses = warehousesData;
+                        this.categories = categoriesData;
+                        this.transactions = transactionsData;
+                        console.log("Data loaded successfully");
+                    } catch (error) {
+                        console.error('خطأ في تحميل بيانات المخزون:', error);
+                        showNotification('حدث خطأ أثناء تحميل البيانات', 'error');
+                    }
+                },
+                
+                handleTransactionTypeChange() {
+                    console.log("Transaction type changed to:", this.formData.transaction_type);
+                    // Reset warehouse selections when changing transaction type
+                    if (this.formData.transaction_type === 'TRANSFER') {
+                        // For transfer, clear both warehouses to avoid confusion
+                        // If we're editing, we can set source to current warehouse
+                        if (this.editMode && this.formData.warehouse_id) {
+                            this.formData.source_warehouse_id = this.formData.warehouse_id;
+                            this.formData.warehouse_id = '';
+                        } else {
+                            // For new transfers, just clear both
+                            this.formData.source_warehouse_id = '';
+                            this.formData.warehouse_id = '';
+                        }
+                    } else {
+                        // For non-transfer transactions, clear source warehouse
+                        this.formData.source_warehouse_id = '';
+                    }
+                },
+                
+                getCurrentQuantity(itemId, warehouseId) {
+                    const inv = this.inventory.find(i => i.item_id === parseInt(itemId) && i.warehouse_id === parseInt(warehouseId));
+                    return inv ? inv.quantity : 0;
+                },
+                
+                resetForm() {
+                    console.log("Resetting form");
+                    this.formData = {
+                        id: null,
+                        item_id: '',
+                        warehouse_id: '',
+                        source_warehouse_id: '',
+                        quantity: 1,
+                        transaction_type: 'IN',
+                        reference: ''
+                    };
+                    this.editMode = false;
+                },
+        
+                get filteredInventory() {
+                    return this.inventory.filter(inv => {
+                        // تصفية حسب المستودع
+                        if (this.filters.warehouseId && inv.warehouse_id != this.filters.warehouseId) {
+                            return false;
+                        }
+                        
+                        // تصفية حسب الفئة (تحتاج إلى التحقق من فئة العنصر)
+                        if (this.filters.categoryId) {
+                            const item = this.items.find(i => i.id === inv.item_id);
+                            if (!item || item.category_id != this.filters.categoryId) {
+                                return false;
+                            }
+                        }
+                        
+                        // تصفية حسب مصطلح البحث
+                        if (this.filters.search) {
+                            const item = this.items.find(i => i.id === inv.item_id);
+                            if (!item) return false;
+                            
+                            const searchTerm = this.filters.search.toLowerCase();
+                            return item.name.toLowerCase().includes(searchTerm) ||
+                                   item.sku.toLowerCase().includes(searchTerm);
+                        }
+                        
+                        return true;
+                    });
+                },
+                
+                getItemName(itemId) {
+                    const item = this.items.find(i => i.id === itemId);
+                    return item ? item.name : `عنصر #${itemId}`;
+                },
+                
+                getItemSku(itemId) {
+                    const item = this.items.find(i => i.id === itemId);
+                    return item ? item.sku : '-';
+                },
+                
+                getWarehouseName(warehouseId) {
+                    const warehouse = this.warehouses.find(w => w.id === warehouseId);
+                    return warehouse ? warehouse.name : `مستودع #${warehouseId}`;
+                },
+                
+                isLowStock(inv) {
+                    const item = this.items.find(i => i.id === inv.item_id);
+                    return item && inv.quantity <= item.reorder_level;
+                },
+                
+                formatDate(dateString) {
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('ar-EG') + ' ' + date.toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'});
+                },
+                
+                editInventory(inv) {
+                    console.log("Editing inventory:", inv);
+                    this.editMode = true;
+                    this.formData = {
+                        id: inv.id,
+                        item_id: parseInt(inv.item_id),
+                        warehouse_id: parseInt(inv.warehouse_id),
+                        source_warehouse_id: '',
+                        quantity: 1,
+                        transaction_type: 'IN',
+                        reference: ''
+                    };
+                    this.showUpdateModal = true;
+                },
+                
+                async viewTransactions(itemId, warehouseId) {
+                    console.log("Viewing transactions for item:", itemId, "warehouse:", warehouseId);
+                    this.itemTransactions = this.transactions.filter(t =>
+                        t.item_id === itemId && t.warehouse_id === warehouseId
+                    ).sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date));
+                    
+                    this.showTransactionsModal = true;
+                },
+                
+                async saveInventory() {
+                    console.log("Saving inventory with data:", this.formData);
+                    try {
+                        // Validate form data
+                        if (!this.formData.item_id) {
+                            console.log("Missing item_id");
+                            showNotification('يرجى اختيار العنصر', 'error');
+                            return;
+                        }
+                        
+                        if (this.formData.transaction_type !== 'TRANSFER' && !this.formData.warehouse_id) {
+                            console.log("Missing warehouse_id for non-transfer");
+                            showNotification('يرجى اختيار المستودع', 'error');
+                            return;
+                        }
+                        
+                        if (this.formData.transaction_type === 'TRANSFER') {
+                            // For transfers, we need to handle both source and destination warehouses
+                            if (!this.formData.source_warehouse_id || !this.formData.warehouse_id) {
+                                console.log("Missing source or destination warehouse for transfer");
+                                showNotification('يرجى تحديد المستودع المصدر والوجهة', 'error');
+                                return;
+                            }
+                            
+                            if (parseInt(this.formData.source_warehouse_id) === parseInt(this.formData.warehouse_id)) {
+                                console.log("Source and destination warehouses are the same");
+                                showNotification('لا يمكن النقل إلى نفس المستودع', 'error');
+                                return;
+                            }
+                            
+                            // Check if there's enough quantity in source warehouse
+                            const currentQty = this.getCurrentQuantity(this.formData.item_id, this.formData.source_warehouse_id);
+                            console.log("Current quantity in source warehouse:", currentQty);
+                            
+                            if (currentQty < this.formData.quantity) {
+                                console.log("Not enough quantity in source warehouse");
+                                showNotification(`الكمية غير كافية في المستودع المصدر. الكمية المتاحة: ${currentQty}`, 'error');
+                                return;
+                            }
+                            
+                            console.log("Processing transfer transaction");
+                            
+                            // First, remove from source warehouse
+                            const sourceData = {
+                                item_id: parseInt(this.formData.item_id),
+                                warehouse_id: parseInt(this.formData.source_warehouse_id),
+                                quantity: -parseInt(this.formData.quantity), // Make sure it's negative for OUT
+                                transaction_type: 'OUT',
+                                reference: `نقل إلى ${this.getWarehouseName(parseInt(this.formData.warehouse_id))}`
+                            };
+                            
+                            console.log("Source data:", sourceData);
+                            const sourceResult = await fetchAPI('/api/inventory/update', 'POST', sourceData);
+                            console.log("Source result:", sourceResult);
+                            
+                            // Then, add to destination warehouse
+                            const destData = {
+                                item_id: parseInt(this.formData.item_id),
+                                warehouse_id: parseInt(this.formData.warehouse_id),
+                                quantity: parseInt(this.formData.quantity),
+                                transaction_type: 'IN',
+                                reference: `نقل من ${this.getWarehouseName(parseInt(this.formData.source_warehouse_id))}`
+                            };
+                            
+                            console.log("Destination data:", destData);
+                            const destResult = await fetchAPI('/api/inventory/update', 'POST', destData);
+                            console.log("Destination result:", destResult);
+                            
+                            showNotification('تم نقل المخزون بنجاح');
+                        } else if (this.formData.transaction_type === 'OUT') {
+                            // For OUT transactions, check if there's enough quantity
+                            const currentQty = this.getCurrentQuantity(this.formData.item_id, this.formData.warehouse_id);
+                            console.log("Current quantity for OUT transaction:", currentQty);
+                            
+                            if (currentQty < this.formData.quantity) {
+                                console.log("Not enough quantity for OUT transaction");
+                                showNotification(`الكمية غير كافية في المستودع. الكمية المتاحة: ${currentQty}`, 'error');
+                                return;
+                            }
+                            
+                            console.log("Processing OUT transaction");
+                            
+                            // Update inventory with reduced quantity
+                            const outData = {
+                                item_id: parseInt(this.formData.item_id),
+                                warehouse_id: parseInt(this.formData.warehouse_id),
+                                quantity: -parseInt(this.formData.quantity), // Negative for OUT
+                                transaction_type: 'OUT',
+                                reference: this.formData.reference
+                            };
+                            
+                            console.log("OUT data:", outData);
+                            const outResult = await fetchAPI('/api/inventory/update', 'POST', outData);
+                            console.log("OUT result:", outResult);
+                            
+                            showNotification('تم تحديث المخزون بنجاح');
+                        } else {
+                            // For IN transactions, just add the quantity
+                            console.log("Processing IN transaction");
+                            
+                            const inData = {
+                                item_id: parseInt(this.formData.item_id),
+                                warehouse_id: parseInt(this.formData.warehouse_id),
+                                quantity: parseInt(this.formData.quantity),
+                                transaction_type: 'IN',
+                                reference: this.formData.reference
+                            };
+                            
+                            console.log("IN data:", inData);
+                            const inResult = await fetchAPI('/api/inventory/update', 'POST', inData);
+                            console.log("IN result:", inResult);
+                            
+                            showNotification('تم تحديث المخزون بنجاح');
+                        }
+                        
+                        console.log("Transaction completed successfully");
+                        this.showUpdateModal = false;
+                        this.resetForm();
+                        
+                        // Refresh inventory data
+                        console.log("Refreshing inventory data");
+                        const inventoryData = await fetchAPI('/api/inventory');
+                        this.inventory = inventoryData;
+                        
+                        // Refresh transactions data
+                        console.log("Refreshing transactions data");
+                        const transactionsData = await fetchAPI('/api/transactions');
+                        this.transactions = transactionsData;
+                        
+                        console.log("Data refresh completed");
+                    } catch (error) {
+                        console.error('خطأ في تحديث المخزون:', error);
+                        showNotification('حدث خطأ أثناء تحديث المخزون', 'error');
+                    }
+                }
+            };
+        }
+        </script>
+        {% endblock %}
+        {% endblock %}
+        

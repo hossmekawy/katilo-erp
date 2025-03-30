@@ -1,0 +1,369 @@
+// Full ER Diagram
+digraph {
+	nodesep=0.5 overlap=false rankdir=TB ranksep=1 size=20 splines=true
+	categories [label="categories
+CategoryID (PK, int)
+CategoryName (string)
+Description (string)" fontsize=10 shape=record]
+	items [label="items
+ItemID (PK, int)
+CategoryID (FK to categories.CategoryID)
+SKU (string, unique)
+ItemName (string)
+Description (text)
+UnitOfMeasure (string)
+Cost (float)
+Price (float)
+ReorderLevel (int)
+CreatedAt (datetime)
+UpdatedAt (datetime)" fontsize=10 shape=record]
+	warehouses [label="warehouses
+WarehouseID (PK, int)
+WarehouseName (string)
+Location (string)
+Capacity (int)
+ContactInfo (string)
+ItemLocation (string)" fontsize=10 shape=record]
+	warehouse_sections [label="warehouse_sections
+id (PK, int)
+warehouse_id (FK to warehouses.WarehouseID)
+section_name (string)
+row_count (int)
+column_count (int)" fontsize=10 shape=record]
+	warehouse_slots [label="warehouse_slots
+id (PK, int)
+section_id (FK to warehouse_sections.id)
+row_number (int)
+column_number (int)
+item_id (FK to items.ItemID, nullable)
+quantity (int)" fontsize=10 shape=record]
+	inventory [label="inventory
+InventoryID (PK, int)
+item_id (FK to items.ItemID)
+warehouse_id (FK to warehouses.WarehouseID)
+quantity (int)
+last_updated (datetime)" fontsize=10 shape=record]
+	inventory_transactions [label="inventory_transactions
+TransactionID (PK, int)
+item_id (FK to items.ItemID)
+warehouse_id (FK to warehouses.WarehouseID)
+transaction_type (enum: IN, OUT, TRANSFER)
+quantity (int)
+transaction_date (datetime)
+reference (string)" fontsize=10 shape=record]
+	bom [label="bom
+BOMID (PK, int)
+FinalProductID (FK to items.ItemID)
+Description (text)
+CreatedAt (datetime)
+UpdatedAt (datetime)" fontsize=10 shape=record]
+	bom_details [label="bom_details
+BOMDetailID (PK, int)
+bom_id (FK to bom.BOMID)
+component_item_id (FK to items.ItemID)
+quantity_required (float)
+unit_of_measure (string)" fontsize=10 shape=record]
+	suppliers [label="suppliers
+SupplierID (PK, int)
+SupplierName (string)
+ContactInfo (text)
+PaymentTerms (string)
+Rating (float)" fontsize=10 shape=record]
+	supplier_items [label="supplier_items
+SupplierItemID (PK, int)
+supplier_id (FK to suppliers.SupplierID)
+item_id (FK to items.ItemID)
+SupplierSKU (string)
+Cost (float)" fontsize=10 shape=record]
+	purchase_orders [label="purchase_orders
+POID (PK, int)
+supplier_id (FK to suppliers.SupplierID)
+order_date (datetime)
+status (enum: Pending, Approved, Received, Cancelled)
+total_amount (float)" fontsize=10 shape=record]
+	purchase_order_details [label="purchase_order_details
+PODetailID (PK, int)
+po_id (FK to purchase_orders.POID)
+item_id (FK to items.ItemID)
+quantity_ordered (int)
+unit_price (float)
+quantity_received (int)" fontsize=10 shape=record]
+	customers [label="customers
+CustomerID (PK, int)
+CustomerName (string)
+ContactInfo (text)
+BillingAddress (text)
+ShippingAddress (text)" fontsize=10 shape=record]
+	sales_orders [label="sales_orders
+SalesOrderID (PK, int)
+customer_id (FK to customers.CustomerID)
+order_date (datetime)
+status (enum: Pending, Shipped, Delivered, Cancelled)
+total_amount (float)" fontsize=10 shape=record]
+	sales_order_details [label="sales_order_details
+SODetailID (PK, int)
+sales_order_id (FK to sales_orders.SalesOrderID)
+item_id (FK to items.ItemID)
+quantity_ordered (int)
+unit_price (float)
+quantity_shipped (int)" fontsize=10 shape=record]
+	batch [label="batch
+BatchID (PK, int)
+item_id (FK to items.ItemID)
+lot_number (string, unique)
+production_date (datetime)
+expiry_date (datetime)
+quantity (int)" fontsize=10 shape=record]
+	batch_slots [label="batch_slots
+BatchSlotID (PK, int)
+batch_id (FK to batch.BatchID)
+slot_id (FK to warehouse_slots.id)
+quantity_in_slot (int)" fontsize=10 shape=record]
+	quality_checks [label="quality_checks
+QCID (PK, int)
+batch_id (FK to batch.BatchID)
+check_date (datetime)
+inspector_name (string)
+status (enum: Passed, Failed, Retest)" fontsize=10 shape=record]
+	quality_check_results [label="quality_check_results
+id (PK, int)
+qc_id (FK to quality_checks.QCID)
+param_name (string)
+param_value (string)" fontsize=10 shape=record]
+	qc_parameters [label="qc_parameters
+QCParamID (PK, int)
+param_name (string)
+reference_range (string)" fontsize=10 shape=record]
+	equipment [label="equipment
+EquipmentID (PK, int)
+Name (string)
+SerialNumber (string, unique)
+Location (string)
+LastMaintenanceDate (datetime)
+MaintenanceInterval (int)" fontsize=10 shape=record]
+	maintenance_logs [label="maintenance_logs
+MaintenanceLogID (PK, int)
+equipment_id (FK to equipment.EquipmentID)
+maintenance_date (datetime)
+technician_name (string)
+notes (text)" fontsize=10 shape=record]
+	shipments [label="shipments
+ShipmentID (PK, int)
+carrier_name (string)
+tracking_number (string, unique)
+shipment_date (datetime)
+estimated_arrival (datetime)
+customer_id (FK to customers.CustomerID)" fontsize=10 shape=record]
+	shipment_details [label="shipment_details
+ShipmentDetailID (PK, int)
+shipment_id (FK to shipments.ShipmentID)
+item_id (FK to items.ItemID)
+quantity_shipped (int)" fontsize=10 shape=record]
+	permission [label="permission
+PermissionID (PK, int)
+permission_name (string, unique)" fontsize=10 shape=record]
+	role_permissions [label="role_permissions
+role_id (FK to roles.id)
+permission_id (FK to permission.PermissionID)" fontsize=10 shape=record]
+	documents [label="documents
+DocumentID (PK, int)
+title (string)
+file_path (string)
+category (enum: Recipe, Certification, Manual, Other)
+uploaded_by (FK to users.id)
+upload_date (datetime)" fontsize=10 shape=record]
+	production_runs [label="production_runs
+ProductionRunID (PK, int)
+planned_start_date (datetime)
+planned_end_date (datetime)
+status (enum: Planned, In Progress, Completed)
+responsible_user_id (FK to users.id)" fontsize=10 shape=record]
+	production_run_details [label="production_run_details
+RunDetailID (PK, int)
+production_run_id (FK to production_runs.ProductionRunID)
+item_id (FK to items.ItemID)
+quantity_planned (int)
+bom_id (FK to bom.BOMID)" fontsize=10 shape=record]
+	system_settings [label="system_settings
+id (PK, int)
+system_title (string)
+theme_color (string)
+background_color (string)" fontsize=10 shape=record]
+	roles [label="roles
+id (PK, int)
+name (string, unique)" fontsize=10 shape=record]
+	users [label="users
+id (PK, int)
+username (string, unique)
+email (string, unique)
+password_hash (string)
+role_id (FK to roles.id)
+is_active (bool)" fontsize=10 shape=record]
+	demand_forecasts [label="demand_forecasts
+id (PK, int)
+item_id (FK to items.ItemID)
+forecasted_quantity (int)
+forecast_date (datetime)
+accuracy_rate (float)" fontsize=10 shape=record]
+	inventory_replenishment_plans [label="inventory_replenishment_plans
+id (PK, int)
+item_id (FK to items.ItemID)
+supplier_id (FK to suppliers.SupplierID)
+recommended_order_quantity (int)
+replenishment_date (datetime)
+status (string)" fontsize=10 shape=record]
+	employee_shifts [label="employee_shifts
+id (PK, int)
+user_id (FK to users.id)
+shift_start (datetime)
+shift_end (datetime)
+role_during_shift (string)" fontsize=10 shape=record]
+	production_efficiencies [label="production_efficiencies
+id (PK, int)
+user_id (FK to users.id)
+production_run_id (FK to production_runs.ProductionRunID)
+items_produced (int)
+errors_made (int)
+efficiency_score (float)" fontsize=10 shape=record]
+	waste_tracking [label="waste_tracking
+id (PK, int)
+item_id (FK to items.ItemID)
+batch_id (FK to batch.BatchID)
+quantity_wasted (int)
+waste_reason (enum: Expired, Spoiled, Damaged, Other)
+waste_date (datetime)
+responsible_employee_id (FK to users.id)" fontsize=10 shape=record]
+	audit_records [label="audit_records
+id (PK, int)
+auditor_name (string)
+audit_date (datetime)
+compliance_status (enum: Passed, Warning, Failed)
+notes (text)
+next_audit_date (datetime)" fontsize=10 shape=record]
+	temperature_logs [label="temperature_logs
+id (PK, int)
+warehouse_id (FK to warehouses.WarehouseID)
+temperature (float)
+recorded_at (datetime)" fontsize=10 shape=record]
+	iot_devices [label="iot_devices
+id (PK, int)
+device_type (enum)
+warehouse_id (FK to warehouses.WarehouseID)
+location_description (string)" fontsize=10 shape=record]
+	smart_inventory_logs [label="smart_inventory_logs
+id (PK, int)
+item_id (FK to items.ItemID)
+warehouse_id (FK to warehouses.WarehouseID)
+movement_type (enum: ScannedIn, ScannedOut)
+device_id (FK to iot_devices.id)
+timestamp (datetime)" fontsize=10 shape=record]
+	customer_interactions [label="customer_interactions
+id (PK, int)
+customer_id (FK to customers.CustomerID)
+interaction_type (enum: Call, Email, Visit, Other)
+notes (text)
+follow_up_date (datetime)" fontsize=10 shape=record]
+	discount_promotions [label="discount_promotions
+id (PK, int)
+customer_id (FK to customers.CustomerID, nullable)
+discount_percentage (float)
+start_date (datetime)
+end_date (datetime)
+min_order_quantity (int)" fontsize=10 shape=record]
+	supplier_performance [label="supplier_performance
+id (PK, int)
+supplier_id (FK to suppliers.SupplierID)
+delivery_time_rating (int)
+product_quality_rating (int)
+communication_rating (int)
+notes (text)" fontsize=10 shape=record]
+	product_returns [label="product_returns
+id (PK, int)
+sales_order_id (FK to sales_orders.SalesOrderID)
+item_id (FK to items.ItemID)
+return_reason (enum: Defective, WrongItem, Damaged, Other)
+return_status (enum: Pending, Approved, Denied)
+refund_amount (float)
+return_date (datetime)" fontsize=10 shape=record]
+	subscription_orders [label="subscription_orders
+id (PK, int)
+customer_id (FK to customers.CustomerID)
+item_id (FK to items.ItemID)
+recurring_frequency (enum: Daily, Weekly, Monthly, Yearly)
+next_delivery_date (datetime)
+status (enum: Active, Paused, Canceled)
+quantity_each_delivery (int)" fontsize=10 shape=record]
+	security_logs [label="security_logs
+id (PK, int)
+user_id (FK to users.id)
+action_type (enum: UnauthorizedAccess, InventoryChange, Login, Other)
+action_date (datetime)
+ip_address (string)" fontsize=10 shape=record]
+	fraud_alerts [label="fraud_alerts
+id (PK, int)
+item_id (FK to items.ItemID)
+unusual_transaction_id (FK to inventory_transactions.TransactionID)
+alert_type (enum: FakeOrder, ExcessiveRefunds, Other)
+reviewed_by (FK to users.id)
+status (enum: Pending, Resolved)
+created_at (datetime)" fontsize=10 shape=record]
+	categories -> items [label=CategoryID arrowhead=crow arrowtail=none fontsize=8]
+	items -> inventory [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> inventory_transactions [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> warehouse_slots [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> bom [label=FinalProductID arrowhead=crow arrowtail=none fontsize=8]
+	items -> bom_details [label=component_item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> supplier_items [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> sales_order_details [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> product_returns [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> subscription_orders [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> fraud_alerts [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> batch [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> demand_forecasts [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> inventory_replenishment_plans [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> production_run_details [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> shipment_details [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> smart_inventory_logs [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	items -> waste_tracking [label=item_id arrowhead=crow arrowtail=none fontsize=8]
+	warehouses -> inventory [label=warehouse_id arrowhead=crow arrowtail=none fontsize=8]
+	warehouses -> inventory_transactions [label=warehouse_id arrowhead=crow arrowtail=none fontsize=8]
+	warehouses -> warehouse_sections [label=warehouse_id arrowhead=crow arrowtail=none fontsize=8]
+	warehouses -> temperature_logs [label=warehouse_id arrowhead=crow arrowtail=none fontsize=8]
+	warehouses -> iot_devices [label=warehouse_id arrowhead=crow arrowtail=none fontsize=8]
+	warehouses -> smart_inventory_logs [label=warehouse_id arrowhead=crow arrowtail=none fontsize=8]
+	warehouse_sections -> warehouse_slots [label=section_id arrowhead=crow arrowtail=none fontsize=8]
+	warehouse_slots -> batch_slots [label=slot_id arrowhead=crow arrowtail=none fontsize=8]
+	inventory_transactions -> fraud_alerts [label=unusual_transaction_id arrowhead=crow arrowtail=none fontsize=8]
+	bom -> bom_details [label=bom_id arrowhead=crow arrowtail=none fontsize=8]
+	suppliers -> supplier_items [label=supplier_id arrowhead=crow arrowtail=none fontsize=8]
+	suppliers -> purchase_orders [label=supplier_id arrowhead=crow arrowtail=none fontsize=8]
+	suppliers -> inventory_replenishment_plans [label=supplier_id arrowhead=crow arrowtail=none fontsize=8]
+	suppliers -> supplier_performance [label=supplier_id arrowhead=crow arrowtail=none fontsize=8]
+	purchase_orders -> purchase_order_details [label=po_id arrowhead=crow arrowtail=none fontsize=8]
+	customers -> sales_orders [label=customer_id arrowhead=crow arrowtail=none fontsize=8]
+	customers -> shipments [label=customer_id arrowhead=crow arrowtail=none fontsize=8]
+	customers -> discount_promotions [label=customer_id arrowhead=crow arrowtail=none fontsize=8]
+	customers -> customer_interactions [label=customer_id arrowhead=crow arrowtail=none fontsize=8]
+	customers -> subscription_orders [label=customer_id arrowhead=crow arrowtail=none fontsize=8]
+	sales_orders -> sales_order_details [label=sales_order_id arrowhead=crow arrowtail=none fontsize=8]
+	sales_orders -> product_returns [label=sales_order_id arrowhead=crow arrowtail=none fontsize=8]
+	batch -> batch_slots [label=batch_id arrowhead=crow arrowtail=none fontsize=8]
+	batch -> quality_checks [label=batch_id arrowhead=crow arrowtail=none fontsize=8]
+	batch -> waste_tracking [label=batch_id arrowhead=crow arrowtail=none fontsize=8]
+	quality_checks -> quality_check_results [label=qc_id arrowhead=crow arrowtail=none fontsize=8]
+	equipment -> maintenance_logs [label=equipment_id arrowhead=crow arrowtail=none fontsize=8]
+	shipments -> shipment_details [label=shipment_id arrowhead=crow arrowtail=none fontsize=8]
+	permission -> role_permissions [label=permission_id arrowhead=crow arrowtail=none fontsize=8]
+	production_runs -> production_run_details [label=production_run_id arrowhead=crow arrowtail=none fontsize=8]
+	production_runs -> production_efficiencies [label=production_run_id arrowhead=crow arrowtail=none fontsize=8]
+	roles -> users [label=role_id arrowhead=crow arrowtail=none fontsize=8]
+	roles -> role_permissions [label=role_id arrowhead=crow arrowtail=none fontsize=8]
+	users -> documents [label=uploaded_by arrowhead=crow arrowtail=none fontsize=8]
+	users -> production_runs [label=responsible_user_id arrowhead=crow arrowtail=none fontsize=8]
+	users -> employee_shifts [label=user_id arrowhead=crow arrowtail=none fontsize=8]
+	users -> production_efficiencies [label=user_id arrowhead=crow arrowtail=none fontsize=8]
+	users -> waste_tracking [label=responsible_employee_id arrowhead=crow arrowtail=none fontsize=8]
+	users -> security_logs [label=user_id arrowhead=crow arrowtail=none fontsize=8]
+	users -> fraud_alerts [label=reviewed_by arrowhead=crow arrowtail=none fontsize=8]
+	iot_devices -> smart_inventory_logs [label=device_id arrowhead=crow arrowtail=none fontsize=8]
+}

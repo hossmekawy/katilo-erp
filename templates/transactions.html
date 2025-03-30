@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}سجل المعاملات - كاتيلو{% endblock %}
+
+{% block content %}
+<div x-data="transactionsManager()">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">سجل المعاملات</h1>
+    </div>
+    
+    <!-- الفلاتر -->
+    <div class="bg-white p-4 rounded-lg shadow mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">العنصر</label>
+                <select x-model="filters.itemId" class="w-full border rounded-lg px-3 py-2">
+                    <option value="">جميع العناصر</option>
+                    <template x-for="item in items" :key="item.id">
+                        <option :value="item.id" x-text="item.name"></option>
+                    </template>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+                <select x-model="filters.warehouseId" class="w-full border rounded-lg px-3 py-2">
+                    <option value="">جميع المستودعات</option>
+                    <template x-for="warehouse in warehouses" :key="warehouse.id">
+                        <option :value="warehouse.id" x-text="warehouse.name"></option>
+                    </template>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">نوع المعاملة</label>
+                <select x-model="filters.transactionType" class="w-full border rounded-lg px-3 py-2">
+                    <option value="">جميع الأنواع</option>
+                    <option value="IN">إدخال مخزون</option>
+                    <option value="OUT">إخراج مخزون</option>
+                    <option value="TRANSFER">نقل</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">نطاق التاريخ</label>
+                <select x-model="filters.dateRange" class="w-full border rounded-lg px-3 py-2">
+                    <option value="all">كل الوقت</option>
+                    <option value="today">اليوم</option>
+                    <option value="week">هذا الأسبوع</option>
+                    <option value="month">هذا الشهر</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- جدول المعاملات -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التاريخ</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">العنصر</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المستودع</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النوع</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الكمية</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المرجع</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <template x-if="filteredTransactions.length === 0">
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            لم يتم العثور على معاملات
+                        </td>
+                    </tr>
+                </template>
+                
+                <template x-for="transaction in filteredTransactions" :key="transaction.id">
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500" x-text="formatDate(transaction.transaction_date)"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900" x-text="getItemName(transaction.item_id)"></div>
+                            <div class="text-xs text-gray-500" x-text="getItemSku(transaction.item_id)"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500" x-text="getWarehouseName(transaction.warehouse_id)"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                  :class="{
+                                      'bg-green-100 text-green-800': transaction.transaction_type === 'IN',
+                                      'bg-red-100 text-red-800': transaction.transaction_type === 'OUT',
+                                      'bg-blue-100 text-blue-800': transaction.transaction_type === 'TRANSFER'
+                                  }"
+                                  x-text="transaction.transaction_type === 'IN' ? 'إدخال' : transaction.transaction_type === 'OUT' ? 'إخراج' : 'نقل'"></span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium"
+                                 :class="{
+                                     'text-green-600': transaction.transaction_type === 'IN',
+                                     'text-red-600': transaction.transaction_type === 'OUT',
+                                     'text-blue-600': transaction.transaction_type === 'TRANSFER'
+                                 }"
+                                 x-text="transaction.quantity"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500" x-text="transaction.reference || '-'"></div>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function transactionsManager() {
+    return {
+        transactions: [],
+        items: [],
+        warehouses: [],
+        
+        filters: {
+            itemId: '',
+            warehouseId: '',
+            transactionType: '',
+            dateRange: 'all'
+        },
+        
+        async init() {
+            try {
+                const [transactionsData, itemsData, warehousesData] = await Promise.all([
+                    fetchAPI('/api/transactions'),
+                    fetchAPI('/api/items'),
+                    fetchAPI('/api/warehouses')
+                ]);
+                
+                this.transactions = transactionsData;
+                this.items = itemsData;
+                this.warehouses = warehousesData;
+            } catch (error) {
+                console.error('خطأ في تحميل المعاملات:', error);
+            }
+        },
+        
+        get filteredTransactions() {
+            return this.transactions
+                .filter(transaction => {
+                    // تصفية حسب العنصر
+                    if (this.filters.itemId && transaction.item_id != this.filters.itemId) {
+                        return false;
+                    }
+                    
+                    // تصفية حسب المستودع
+                    if (this.filters.warehouseId && transaction.warehouse_id != this.filters.warehouseId) {
+                        return false;
+                    }
+                    
+                    // تصفية حسب نوع المعاملة
+                    if (this.filters.transactionType && transaction.transaction_type !== this.filters.transactionType) {
+                        return false;
+                    }
+                    
+                    // تصفية حسب نطاق التاريخ
+                    if (this.filters.dateRange !== 'all') {
+                        const transactionDate = new Date(transaction.transaction_date);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        
+                        if (this.filters.dateRange === 'today') {
+                            const tomorrow = new Date(today);
+                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            return transactionDate >= today && transactionDate < tomorrow;
+                        } else if (this.filters.dateRange === 'week') {
+                            const startOfWeek = new Date(today);
+                            startOfWeek.setDate(today.getDate() - today.getDay());
+                            const endOfWeek = new Date(startOfWeek);
+                            endOfWeek.setDate(startOfWeek.getDate() + 7);
+                            return transactionDate >= startOfWeek && transactionDate < endOfWeek;
+                        } else if (this.filters.dateRange === 'month') {
+                            const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                            return transactionDate >= startOfMonth && transactionDate <= endOfMonth;
+                        }
+                    }
+                    
+                    return true;
+                })
+                .sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date));
+        },
+        
+        getItemName(itemId) {
+            const item = this.items.find(i => i.id === itemId);
+            return item ? item.name : `عنصر #${itemId}`;
+        },
+        
+        getItemSku(itemId) {
+            const item = this.items.find(i => i.id === itemId);
+            return item ? item.sku : '-';
+        },
+        
+        getWarehouseName(warehouseId) {
+            const warehouse = this.warehouses.find(w => w.id === warehouseId);
+            return warehouse ? warehouse.name : `مستودع #${warehouseId}`;
+        },
+        
+        formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ar-EG') + ' ' + date.toLocaleTimeString('ar-SA', {hour: '2-digit', minute:'2-digit'});
+        }
+    };
+}
+</script>
+{% endblock %}
+{% endblock %}

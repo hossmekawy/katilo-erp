@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Katilo{% endblock %}
+
+{% block content %}
+<div class="flex justify-center items-center min-h-[80vh]">
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md" x-data="registerForm()">
+        <h2 class="text-2xl font-bold text-center mb-6">Create an Account</h2>
+        
+        <form @submit.prevent="submitRegistration">
+            <div class="mb-4">
+                <label for="username" class="block text-gray-700 font-medium mb-2">Username</label>
+                <input type="text" id="username" x-model="formData.username" required
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div class="mb-4">
+                <label for="email" class="block text-gray-700 font-medium mb-2">Email</label>
+                <input type="email" id="email" x-model="formData.email" required
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div class="mb-4">
+                <label for="password" class="block text-gray-700 font-medium mb-2">Password</label>
+                <input type="password" id="password" x-model="formData.password" required
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div class="mb-6">
+                <label for="confirm_password" class="block text-gray-700 font-medium mb-2">Confirm Password</label>
+                <input type="password" id="confirm_password" x-model="formData.confirm_password" required
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p x-show="formData.password !== formData.confirm_password && formData.confirm_password" 
+                   class="text-red-500 text-sm mt-1">Passwords do not match</p>
+            </div>
+            
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition"
+                    :disabled="loading || formData.password !== formData.confirm_password" 
+                    x-text="loading ? 'Creating account...' : 'Register'"></button>
+            
+            <div class="mt-4 text-center">
+                <p class="text-gray-600">Already have an account? <a href="/login" class="text-blue-600 hover:underline">Login</a></p>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function registerForm() {
+    return {
+        formData: {
+            username: '',
+            email: '',
+            password: '',
+            confirm_password: ''
+        },
+        loading: false,
+        
+        async submitRegistration() {
+            if (this.formData.password !== this.formData.confirm_password) {
+                showNotification('Passwords do not match', 'error');
+                return;
+            }
+            
+            this.loading = true;
+            try {
+                const data = {
+                    username: this.formData.username,
+                    email: this.formData.email,
+                    password: this.formData.password
+                };
+                
+                const response = await fetchAPI('/api/auth/register', 'POST', data);
+                showNotification('Account created successfully!');
+                window.location.href = '/login';
+            } catch (error) {
+                console.error('Registration failed:', error);
+            } finally {
+                this.loading = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}
+{% endblock %}
