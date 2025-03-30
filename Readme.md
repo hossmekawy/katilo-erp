@@ -5,7 +5,7 @@
 <h1 align="center" style="font-size: 3rem; color: #4CAF50;">✨ Katilo ERP ✨</h1>
 
 <p align="center">
-  <em>A Modern & Scalable Inventory and Warehouse Management Platform</em>
+  <em>A Modern & Scalable Inventory and Warehouse Management Platform in arabic عربي</em>
 </p>
 
 <p align="center">
