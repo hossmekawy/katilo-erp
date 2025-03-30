@@ -1,161 +1,132 @@
-```markdown
 <p align="center">
-  <img src="https://via.placeholder.com/150" alt="Katilo ERP Logo" width="150"/>
+  <img src="https://via.placeholder.com/150" alt="Katilo ERP Logo" width="120" />
 </p>
 
-<h1 align="center">Katilo ERP</h1>
+<h1 align="center" style="font-size: 3rem; color: #4CAF50;">✨ Katilo ERP ✨</h1>
 
 <p align="center">
-  <strong>A Comprehensive Inventory and Warehouse Management System</strong>
+  <em>A Modern & Scalable Inventory and Warehouse Management Platform</em>
 </p>
 
 <p align="center">
-  <a href="https://github.com/hossmekawy/katilo-erp/stargazers"><img src="https://img.shields.io/github/stars/hossmekawy/katilo-erp.svg?style=social" alt="Stars"></a>
-  <a href="https://github.com/hossmekawy/katilo-erp/network/members"><img src="https://img.shields.io/github/forks/hossmekawy/katilo-erp.svg?style=social" alt="Forks"></a>
-  <a href="https://github.com/hossmekawy/katilo-erp/issues"><img src="https://img.shields.io/github/issues/hossmekawy/katilo-erp.svg" alt="Issues"></a>
-  <a href="https://github.com/hossmekawy/katilo-erp/blob/main/LICENSE"><img src="https://img.shields.io/github/license/hossmekawy/katilo-erp.svg" alt="License"></a>
+  <a href="https://github.com/hossmekawy/katilo-erp/stargazers"><img src="https://img.shields.io/github/stars/hossmekawy/katilo-erp.svg?style=for-the-badge" alt="Stars"></a>
+  <a href="https://github.com/hossmekawy/katilo-erp/network/members"><img src="https://img.shields.io/github/forks/hossmekawy/katilo-erp.svg?style=for-the-badge" alt="Forks"></a>
+  <a href="https://github.com/hossmekawy/katilo-erp/issues"><img src="https://img.shields.io/github/issues/hossmekawy/katilo-erp.svg?style=for-the-badge" alt="Issues"></a>
+  <a href="https://github.com/hossmekawy/katilo-erp/blob/main/LICENSE"><img src="https://img.shields.io/github/license/hossmekawy/katilo-erp.svg?style=for-the-badge" alt="License"></a>
 </p>
 
 ---
 
-## 🌟 Overview
+## 🌐 Overview
 
-**Katilo ERP** is a powerful, open-source Enterprise Resource Planning (ERP) system built with Flask, designed to streamline inventory management, warehouse operations, user administration, and more. Whether you're managing stock levels, tracking transactions, or overseeing production runs, Katilo ERP provides a robust and scalable solution.
+**Katilo ERP** is an open-source ERP platform designed with **Flask** to handle all your business's inventory, warehouse, and operations management. Clean, lightweight, and modular.
 
-### Key Features
-- 📦 **Inventory Management**: Track items, quantities, and reorder levels.
-- 🏢 **Warehouse Layout**: Organize sections and slots for efficient storage.
-- 👥 **User Management**: Role-based access control (RBAC) with admin and user roles.
-- 📞 **Support Tickets**: Integrated system for user support with file attachments.
-- 📊 **Dashboard**: Real-time stats on items, warehouses, and transactions.
-- 🔄 **Advanced Features**: Demand forecasting, production planning, and more!
+### 🎯 Key Features
 
----
-
-## 🚀 Getting Started
-
-Follow these steps to set up and run Katilo ERP on your local machine.
-
-### Prerequisites
-- **Python 3.8+**: Ensure Python is installed. [Download here](https://www.python.org/downloads/).
-- **Git**: For cloning the repository. [Install Git](https://git-scm.com/downloads).
-- **Virtual Environment**: Recommended for isolating dependencies.
-
-### Installation
-
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/hossmekawy/katilo-erp.git
-   cd katilo-erp
-   ```
-
-2. **Set Up a Virtual Environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-   The `requirements.txt` file includes:
-   ```
-   Flask==2.3.3
-   Flask-SQLAlchemy==3.0.3
-   Flask-Login==0.6.2
-   SQLAlchemy==2.0.20
-   Werkzeug==2.3.7
-   python-dateutil==2.8.2
-   ```
-
-4. **Configure the Application**
-   - The app uses SQLite by default (`sqlite:///katilo.db`). No additional setup is needed for the database.
-   - Update `app.config['SECRET_KEY']` in `app.py` with a secure key:
-     ```python
-     app.config['SECRET_KEY'] = 'your-very-secure-secret-key'
-     ```
-
-5. **Initialize the Database**
-   Run the following commands in a Python shell:
-   ```python
-   from app import app, db
-   with app.app_context():
-       db.create_all()
-   ```
-
-### Running the Application
-
-1. **Start the Flask Server**
-   ```bash
-   python app.py
-   ```
-
-2. **Access the App**
-   Open your browser and navigate to:
-   ```
-   http://localhost:5000
-   ```
-
-   - **Login**: Use `/login` to access the login page.
-   - **Register**: Admins can create users via `/api/admin/users`.
+- 📦 **Inventory Management** — Track stock, quantities, and alerts.
+- 🏢 **Warehouse Mapping** — Slot/section organization.
+- 👤 **User Roles & Permissions** — Admin and employee access control.
+- 🎟️ **Support Tickets** — With file uploads and responses.
+- 📊 **Dynamic Dashboard** — Real-time metrics and analytics.
+- 🛠️ **Upcoming** — Forecasting, production planning, and much more!
 
 ---
 
-## 🛠️ Project Structure
+## ⚙️ Installation & Setup
 
+### 📋 Requirements
+- Python 3.8+
+- Git
+- Virtual Environment tool (optional but recommended)
+
+### 🚧 Steps
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/hossmekawy/katilo-erp.git
+cd katilo-erp
+
+# 2. Set up the virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# 3. Install requirements
+pip install -r requirements.txt
+
+# 4. (Optional) Set a secure SECRET_KEY in app.py
+app.config['SECRET_KEY'] = 'your-secret-key'
+
+# 5. Initialize DB
+python
+>>> from app import app, db
+>>> with app.app_context():
+>>>     db.create_all()
 ```
+
+### ▶️ Run the App
+```bash
+python app.py
+```
+
+Navigate to:
+```
+http://localhost:5000
+```
+
+- 🔐 `/login` – User login
+- ➕ `/api/admin/users` – Admin-only user registration
+
+---
+
+## 📁 Project Layout
+
+```bash
 katilo-erp/
-├── app.py              # Main Flask application
-├── models.py           # Database models
-├── support_routes.py   # Support ticket routes
-├── static/             # Static files (CSS, JS, uploads)
-│   └── uploads/
-│       └── support/    # Uploaded support ticket attachments
-├── templates/          # HTML templates
-├── requirements.txt    # Python dependencies
-└── katilo.db           # SQLite database (created after initialization)
+├── app.py              # Main Flask app
+├── models.py           # DB models
+├── support_routes.py   # Ticket endpoints
+├── static/
+│   └── uploads/support # File uploads
+├── templates/          # HTML views
+├── requirements.txt    # Dependencies
+└── katilo.db           # SQLite DB (auto-created)
 ```
 
 ---
 
-## 📖 Usage
+## 💡 How to Use
 
-- **Admin Access**: Log in as an admin to manage users, roles, and permissions.
-- **Inventory**: Navigate to `/inventory-management` to manage items and stock.
-- **Support**: Use `/contact-support` to submit tickets (requires login).
-- **Dashboard**: View stats at `/dashboard`.
+- 🧑‍💼 **Admin** can manage users, view dashboards, and handle tickets.
+- 🧾 **Inventory** tools available at `/inventory-management`
+- 🆘 **Support** form is at `/contact-support`
+- 📈 **Stats** and visual metrics at `/dashboard`
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how to get involved:
+We welcome pull requests! Here's how:
 
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Commit your changes (`git commit -m "Add your feature"`).
-4. Push to the branch (`git push origin feature/your-feature`).
-5. Open a Pull Request.
+1. Fork the project
+2. Create a feature branch: `git checkout -b feature/xyz`
+3. Commit your work: `git commit -m "feat: add xyz feature"`
+4. Push it: `git push origin feature/xyz`
+5. Open a PR
 
-Please read our [Contributing Guidelines](CONTRIBUTING.md) for more details.
+📘 Read our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ---
 
-## 📜 License
+## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+Licensed under the **MIT License**. See the [LICENSE](LICENSE) file.
 
 ---
 
 ## 👨‍💻 Author
 
-Developed by [Hossam Mekawy](https://github.com/hossmekawy). Feel free to reach out with questions or suggestions!
-
----
+Made with 💚 by [Hossam Mekawy](https://github.com/hossmekawy)
 
 <p align="center">
-  <strong>Happy Managing with Katilo ERP! 🚚📈</strong>
+  <img src="https://img.shields.io/badge/Thanks%20for%20visiting-Katilo%20ERP-brightgreen?style=for-the-badge"/>
 </p>
-```
