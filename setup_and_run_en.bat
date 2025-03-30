@@ -14,7 +14,7 @@ echo      I - Intuitive User Experience
 echo      L - Logistics Made Simple
 echo      O - Optimized for Efficiency
 echo.
-echo Developed by Hossam Mekawy - GitHub: https://github.com/hossmekawy/katilo-erp
+echo Developed by EL 7AMLA team - GitHub: https://github.com/hossmekawy/katilo-erp
 echo Logo: https://ik.imagekit.io/tijarahub/optimized/Frontend-Ayehia/Vendors/Egypt/Katilo/Logo.png
 echo.
 echo Preparing to set up and launch your ERP system...
