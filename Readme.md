@@ -53,7 +53,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # 3. Install requirements
 pip install -r requirements.txt
 
-or use setup_and_run_en.bat and it will auto do these
+# or use setup_and_run_en.bat and it will auto do these
 
 # 4. (Optional) Set a secure SECRET_KEY in app.py
 app.config['SECRET_KEY'] = 'your-secret-key'
