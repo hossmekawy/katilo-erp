@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://via.placeholder.com/150" alt="Katilo ERP Logo" width="120" />
+  <img src="[https://via.placeholder.com/150](https://ik.imagekit.io/tijarahub/optimized/Frontend-Ayehia/Vendors/Egypt/Katilo/Logo.png?1727273743029)" alt="Katilo ERP Logo" width="120" />
 </p>
 
 <h1 align="center" style="font-size: 3rem; color: #4CAF50;">✨ Katilo ERP ✨</h1>
