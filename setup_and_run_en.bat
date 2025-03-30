@@ -14,7 +14,7 @@ echo      I - Intuitive User Experience
 echo      L - Logistics Made Simple
 echo      O - Optimized for Efficiency
 echo.
-echo Developed by EL 7AMLA team - GitHub: https://github.com/hossmekawy/katilo-erp
+echo Developed by 7AMLA TEAM  - GitHub: https://github.com/hossmekawy/katilo-erp
 echo Logo: https://ik.imagekit.io/tijarahub/optimized/Frontend-Ayehia/Vendors/Egypt/Katilo/Logo.png
 echo.
 echo Preparing to set up and launch your ERP system...
@@ -40,7 +40,7 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 echo [#####-----] 50%% Virtual environment created successfully!
-timeout /t 1 >nul
+timeout /t 5 >nul
 cls
 
 echo ===============================================================================
@@ -57,7 +57,7 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 echo [#######---] 70%% Virtual environment activated!
-timeout /t 1 >nul
+timeout /t 5 >nul
 cls
 
 echo ===============================================================================
@@ -75,7 +75,7 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 echo [#########-] 90%% Requirements installed successfully!
-timeout /t 1 >nul
+timeout /t 5 >nul
 cls
 
 echo ===============================================================================
