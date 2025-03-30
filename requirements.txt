@@ -1,0 +1,20 @@
+# requirements.txt
+
+# Core Flask framework and extensions
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.3
+Flask-Login==0.6.2
+
+# Database and security
+SQLAlchemy==2.0.20
+Werkzeug==2.3.7
+
+# File handling and utilities
+python-dateutil==2.8.2
+
+# Optional: for development and debugging
+Werkzeug[watchdog]==2.3.7  # Includes watchdog for auto-reloading in debug mode
+
+# Notes:
+# - Ensure SQLite is supported by your Python installation (usually built-in)
+# - Versions are based on stable releases as of March 29, 2025; adjust as needed
