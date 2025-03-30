@@ -1,44 +1,105 @@
 @echo off
-echo Welcome! Setting up and running Katilo ERP...
-echo.
+color 0A
+title KATILO ERP Setup & Launch
 
-echo 1. Creating virtual environment...
+echo.
+echo ===============================================================================
+echo          Welcome to KATILO ERP - Version 1.0.0
+echo ===============================================================================
+echo.
+echo      K - Knowledgeable Inventory Management
+echo      A - Advanced Warehouse Solutions
+echo      T - Transaction Tracking Excellence
+echo      I - Intuitive User Experience
+echo      L - Logistics Made Simple
+echo      O - Optimized for Efficiency
+echo.
+echo Developed by Hossam Mekawy - GitHub: https://github.com/hossmekawy/katilo-erp
+echo Logo: https://ik.imagekit.io/tijarahub/optimized/Frontend-Ayehia/Vendors/Egypt/Katilo/Logo.png
+echo.
+echo Preparing to set up and launch your ERP system...
+timeout /t 2 >nul
+
+echo.
+echo [----------] 0%% Initializing...
+timeout /t 1 >nul
+cls
+
+echo ===============================================================================
+echo          Step 1: Creating Virtual Environment
+echo ===============================================================================
+echo.
+echo [####------] 40%% Setting up venv...
 python -m venv venv
 if %ERRORLEVEL% NEQ 0 (
-    echo Error: Failed to create virtual environment. Ensure Python is installed.
+    color 0C
+    echo.
+    echo ERROR: Failed to create virtual environment!
+    echo Please ensure Python is installed and added to PATH.
     pause
     exit /b %ERRORLEVEL%
 )
-echo Virtual environment created successfully!
-echo.
+echo [#####-----] 50%% Virtual environment created successfully!
+timeout /t 1 >nul
+cls
 
-echo 2. Activating virtual environment...
+echo ===============================================================================
+echo          Step 2: Activating Virtual Environment
+echo ===============================================================================
+echo.
+echo [######----] 60%% Activating...
 call venv\Scripts\activate
 if %ERRORLEVEL% NEQ 0 (
-    echo Error: Failed to activate virtual environment.
+    color 0C
+    echo.
+    echo ERROR: Failed to activate virtual environment!
     pause
     exit /b %ERRORLEVEL%
 )
-echo Virtual environment activated!
-echo.
+echo [#######---] 70%% Virtual environment activated!
+timeout /t 1 >nul
+cls
 
-echo 3. Installing requirements from requirements.txt...
+echo ===============================================================================
+echo          Step 3: Installing Dependencies
+echo ===============================================================================
+echo.
+echo [########--] 80%% Installing requirements...
 pip install -r requirements.txt
 if %ERRORLEVEL% NEQ 0 (
-    echo Error: Failed to install requirements. Ensure requirements.txt exists and internet is connected.
+    color 0C
+    echo.
+    echo ERROR: Failed to install requirements!
+    echo Ensure requirements.txt exists and you have an internet connection.
     pause
     exit /b %ERRORLEVEL%
 )
-echo Requirements installed successfully!
-echo.
+echo [#########-] 90%% Requirements installed successfully!
+timeout /t 1 >nul
+cls
 
-echo 4. Running the application...
+echo ===============================================================================
+echo          Step 4: Launching KATILO ERP
+echo ===============================================================================
+echo.
+echo [##########] 100%% Starting application...
+timeout /t 1 >nul
 python app.py
 if %ERRORLEVEL% NEQ 0 (
-    echo Error: Failed to run app.py. Ensure the file exists and is valid.
+    color 0C
+    echo.
+    echo ERROR: Failed to run app.py!
+    echo Ensure app.py exists and is valid.
     pause
     exit /b %ERRORLEVEL%
 )
 
-echo The application is now running! Open your browser at http://localhost:5000
+color 0A
+echo.
+echo ===============================================================================
+echo          KATILO ERP is now running!
+echo          Open your browser at: http://localhost:5000
+echo ===============================================================================
+echo.
+echo Enjoy managing your inventory with KATILO ERP!
 pause
