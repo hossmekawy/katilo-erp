@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+
+{% block title %}حسابات الموردين - نظام كاتيلو{% endblock %}
+
+{% block page_header %}حسابات الموردين{% endblock %}
+
+{% block content %}
+<div x-data="supplierAccountsApp()" class="space-y-6">
+    <!-- Header with actions -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h2 class="text-xl font-bold text-gray-800">حسابات الموردين</h2>
+            <p class="text-sm text-gray-600">إدارة الحسابات المالية للموردين</p>
+        </div>
+    </div>
+    
+    <!-- Filters and search -->
+    <div class="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+        <div class="flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">بحث</label>
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="search" 
+                        x-model="searchQuery"
+                        @input="searchSuppliers"
+                        placeholder="ابحث عن مورد..." 
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    >
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="w-full md:w-48">
+                <label for="balance-filter" class="block text-sm font-medium text-gray-700 mb-1">الرصيد</label>
+                <select 
+                    id="balance-filter" 
+                    x-model="balanceFilter"
+                    @change="filterSuppliers"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                >
+                    <option value="all">جميع الموردين</option>
+                    <option value="positive">رصيد مدين (موجب)</option>
+                    <option value="negative">رصيد دائن (سالب)</option>
+                    <option value="zero">رصيد صفري</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Suppliers Accounts Table -->
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المورد
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            عدد الطلبات
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            إجمالي المشتريات
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            إجمالي المدفوعات
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الرصيد
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="suppliers.length === 0">
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                <div class="py-8">
+                                    <i class="fas fa-users text-gray-300 text-5xl mb-4"></i>
+                                    <p class="font-medium">لا توجد بيانات للموردين</p>
+                                    <p class="text-gray-400 mt-1">قم بإضافة موردين للبدء</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-for="supplier in suppliers" :key="supplier.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full">
+                                        <span x-text="supplier.name.charAt(0).toUpperCase()"></span>
+                                    </div>
+                                    <div class="ml-4 rtl:mr-4 rtl:ml-0">
+                                        <div class="text-sm font-medium text-gray-900" x-text="supplier.name"></div>
+                                        <div class="text-sm text-gray-500">
+                                            <span x-text="supplier.contact || supplier.email || supplier.phone || 'لا يوجد بيانات اتصال'"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="supplier.purchase_orders_count"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(supplier.total_ordered)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(supplier.total_paid)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="{
+                                          'bg-red-100 text-red-800': supplier.balance > 0,
+                                          'bg-green-100 text-green-800': supplier.balance < 0,
+                                          'bg-gray-100 text-gray-800': supplier.balance === 0
+                                      }">
+                                    <span x-text="formatCurrency(supplier.balance)"></span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex items-center space-x-3 space-x-reverse">
+                                    <a :href="'/supplier-accounts/' + supplier.id" class="text-blue-600 hover:text-blue-900">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button @click="downloadPdf(supplier.id)" class="text-red-600 hover:text-red-900">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </button>
+                                    <button @click="downloadExcel(supplier.id)" class="text-green-600 hover:text-green-900">
+                                        <i class="fas fa-file-excel"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-800">
+                    <i class="fas fa-shopping-cart text-xl"></i>
+                </div>
+                <div class="ml-5 rtl:mr-5 rtl:ml-0">
+                    <div class="text-sm font-medium text-gray-500">إجمالي المشتريات</div>
+                    <div class="mt-1 text-xl font-semibold text-gray-900" x-text="formatCurrency(totalOrdered)"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-800">
+                    <i class="fas fa-money-bill-wave text-xl"></i>
+                </div>
+                <div class="ml-5 rtl:mr-5 rtl:ml-0">
+                    <div class="text-sm font-medium text-gray-500">إجمالي المدفوعات</div>
+                    <div class="mt-1 text-xl font-semibold text-gray-900" x-text="formatCurrency(totalPaid)"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-red-100 text-red-800">
+                    <i class="fas fa-balance-scale text-xl"></i>
+                </div>
+                <div class="ml-5 rtl:mr-5 rtl:ml-0">
+                    <div class="text-sm font-medium text-gray-500">إجمالي الرصيد المستحق</div>
+                    <div class="mt-1 text-xl font-semibold text-gray-900" x-text="formatCurrency(totalBalance)"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function supplierAccountsApp() {
+        return {
+            suppliers: [],
+            searchQuery: '',
+            balanceFilter: 'all',
+            
+            get totalOrdered() {
+                return this.suppliers.reduce((sum, supplier) => sum + supplier.total_ordered, 0);
+            },
+            
+            get totalPaid() {
+                return this.suppliers.reduce((sum, supplier) => sum + supplier.total_paid, 0);
+            },
+            
+            get totalBalance() {
+                return this.suppliers.reduce((sum, supplier) => sum + supplier.balance, 0);
+            },
+            
+            init() {
+                this.fetchSupplierAccounts();
+            },
+            
+            async fetchSupplierAccounts() {
+                try {
+                    const response = await fetch('/api/supplier-accounts');
+                    if (!response.ok) throw new Error('Failed to fetch supplier accounts');
+                    this.suppliers = await response.json();
+                } catch (error) {
+                    console.error('Error fetching supplier accounts:', error);
+                    showNotification(error.message, 'error');
+                }
+            },
+            
+            searchSuppliers() {
+                if (this.searchQuery.length < 2 && this.balanceFilter === 'all') {
+                    return this.fetchSupplierAccounts();
+                }
+                
+                this.filterSuppliers();
+            },
+            
+            async filterSuppliers() {
+                try {
+                    // First fetch all suppliers
+                    const response = await fetch('/api/supplier-accounts');
+                    if (!response.ok) throw new Error('Failed to fetch supplier accounts');
+                    let suppliers = await response.json();
+                    
+                    // Apply search filter
+                    if (this.searchQuery.length >= 2) {
+                        const query = this.searchQuery.toLowerCase();
+                        suppliers = suppliers.filter(supplier => 
+                            supplier.name.toLowerCase().includes(query) || 
+                            (supplier.contact && supplier.contact.toLowerCase().includes(query))
+                        );
+                    }
+                    
+                    // Apply balance filter
+                    if (this.balanceFilter !== 'all') {
+                        switch (this.balanceFilter) {
+                            case 'positive':
+                                suppliers = suppliers.filter(supplier => supplier.balance > 0);
+                                break;
+                            case 'negative':
+                                suppliers = suppliers.filter(supplier => supplier.balance < 0);
+                                break;
+                            case 'zero':
+                                suppliers = suppliers.filter(supplier => supplier.balance === 0);
+                                break;
+                        }
+                    }
+                    
+                    this.suppliers = suppliers;
+                } catch (error) {
+                    console.error('Error filtering suppliers:', error);
+                    showNotification(error.message, 'error');
+                }
+            },
+            
+            downloadPdf(supplierId) {
+                window.open(`/api/supplier-accounts/${supplierId}/pdf`, '_blank');
+            },
+            
+            downloadExcel(supplierId) {
+                window.open(`/api/supplier-accounts/${supplierId}/excel`, '_blank');
+            },
+            
+            formatCurrency(amount) {
+                if (amount === undefined || amount === null) return '';
+                return new Intl.NumberFormat('ar-EG', {
+                    style: 'currency',
+                    currency: 'EGP'
+                }).format(amount);
+            }
+        };
+    }
+</script>
+{% endblock %}
+

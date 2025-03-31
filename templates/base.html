@@ -99,6 +99,22 @@
             from { transform: translateY(0); opacity: 1; }
             to { transform: translateY(20px); opacity: 0; }
         }
+        /* Add this to your existing style section */
+/* Hide scrollbar but maintain scrolling functionality */
+aside nav.overflow-y-auto,
+.mobile-menu nav.overflow-y-auto {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+aside nav.overflow-y-auto::-webkit-scrollbar,
+.mobile-menu nav.overflow-y-auto::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+    width: 0;
+    height: 0;
+}
+
+
     </style>
     {% block styles %}{% endblock %}
 </head>
@@ -119,37 +135,95 @@
             
             <nav class="flex-1 overflow-y-auto py-4 px-3">
                 <div class="space-y-1.5">
+                    <!-- Dashboard -->
                     <a href="/dashboard" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/dashboard' %}active{% endif %}">
                         <i class="fas fa-tachometer-alt"></i> 
                         <span>لوحة التحكم</span>
                     </a>
                     
-                    <a href="/inventory-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/inventory-management' %}active{% endif %}">
-                        <i class="fas fa-boxes"></i> 
-                        <span>المخزون</span>
-                    </a>
+                    <!-- Inventory Management Section -->
+                    <div x-data="{ open: {{ 'true' if request.path in ['/inventory-management', '/warehouse-layout', '/warehouses-management'] else 'false' }} }">
+                        <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-boxes"></i>
+                                <span class="mr-2">إدارة المخزون</span>
+                            </div>
+                            <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+                        </button>
+                        
+                        <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+                            <a href="/inventory-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/inventory-management' %}active{% endif %}">
+                                <i class="fas fa-box-open"></i>
+                                <span>المخزون</span>
+                            </a>
+                            <a href="/warehouse-layout" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/warehouse-layout' %}active{% endif %}">
+                                <i class="fas fa-th"></i>
+                                <span>تخطيط المستودع</span>
+                            </a>
+                            <a href="/warehouses-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/warehouses-management' %}active{% endif %}">
+                                <i class="fas fa-warehouse"></i>
+                                <span>إدارة المستودعات</span>
+                            </a>
+                        </div>
+                    </div>
                     
-                    <a href="/warehouse-layout" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/warehouse-layout' %}active{% endif %}">
-                        <i class="fas fa-warehouse"></i> 
-                        <span>تخطيط المستودع</span>
-                    </a>
+                    <!-- Products Management Section -->
+                    <div x-data="{ open: {{ 'true' if request.path in ['/categories-management', '/items-management', '/bom-management'] else 'false' }} }">
+                        <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-cubes"></i>
+                                <span class="mr-2">إدارة المنتجات</span>
+                            </div>
+                            <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+                        </button>
+                        
+                        <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+                            <a href="/categories-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/categories-management' %}active{% endif %}">
+                                <i class="fas fa-tags"></i>
+                                <span>التصنيفات</span>
+                            </a>
+                            <a href="/items-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/items-management' %}active{% endif %}">
+                                <i class="fas fa-cube"></i>
+                                <span>العناصر</span>
+                            </a>
+                            <a href="/bom-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/bom-management' %}active{% endif %}">
+                                <i class="fas fa-clipboard-list"></i>
+                                <span>قوائم المواد</span>
+                            </a>
+                        </div>
+                    </div>
                     
-                    <a href="/categories-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/categories-management' %}active{% endif %}">
-                        <i class="fas fa-tags"></i> 
-                        <span>التصنيفات</span>
-                    </a>
+                    <!-- Suppliers Management Section -->
+                    <div x-data="{ open: {{ 'true' if request.path in ['/suppliers-management', '/supplier-accounts', '/purchase-orders'] else 'false' }} }">
+                        <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-truck"></i>
+                                <span class="mr-2">إدارة الموردين</span>
+                            </div>
+                            <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+                        </button>
+                        
+                        <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+                            <a href="/suppliers-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/suppliers-management' %}active{% endif %}">
+                                <i class="fas fa-address-book"></i>
+                                <span>الموردين</span>
+                            </a>
+                            <a href="/supplier-accounts" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/supplier-accounts' %}active{% endif %}">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                                <span>حسابات الموردين</span>
+                            </a>
+                            <a href="/purchase-orders" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/purchase-orders' %}active{% endif %}">
+                                <i class="fas fa-shopping-cart"></i>
+                                <span>طلبات الشراء</span>
+                            </a>
+                        </div>
+                    </div>
                     
-                    <a href="/items-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/items-management' %}active{% endif %}">
-                        <i class="fas fa-cubes"></i> 
-                        <span>العناصر</span>
-                    </a>
-                    
+                    <!-- Transactions -->
                     <a href="/transactions-history" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/transactions-history' %}active{% endif %}">
-                        <i class="fas fa-exchange-alt"></i> 
+                        <i class="fas fa-exchange-alt"></i>
                         <span>المعاملات</span>
                     </a>
-
-                    
                 </div>
                 
                 {% if current_user.role and current_user.role.name == 'admin' %}
@@ -158,23 +232,46 @@
                         إدارة النظام
                     </h3>
                     <div class="space-y-1.5">
-                        <a href="/admin/users" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/users' %}active{% endif %}">
-                            <i class="fas fa-users"></i> 
-                            <span>المستخدمين</span>
-                        </a>
+                        <!-- Admin Section -->
+                        <div x-data="{ open: {{ 'true' if request.path in ['/admin/users', '/admin/roles', '/admin/support-tickets'] else 'false' }} }">
+                            <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <i class="fas fa-user-shield"></i>
+                                    <span class="mr-2">إدارة النظام</span>
+                                </div>
+                                <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+                            </button>
+                            
+                            <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+                                <a href="/admin/users" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/admin/users' %}active{% endif %}">
+                                    <i class="fas fa-users"></i>
+                                    <span>المستخدمين</span>
+                                </a>
+                                <a href="/admin/roles" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/admin/roles' %}active{% endif %}">
+                                    <i class="fas fa-user-tag"></i>
+                                    <span>الأدوار</span>
+                                </a>
+                                <a href="/admin/support-tickets" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/admin/support-tickets' %}active{% endif %}">
+                                    <i class="fas fa-ticket-alt"></i>
+                                    <span>تذاكر الدعم</span>
+                                </a>
+                            </div>
+                        </div>
                         
-                        <a href="/admin/roles" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/roles' %}active{% endif %}">
-                            <i class="fas fa-user-tag"></i> 
-                            <span>الأدوار</span>
-                        </a>
-                        <a href="/admin/support-tickets" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/support-tickets' %}active{% endif %}">
-                            <i class="fas fa-ticket-alt"></i> 
-                            <span>تذاكر الدعم</span>
+                        <!-- Help Guide -->
+                        <a href="/tips" class="block py-2.5 px-4 rounded-lg transition-all duration-300 {% if request.path == '/tips' %}bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg{% else %}bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:text-blue-800 hover:shadow-md transform hover:scale-105{% endif %} relative">
+                            <i class="fas fa-lightbulb mr-2"></i>
+                            <span class="font-bold">دليل</span>
+                            
+                            <span class="absolute -top-1 -left-1 bg-yellow-400 text-white text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center">
+                                <i class="fas fa-star text-xs"></i>
+                            </span>
                         </a>
                     </div>
                 </div>
                 {% endif %}
             </nav>
+            
             
             <div class="p-4 border-t border-white/10">
                 <div class="flex items-center space-x-3">
@@ -309,78 +406,165 @@
                     </div>
                     
                     <!-- Mobile Navigation -->
-                    <nav class="flex-1 overflow-y-auto py-4 px-3">
-                        <div class="space-y-1.5">
-                            <a href="/dashboard" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/dashboard' %}active{% endif %}">
-                                <i class="fas fa-tachometer-alt"></i> 
-                                <span>لوحة التحكم</span>
-                            </a>
-                            
-                            <a href="/inventory-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/inventory-management' %}active{% endif %}">
-                                <i class="fas fa-boxes"></i> 
-                                <span>المخزون</span>
-                            </a>
-                            
-                            <a href="/warehouse-layout" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/warehouse-layout' %}active{% endif %}">
-                                <i class="fas fa-warehouse"></i> 
-                                <span>تخطيط المستودع</span>
-                            </a>
-                            
-                            <a href="/categories-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/categories-management' %}active{% endif %}">
-                                <i class="fas fa-tags"></i> 
-                                <span>التصنيفات</span>
-                            </a>
-                            
-                            <a href="/items-management" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/items-management' %}active{% endif %}">
-                                <i class="fas fa-cubes"></i> 
-                                <span>العناصر</span>
-                            </a>
-                            
-                            <a href="/transactions-history" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/transactions-history' %}active{% endif %}">
-                                <i class="fas fa-exchange-alt"></i> 
-                                <span>المعاملات</span>
-                            </a>
+                    <!-- Mobile Navigation -->
+<nav class="flex-1 overflow-y-auto py-4 px-3">
+    <div class="space-y-1.5">
+        <!-- Dashboard -->
+        <a href="/dashboard" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/dashboard' %}active{% endif %}">
+            <i class="fas fa-tachometer-alt"></i>
+            <span>لوحة التحكم</span>
+        </a>
+        
+        <!-- Inventory Management Section -->
+        <div x-data="{ open: {{ 'true' if request.path in ['/inventory-management', '/warehouse-layout', '/warehouses-management'] else 'false' }} }">
+            <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-boxes"></i>
+                    <span class="mr-2">إدارة المخزون</span>
+                </div>
+                <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+            </button>
+            
+            <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+                <a href="/inventory-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/inventory-management' %}active{% endif %}">
+                    <i class="fas fa-box-open"></i>
+                    <span>المخزون</span>
+                </a>
+                <a href="/warehouse-layout" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/warehouse-layout' %}active{% endif %}">
+                    <i class="fas fa-th"></i>
+                    <span>تخطيط المستودع</span>
+                </a>
+                <a href="/warehouses-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/warehouses-management' %}active{% endif %}">
+                    <i class="fas fa-warehouse"></i>
+                    <span>إدارة المستودعات</span>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Products Management Section -->
+        <div x-data="{ open: {{ 'true' if request.path in ['/categories-management', '/items-management', '/bom-management'] else 'false' }} }">
+            <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-cubes"></i>
+                    <span class="mr-2">إدارة المنتجات</span>
+                </div>
+                <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+            </button>
+            
+            <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+                <a href="/categories-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/categories-management' %}active{% endif %}">
+                    <i class="fas fa-tags"></i>
+                    <span>التصنيفات</span>
+                </a>
+                <a href="/items-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/items-management' %}active{% endif %}">
+                    <i class="fas fa-cube"></i>
+                    <span>العناصر</span>
+                </a>
+                <a href="/bom-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/bom-management' %}active{% endif %}">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>قوائم المواد</span>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Suppliers Management Section -->
+        <div x-data="{ open: {{ 'true' if request.path in ['/suppliers-management', '/supplier-accounts', '/purchase-orders'] else 'false' }} }">
+            <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-truck"></i>
+                    <span class="mr-2">إدارة الموردين</span>
+                </div>
+                <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+            </button>
+            
+            <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+                <a href="/suppliers-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/suppliers-management' %}active{% endif %}">
+                    <i class="fas fa-address-book"></i>
+                    <span>الموردين</span>
+                    <a href="/suppliers-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/suppliers-management' %}active{% endif %}">
+                        <i class="fas fa-address-book"></i>
+                        <span>الموردين</span>
+                    </a>
+                    <a href="/supplier-accounts" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/supplier-accounts' %}active{% endif %}">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>حسابات الموردين</span>
+                    </a>
+                    <a href="/purchase-orders" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/purchase-orders' %}active{% endif %}">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>طلبات الشراء</span>
+                    </a>
+                    <a href="/supplier-items-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/supplier-items-management' %}active{% endif %}">
+                        <i class="fas fa-dolly-flatbed"></i>
+                        <span>عناصر الموردين</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Transactions -->
+            <a href="/transactions-history" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/transactions-history' %}active{% endif %}">
+                <i class="fas fa-exchange-alt"></i>
+                <span>المعاملات</span>
+            </a>
+        </div>
+        
+        {% if current_user.role and current_user.role.name == 'admin' %}
+        <div class="mt-6 pt-6 border-t border-white/10">
+            <h3 class="px-4 text-xs font-semibold text-blue-200 uppercase tracking-wider mb-3">
+                إدارة النظام
+            </h3>
+            <div class="space-y-1.5">
+                <!-- Admin Section -->
+                <div x-data="{ open: {{ 'true' if request.path in ['/admin/users', '/admin/roles', '/admin/support-tickets'] else 'false' }} }">
+                    <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i class="fas fa-user-shield"></i>
+                            <span class="mr-2">إدارة النظام</span>
                         </div>
-                        
-                        {% if current_user.role and current_user.role.name == 'admin' %}
-                        <div class="mt-6 pt-6 border-t border-white/10">
-                            <h3 class="px-4 text-xs font-semibold text-blue-200 uppercase tracking-wider mb-3">
-                                إدارة النظام
-                            </h3>
-                            <div class="space-y-1.5">
-                                <a href="/admin/users" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/users' %}active{% endif %}">
-                                    <i class="fas fa-users"></i> 
-                                    <span>المستخدمين</span>
-                                </a>
-                                
-                                <a href="/admin/roles" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/roles' %}active{% endif %}">
-                                    <i class="fas fa-user-tag"></i> 
-                                    <span>الأدوار</span>
-                                </a>
-                                <a href="/admin/support-tickets" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/admin/support-tickets' %}active{% endif %}">
-                                    <i class="fas fa-ticket-alt"></i> 
-                                    <span>تذاكر الدعم</span>
-                                </a>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        <!-- Mobile Menu Footer -->
-                        <div class="mt-6 pt-6 border-t border-white/10">
-                            <a href="/user-profile" class="sidebar-item block py-2.5 px-4 rounded-lg">
-                                <i class="fas fa-user-circle"></i> 
-                                <span>الملف الشخصي</span>
-                            </a>
-                            <a href="/settings" class="sidebar-item block py-2.5 px-4 rounded-lg">
-                                <i class="fas fa-cog"></i> 
-                                <span>الإعدادات</span>
-                            </a>
-                            <a href="/api/auth/logout" class="sidebar-item block py-2.5 px-4 rounded-lg text-red-300 hover:text-red-200">
-                                <i class="fas fa-sign-out-alt"></i> 
-                                <span>تسجيل الخروج</span>
-                            </a>
-                        </div>
-                    </nav>
+                        <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+                    </button>
+                    
+                    <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+                        <a href="/admin/users" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/admin/users' %}active{% endif %}">
+                            <i class="fas fa-users"></i>
+                            <span>المستخدمين</span>
+                        </a>
+                        <a href="/admin/roles" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/admin/roles' %}active{% endif %}">
+                            <i class="fas fa-user-tag"></i>
+                            <span>الأدوار</span>
+                        </a>
+                        <a href="/admin/support-tickets" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/admin/support-tickets' %}active{% endif %}">
+                            <i class="fas fa-ticket-alt"></i>
+                            <span>تذاكر الدعم</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Help Guide -->
+                <a href="/tips" class="block py-2.5 px-4 rounded-lg transition-colors duration-200 {% if request.path == '/tips' %}bg-blue-600 text-white{% else %}bg-gray-50 text-gray-700 hover:bg-blue-100 hover:text-blue-600{% endif %}">
+                    <i class="fas fa-lightbulb mr-2"></i>
+                    <span>دليل</span>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Mobile Menu Footer -->
+        <div class="mt-6 pt-6 border-t border-white/10">
+            <a href="/user-profile" class="sidebar-item block py-2.5 px-4 rounded-lg">
+                <i class="fas fa-user-circle"></i>
+                <span>الملف الشخصي</span>
+            </a>
+            <a href="/settings" class="sidebar-item block py-2.5 px-4 rounded-lg">
+                <i class="fas fa-cog"></i>
+                <span>الإعدادات</span>
+            </a>
+            <a href="/api/auth/logout" class="sidebar-item block py-2.5 px-4 rounded-lg text-red-300 hover:text-red-200">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>تسجيل الخروج</span>
+            </a>
+        </div>
+    </nav>
+    
                 </div>
             </div>
             {% endif %}
@@ -620,7 +804,10 @@
                             'create': 'إنشاء',
                             'edit': 'تعديل',
                             'view': 'عرض',
-                            'delete': 'حذف'
+                            'delete': 'حذف',
+                            'purchase-orders': 'طلبات الشراء',
+                            'supplier-accounts': 'حسابات الموردين',
+                            'suppliers-management':'إدارة الموردين',
                         };
                         
                         return {

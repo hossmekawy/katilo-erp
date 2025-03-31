@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>كشف حساب المورد - {{ supplier.supplier_name }}</title>
+    <style>
+        @font-face {
+            font-family: 'Cairo';
+            src: url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+        }
+       
+        body {
+            font-family: 'Cairo', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            direction: rtl;
+        }
+       
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .logo {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: auto;
+        }
+       
+        .header h1 {
+            margin: 0;
+            color: #2563eb;
+            font-size: 24px;
+        }
+       
+        .header p {
+            margin: 5px 0 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+       
+        .info-section {
+            margin-bottom: 30px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+        }
+       
+        .info-section h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #1f2937;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 10px;
+        }
+       
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+       
+        .info-item h3 {
+            margin: 0 0 5px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+       
+        .info-item p {
+            margin: 0;
+            font-size: 16px;
+            color: #1f2937;
+        }
+       
+        .summary-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+       
+        .summary-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+       
+        .summary-card h3 {
+            margin: 0 0 10px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+       
+        .summary-card p {
+            margin: 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+       
+        .positive-balance {
+            color: #dc2626;
+        }
+       
+        .negative-balance {
+            color: #059669;
+        }
+       
+        .zero-balance {
+            color: #1f2937;
+        }
+       
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+       
+        table th, table td {
+            border: 1px solid #e5e7eb;
+            padding: 10px;
+            text-align: right;
+        }
+       
+        table th {
+            background-color: #f9fafb;
+            font-weight: bold;
+            color: #4b5563;
+            font-size: 14px;
+        }
+       
+        table td {
+            font-size: 14px;
+        }
+       
+        .table-section {
+            margin-bottom: 30px;
+        }
+       
+        .table-section h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #1f2937;
+        }
+       
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 15px;
+        }
+        
+        .user-info {
+            position: absolute;
+            top: 0;
+            left: 0;
+            text-align: left;
+            font-size: 12px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="{{ logo_src }}" alt="Logo" class="logo">
+        <div class="user-info">
+            <p>تم إنشاؤه بواسطة: {{ current_user.username }}</p>
+            <p>{{ current_user.email }}</p>
+            <p>{{ current_user.department or '' }}</p>
+        </div>
+        <h1>كشف حساب المورد</h1>
+        <p>{{ supplier.supplier_name }}</p>
+        <p>تاريخ الإصدار: {{ generated_date }}</p>
+    </div>
+   
+    <!-- Supplier information section -->
+    <div class="info-section">
+        <h2>معلومات المورد</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <h3>اسم المورد</h3>
+                <p>{{ supplier.supplier_name }}</p>
+            </div>
+            <div class="info-item">
+                <h3>معلومات الاتصال</h3>
+                <p>{{ supplier.contact_info or 'لا يوجد' }}</p>
+            </div>
+            <div class="info-item">
+                <h3>البريد الإلكتروني</h3>
+                <p>{{ supplier.email or 'لا يوجد' }}</p>
+            </div>
+            <div class="info-item">
+                <h3>الهاتف</h3>
+                <p>{{ supplier.phone or 'لا يوجد' }}</p>
+            </div>
+            <div class="info-item">
+                <h3>العنوان</h3>
+                <p>{{ supplier.address or 'لا يوجد' }}</p>
+            </div>
+            <div class="info-item">
+                <h3>شروط الدفع</h3>
+                <p>{{ supplier.payment_terms or 'لا يوجد' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial summary section -->
+    <div class="summary-cards">
+        <div class="summary-card">
+            <h3>إجمالي المشتريات</h3>
+            <p>{{ '{:,.2f}'.format(total_ordered|float) }} ج.م</p>
+        </div>
+        <div class="summary-card">
+            <h3>إجمالي المدفوعات</h3>
+            <p>{{ '{:,.2f}'.format(total_paid|float) }} ج.م</p>
+        </div>
+        <div class="summary-card">
+            <h3>الرصيد المستحق</h3>
+            {% if balance > 0 %}
+                <p class="positive-balance">{{ '{:,.2f}'.format(balance|float) }} ج.م</p>
+            {% elif balance < 0 %}
+                <p class="negative-balance">{{ '{:,.2f}'.format(balance|float) }} ج.م</p>
+            {% else %}
+                <p class="zero-balance">{{ '{:,.2f}'.format(balance|float) }} ج.م</p>
+            {% endif %}
+        </div>
+    </div>
+   
+    <!-- Purchase orders section -->
+    <div class="table-section">
+        <h2>طلبات الشراء</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>رقم الطلب</th>
+                    <th>تاريخ الطلب</th>
+                    <th>الحالة</th>
+                    <th>المبلغ الإجمالي</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if purchase_orders %}
+                    {% for order in purchase_orders %}
+                        <tr>
+                            <td>#{{ order.id }}</td>
+                            <td>{{ order.order_date }}</td>
+                            <td>
+                                {% if order.status == 'Pending' %}
+                                    قيد الانتظار
+                                {% elif order.status == 'Approved' %}
+                                    تمت الموافقة
+                                {% elif order.status == 'Received' %}
+                                    تم الاستلام
+                                {% elif order.status == 'Cancelled' %}
+                                    ملغي
+                                {% else %}
+                                    {{ order.status }}
+                                {% endif %}
+                            </td>
+                            <td>{{ '{:,.2f}'.format(order.total_amount|float) }} ج.م</td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center;">لا توجد طلبات شراء</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+   
+    <!-- Payments section -->
+    <div class="table-section">
+        <h2>المدفوعات</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>رقم الدفعة</th>
+                    <th>تاريخ الدفع</th>
+                    <th>المبلغ</th>
+                    <th>المرجع</th>
+                    <th>طريقة الدفع</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if payments %}
+                    {% for payment in payments %}
+                        <tr>
+                            <td>{{ payment.id }}</td>
+                            <td>{{ payment.date }}</td>
+                            <td>{{ '{:,.2f}'.format(payment.amount|float) }} ج.م</td>
+                            <td>{{ payment.reference }}</td>
+                            <td>{{ payment.method }}</td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center;">لا توجد مدفوعات</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+   
+    <!-- Account statement section -->
+    <div class="table-section">
+        <h2>كشف الحساب</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>البيان</th>
+                    <th>المرجع</th>
+                    <th>مدين</th>
+                    <th>دائن</th>
+                    <th>الرصيد</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set running_balance = 0 %}
+                {% for order in purchase_orders if order.status != 'Cancelled' %}
+                    {% set running_balance = running_balance + order.total_amount %}
+                    <tr>
+                        <td>{{ order.order_date }}</td>
+                        <td>طلب شراء</td>
+                        <td>#{{ order.id }}</td>
+                        <td>{{ '{:,.2f}'.format(order.total_amount|float) }} ج.م</td>
+                        <td>-</td>
+                        <td>{{ '{:,.2f}'.format(running_balance|float) }} ج.م</td>
+                    </tr>
+                {% endfor %}
+               
+                {% for payment in payments %}
+                    {% set running_balance = running_balance - payment.amount %}
+                    <tr>
+                        <td>{{ payment.date }}</td>
+                        <td>دفعة</td>
+                        <td>{{ payment.reference }}</td>
+                        <td>-</td>
+                        <td>{{ '{:,.2f}'.format(payment.amount|float) }} ج.م</td>
+                        <td>{{ '{:,.2f}'.format(running_balance|float) }} ج.م</td>
+                    </tr>
+                {% endfor %}
+               
+                {% if not purchase_orders and not payments %}
+                    <tr>
+                        <td colspan="6" style="text-align: center;">لا توجد معاملات</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+   
+    <div class="footer">
+        <p> 2025 تم إنشاء هذا التقرير بواسطة نظام كاتيلو</p>
+        <p>{{ generated_date }}</p>
+    </div>
+</body>
+</html>

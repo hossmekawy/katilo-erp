@@ -1,10 +1,20 @@
 from flask import Flask, request, jsonify, session, redirect, render_template
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from sqlalchemy import inspect
 from werkzeug.security import generate_password_hash
-from support_routes import support_bp
+from routes.bom_routes import bom_bp
+from routes.supplier_routes import supplier_bp
+from routes.purchase_orders import purchase_order_bp
+from routes.support_routes import support_bp
+from routes.supplier_accounts import supplier_accounts_bp
+from routes.warehouse_routes import warehouse_bp
+from routes.profile_routes import profile_bp
+import socket
+import webbrowser
+import urllib.request
 from models import (
     # Core Entities
-    Category, Item, Warehouse, 
+    Category, Item, Warehouse,
     
     # Warehouse Layout
     WarehouseSection, WarehouseSlot,
@@ -15,8 +25,8 @@ from models import (
     # Manufacturing
     BOM, BOMDetail,
     
-    # Supplier Management  
-    Supplier, SupplierItem,
+    # Supplier Management
+    Supplier, SupplierItem,SupplierLedgerEntry,SupplierPayment,
     
     # Purchase Orders
     PurchaseOrder, PurchaseOrderDetail,
@@ -46,30 +56,44 @@ from models import (
     ProductionRun, ProductionRunDetail,
     
     # Advanced Features
-    DemandForecast, InventoryReplenishmentPlan,
-    EmployeeShift, ProductionEfficiency,
-    CustomerInteraction, DiscountPromotion,
+    DemandForecast,
+    InventoryReplenishmentPlan,
+    EmployeeShift,
+    ProductionEfficiency,
+    CustomerInteraction,
+    DiscountPromotion,
     ProductReturn,
     db
 )
 
 # Initialize Flask app
 app = Flask(__name__)
+
+# App configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///katilo.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'your-secret-key'
-db.init_app(app)  # Connect SQLAlchemy to this Flask app
+app.config['UPLOAD_FOLDER'] = 'static/uploads/support'
+app.config['PROFILE_UPLOAD_FOLDER'] = 'static/uploads/profiles'
+# Initialize extensions
+db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
-# Configure upload folder for attachments (needed for support file uploads)
-UPLOAD_FOLDER = 'static/uploads/support'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 # Ensure upload directory exists
 import os
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['PROFILE_UPLOAD_FOLDER'], exist_ok=True)
+
+
+# Register blueprints
 app.register_blueprint(support_bp)
-
-
+app.register_blueprint(bom_bp)
+app.register_blueprint(supplier_bp)
+app.register_blueprint(purchase_order_bp)
+app.register_blueprint(supplier_accounts_bp)
+app.register_blueprint(warehouse_bp)
+app.register_blueprint(profile_bp)
 # Create database tables
 with app.app_context():
     db.create_all()
@@ -109,6 +133,36 @@ with app.app_context():
     
     db.session.commit()
 
+    # Create admin user if it doesn't exist
+    if not User.query.filter_by(email='hussienmekawy38@gmail.com').first():
+        admin_user = User(
+            username='hussien',
+            email='hussienmekawy38@gmail.com',
+            role_id=admin_role.id
+        )
+        admin_user.set_password('Sahs223344$')
+        db.session.add(admin_user)
+        db.session.commit()
+    
+    if inspect(db.engine).has_table(SupplierLedgerEntry.__tablename__) and not SupplierLedgerEntry.query.first():
+        # Get all purchase orders
+        purchase_orders = PurchaseOrder.query.all()
+        
+        # Create ledger entries for each purchase order
+        for po in purchase_orders:
+            if po.status != 'Cancelled':
+                ledger_entry = SupplierLedgerEntry(
+                    supplier_id=po.supplier_id,
+                    entry_date=po.order_date,
+                    description="طلب شراء",
+                    reference_type='purchase_order',
+                    reference_id=po.id,
+                    debit=po.total_amount  # Debit increases when we order from supplier
+                )
+                db.session.add(ledger_entry)
+        
+        db.session.commit()
+        print("Created ledger entries for existing purchase orders")
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -192,50 +246,7 @@ def logout():
     return redirect('/')  # Direct redirect to home page
 
 
-@app.route('/api/auth/profile')
-@login_required
-def get_profile():
-    return jsonify({
-        'id': current_user.id,
-        'username': current_user.username,
-        'email': current_user.email,
-        'role': current_user.role.name if current_user.role else 'user',
-        'phone': current_user.phone,
-        'department': current_user.department,
-        'position': current_user.position
-    })
 
-@app.route('/api/auth/profile', methods=['PUT'])
-@login_required
-def update_profile():
-    data = request.get_json()
-    
-    # Update user fields
-    if 'phone' in data:
-        current_user.phone = data['phone']
-    if 'department' in data:
-        current_user.department = data['department']
-    if 'position' in data:
-        current_user.position = data['position']
-    
-    # Handle password change if provided
-    if 'password' in data and data['password']:
-        current_user.set_password(data['password'])
-    
-    db.session.commit()
-    
-    return jsonify({
-        'id': current_user.id,
-        'username': current_user.username,
-        'email': current_user.email,
-        'role': current_user.role.name if current_user.role else 'user',
-        'phone': current_user.phone,
-        'department': current_user.department,
-        'position': current_user.position
-    })
-
-
-# Role Management Routes
 @app.route('/api/roles', methods=['GET'])
 @login_required
 def get_roles():
@@ -580,6 +591,9 @@ def get_items():
 @login_required
 def create_item():
     data = request.get_json()
+    existing_item = Item.query.filter_by(sku=data['sku']).first()
+    if existing_item:
+        return jsonify({'message': 'عنصر بنفس الرمز التعريفي (SKU) موجود بالفعل'}), 400
     item = Item(
         name=data['name'],
         category_id=data['category_id'],
@@ -617,33 +631,6 @@ def delete_item(id):
     db.session.delete(item)
     db.session.commit()
     return '', 204
-
-# Warehouse Routes
-@app.route('/api/warehouses', methods=['GET'])
-@login_required
-def get_warehouses():
-    warehouses = Warehouse.query.all()
-    return jsonify([{
-        'id': w.id,
-        'name': w.name,
-        'location': w.location,
-        'capacity': w.capacity,
-        'contact_info': w.contact_info
-    } for w in warehouses])
-
-@app.route('/api/warehouses', methods=['POST'])
-@login_required
-def create_warehouse():
-    data = request.get_json()
-    warehouse = Warehouse(
-        name=data['name'],
-        location=data['location'],
-        capacity=data['capacity'],
-        contact_info=data.get('contact_info')
-    )
-    db.session.add(warehouse)
-    db.session.commit()
-    return jsonify({'id': warehouse.id, 'name': warehouse.name}), 201
 
 # Inventory Routes
 @app.route('/api/inventory', methods=['GET'])
@@ -741,149 +728,6 @@ def get_transactions():
 
 
 # Warehouse Section Routes
-@app.route('/api/warehouse-sections', methods=['GET'])
-@login_required
-def get_warehouse_sections():
-    sections = WarehouseSection.query.all()
-    return jsonify([{
-        'id': s.id,
-        'warehouse_id': s.warehouse_id,
-        'section_name': s.section_name,
-        'row_count': s.row_count,
-        'column_count': s.column_count
-    } for s in sections])
-
-@app.route('/api/warehouse-sections', methods=['POST'])
-@login_required
-def create_warehouse_section():
-    data = request.get_json()
-    section = WarehouseSection(
-        warehouse_id=data['warehouse_id'],
-        section_name=data['section_name'],
-        row_count=data.get('row_count', 10),
-        column_count=data.get('column_count', 10)
-    )
-    db.session.add(section)
-    db.session.commit()
-    return jsonify({
-        'id': section.id,
-        'section_name': section.section_name,
-        'warehouse_id': section.warehouse_id
-    }), 201
-
-@app.route('/api/warehouse-sections/<int:id>', methods=['PUT'])
-@login_required
-def update_warehouse_section(id):
-    section = WarehouseSection.query.get_or_404(id)
-    data = request.get_json()
-    for key, value in data.items():
-        if hasattr(section, key):
-            setattr(section, key, value)
-    db.session.commit()
-    return jsonify({
-        'id': section.id,
-        'section_name': section.section_name,
-        'row_count': section.row_count,
-        'column_count': section.column_count
-    })
-
-@app.route('/api/warehouse-sections/<int:id>', methods=['DELETE'])
-@login_required
-def delete_warehouse_section(id):
-    section = WarehouseSection.query.get_or_404(id)
-    db.session.delete(section)
-    db.session.commit()
-    return '', 204
-
-# Warehouse Slot Routes
-@app.route('/api/warehouse-slots', methods=['GET'])
-@login_required
-def get_warehouse_slots():
-    slots = WarehouseSlot.query.all()
-    return jsonify([{
-        'id': s.id,
-        'section_id': s.section_id,
-        'row_number': s.row_number,
-        'column_number': s.column_number,
-        'item_id': s.item_id,
-        'quantity': s.quantity
-    } for s in slots])
-
-@app.route('/api/warehouse-slots', methods=['POST'])
-@login_required
-def create_warehouse_slot():
-    data = request.get_json()
-    slot = WarehouseSlot(
-        section_id=data['section_id'],
-        row_number=data['row_number'],
-        column_number=data['column_number'],
-        item_id=data.get('item_id'),
-        quantity=data.get('quantity', 0)
-    )
-    db.session.add(slot)
-    db.session.commit()
-    return jsonify({
-        'id': slot.id,
-        'section_id': slot.section_id,
-        'row_number': slot.row_number,
-        'column_number': slot.column_number
-    }), 201
-
-@app.route('/api/warehouse-slots/<int:id>', methods=['PUT'])
-@login_required
-def update_warehouse_slot(id):
-    slot = WarehouseSlot.query.get_or_404(id)
-    data = request.get_json()
-    for key, value in data.items():
-        if hasattr(slot, key):
-            setattr(slot, key, value)
-    db.session.commit()
-    return jsonify({
-        'id': slot.id,
-        'section_id': slot.section_id,
-        'item_id': slot.item_id,
-        'quantity': slot.quantity
-    })
-
-@app.route('/api/warehouse-slots/<int:id>', methods=['DELETE'])
-@login_required
-def delete_warehouse_slot(id):
-    slot = WarehouseSlot.query.get_or_404(id)
-    db.session.delete(slot)
-    db.session.commit()
-    return '', 204
-
-# Additional utility endpoints for warehouse layout management
-@app.route('/api/warehouse-sections/<int:id>/slots', methods=['GET'])
-@login_required
-def get_section_slots(id):
-    slots = WarehouseSlot.query.filter_by(section_id=id).all()
-    return jsonify([{
-        'id': s.id,
-        'row_number': s.row_number,
-        'column_number': s.column_number,
-        'item_id': s.item_id,
-        'quantity': s.quantity
-    } for s in slots])
-
-@app.route('/api/warehouses/<int:id>/sections', methods=['GET'])
-@login_required
-def get_warehouse_layout(id):
-    sections = WarehouseSection.query.filter_by(warehouse_id=id).all()
-    return jsonify([{
-        'id': s.id,
-        'section_name': s.section_name,
-        'row_count': s.row_count,
-        'column_count': s.column_count,
-        'slots': [{
-            'id': slot.id,
-            'row_number': slot.row_number,
-            'column_number': slot.column_number,
-            'item_id': slot.item_id,
-            'quantity': slot.quantity
-        } for slot in s.slots]
-    } for s in sections])
-
 # Dashboard API Endpoints
 @app.route('/api/dashboard/stats')
 @login_required
@@ -947,6 +791,9 @@ def get_recent_transactions():
     
     return jsonify(result)
 
+
+
+
 # # # # # # # # # # # # # # # # # # # # # # 
 # # # # # # # # # # # # # # # # # # # # # # 
 # # # # # # # # # # # # # # # # # # # # # # 
@@ -988,10 +835,9 @@ def dashboard():
 def inventory_page():
     return render_template('inventory.html')
 
-@app.route('/warehouse-layout')
-@login_required
-def warehouse_layout_page():
-    return render_template('warehouse_layout.html')
+
+
+
 
 @app.route('/categories-management')
 @login_required
@@ -1008,10 +854,15 @@ def items_page():
 def transactions_page():
     return render_template('transactions.html')
 
-@app.route('/user-profile')
+@app.route('/tips')
 @login_required
-def profile_page():
-    return render_template('profile.html')
+def tips_page():
+    return render_template('tips.html')
+
+
+
+
+
 
 @app.route('/admin/users')
 @login_required
@@ -1030,6 +881,28 @@ def admin_roles_page():
 
 
 
+def check_internet():
+    try:
+        urllib.request.urlopen('http://google.com', timeout=1)
+        return True
+    except:
+        return False
+
+
+
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    
+    
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    
+    if check_internet():
+        print("internet connection successful")
+    else:
+        print("No internet connection")
+    
+    port = 5000
+    url = f"http://{local_ip}:{port}"
+    webbrowser.open(url)
+    app.run(host='0.0.0.0', port=port, debug=True)

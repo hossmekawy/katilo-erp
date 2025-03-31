@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نصائح وحيل</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen font-sans">
+
+    <!-- Navigation Bar with Dashboard Link -->
+    <nav class="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-white text-2xl font-bold flex items-center">
+                <i class="fas fa-warehouse mr-2 "> </i> KATILO دليل استخدام 
+            
+            </h1>
+            <a href="/dashboard" class="inline-flex items-center px-4 py-2 bg-white text-blue-600 font-semibold rounded-lg shadow-md hover:bg-blue-100 hover:text-blue-800 transition-all duration-300 transform hover:scale-105">
+                <i class="fas fa-tachometer-alt mr-2"></i> لوحة التحكم
+            </a>
+        </div>
+    </nav>
+
+    <!-- Tips and Tutorial Section 1: Item Management -->
+    <div class="mt-10 bg-white rounded-lg shadow-md overflow-hidden mx-4">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="fas fa-lightbulb mr-2"></i> دليل استخدام إدارة العناصر
+            </h2>
+        </div>
+
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="border rounded-lg p-4 bg-blue-50 hover:bg-blue-100 transition-colors">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-2 flex items-center">
+                        <i class="fas fa-plus-circle mr-2"></i> إضافة وتعديل العناصر
+                    </h3>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> أضف عنصرًا جديدًا بالنقر على زر "إضافة عنصر" في الأعلى.</li>
+                        <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> املأ جميع الحقول المطلوبة مثل الاسم ورمز SKU والفئة.</li>
+                        <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> لتعديل عنصر موجود، انقر على أيقونة التعديل <i class="fas fa-edit text-blue-600"></i> بجانب العنصر.</li>
+                    </ul>
+                </div>
+
+                <div class="border rounded-lg p-4 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+                    <h3 class="text-lg font-semibold text-indigo-800 mb-2 flex items-center">
+                        <i class="fas fa-search mr-2"></i> البحث والتصفية
+                    </h3>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> استخدم حقل البحث للعثور على عناصر محددة بسرعة.</li>
+                        <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> صفّ العناصر حسب الفئة باستخدام القائمة المنسدلة "الفئة".</li>
+                        <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> رتب العناصر حسب الاسم أو رمز SKU أو السعر أو التكلفة.</li>
+                    </ul>
+                </div>
+
+                <div class="border rounded-lg p-4 bg-green-50 hover:bg-green-100 transition-colors">
+                    <h3 class="text-lg font-semibold text-green-800 mb-2 flex items-center">
+                        <i class="fas fa-tags mr-2"></i> إدارة المخزون
+                    </h3>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> حدد "مستوى إعادة الطلب" المناسب لكل عنصر لتجنب نفاد المخزون.</li>
+                        <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> تأكد من تحديث التكلفة والسعر بانتظام للحفاظ على دقة البيانات المالية.</li>
+                        <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> استخدم رموز SKU فريدة وذات معنى لتسهيل تتبع العناصر.</li>
+                    </ul>
+                </div>
+
+                <div class="border rounded-lg p-4 bg-red-50 hover:bg-red-100 transition-colors">
+                    <h3 class="text-lg font-semibold text-red-800 mb-2 flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2"></i> تنبيهات مهمة
+                    </h3>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start"><i class="fas fa-exclamation-circle text-red-500 mt-1 mr-2"></i> حذف عنصر سيؤدي إلى إزالته نهائيًا من النظام. تأكد من أنك متأكد قبل الحذف.</li>
+                        <li class="flex items-start"><i class="fas fa-exclamation-circle text-red-500 mt-1 mr-2"></i> لا يمكن استخدام رمز SKU مكرر لأكثر من عنصر.</li>
+                        <li class="flex items-start"><i class="fas fa-exclamation-circle text-red-500 mt-1 mr-2"></i> تأكد من إضافة العناصر إلى الفئة الصحيحة لتسهيل إدارة المخزون.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Best Practices -->
+            <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-yellow-800 mb-2 flex items-center">
+                    <i class="fas fa-star mr-2"></i> أفضل الممارسات
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-yellow-200 rounded-full w-8 h-8 flex items-center justify-center text-yellow-800 mr-3">1</div>
+                        <div>
+                            <h4 class="font-medium">استخدم أسماء وصفية</h4>
+                            <p class="text-sm text-gray-600 mt-1">اختر أسماء واضحة ووصفية للعناصر تسهل التعرف عليها.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-yellow-200 rounded-full w-8 h-8 flex items-center justify-center text-yellow-800 mr-3">2</div>
+                        <div>
+                            <h4 class="font-medium">حافظ على تحديث البيانات</h4>
+                            <p class="text-sm text-gray-600 mt-1">قم بتحديث معلومات العناصر بانتظام، خاصة الأسعار والتكاليف.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-yellow-200 rounded-full w-8 h-8 flex items-center justify-center text-yellow-800 mr-3">3</div>
+                        <div>
+                            <h4 class="font-medium">نظم العناصر في فئات</h4>
+                            <p class="text-sm text-gray-600 mt-1">استخدم نظام تصنيف منطقي لتنظيم العناصر في فئات ذات معنى.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-yellow-200 rounded-full w-8 h-8 flex items-center justify-center text-yellow-800 mr-3">4</div>
+                        <div>
+                            <h4 class="font-medium">راقب مستويات المخزون</h4>
+                            <p class="text-sm text-gray-600 mt-1">ضبط مستويات إعادة الطلب بشكل صحيح لتجنب نفاد المخزون.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FAQs -->
+            <div class="mt-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">الأسئلة الشائعة</h3>
+                <div class="space-y-3">
+                    <div x-data="{ open: false }" class="border rounded-lg overflow-hidden">
+                        <button @click="open = !open" class="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 transition-colors text-right">
+                            <span class="font-medium">كيف يمكنني إضافة عنصر جديد؟</span>
+                            <i class="fas" :class="open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div x-show="open" class="p-4 bg-white">
+                            <p>انقر على زر "إضافة عنصر" في أعلى الصفحة، ثم املأ النموذج بالمعلومات المطلوبة مثل الاسم ورمز SKU والفئة والسعر والتكلفة. ثم انقر على "حفظ" لإضافة العنصر.</p>
+                        </div>
+                    </div>
+                    <div x-data="{ open: false }" class="border rounded-lg overflow-hidden">
+                        <button @click="open = !open" class="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 transition-colors text-right">
+                            <span class="font-medium">كيف يمكنني البحث عن عنصر معين؟</span>
+                            <i class="fas" :class="open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div x-show="open" class="p-4 bg-white">
+                            <p>استخدم حقل البحث في أعلى الصفحة للبحث عن العناصر حسب الاسم أو رمز SKU أو الوصف. يمكنك أيضًا تصفية العناصر حسب الفئة باستخدام القائمة المنسدلة "الفئة".</p>
+                        </div>
+                    </div>
+                    <div x-data="{ open: false }" class="border rounded-lg overflow-hidden">
+                        <button @click="open = !open" class="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 transition-colors text-right">
+                            <span class="font-medium">ما هو مستوى إعادة الطلب؟</span>
+                            <i class="fas" :class="open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div x-show="open" class="p-4 bg-white">
+                            <p>مستوى إعادة الطلب هو الحد الأدنى للكمية التي عندما يصل إليها المخزون، يجب عليك إعادة طلب المزيد من هذا العنصر. يساعد هذا في تجنب نفاد المخزون والحفاظ على استمرارية العمليات.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Steps -->
+            <div class="mt-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">خطوات سريعة لإدارة العناصر</h3>
+                <div class="flex flex-wrap -mx-2">
+                    <div class="w-full md:w-1/3 px-2 mb-4">
+                        <div class="border rounded-lg h-full bg-gradient-to-b from-blue-50 to-white p-4">
+                            <div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center text-blue-600 mb-3">
+                                <i class="fas fa-plus text-xl"></i>
+                            </div>
+                            <h4 class="font-semibold mb-2">1. إضافة العناصر</h4>
+                            <p class="text-sm text-gray-600">أضف عناصر جديدة بالنقر على زر "إضافة عنصر" وملء النموذج بالمعلومات المطلوبة.</p>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-1/3 px-2 mb-4">
+                        <div class="border rounded-lg h-full bg-gradient-to-b from-green-50 to-white p-4">
+                            <div class="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center text-green-600 mb-3">
+                                <i class="fas fa-edit text-xl"></i>
+                            </div>
+                            <h4 class="font-semibold mb-2">2. تحديث المعلومات</h4>
+                            <p class="text-sm text-gray-600">حافظ على تحديث معلومات العناصر بانتظام، خاصة الأسعار والتكاليف ومستويات إعادة الطلب.</p>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-1/3 px-2 mb-4">
+                        <div class="border rounded-lg h-full bg-gradient-to-b from-purple-50 to-white p-4">
+                            <div class="bg-purple-100 w-12 h-12 rounded-full flex items-center justify-center text-purple-600 mb-3">
+                                <i class="fas fa-chart-line text-xl"></i>
+                            </div>
+                            <h4 class="font-semibold mb-2">3. مراقبة المخزون</h4>
+                            <p class="text-sm text-gray-600">راقب مستويات المخزون بانتظام وقم بإعادة الطلب عندما تصل إلى مستوى إعادة الطلب المحدد.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Beginner Tips -->
+            <div class="mt-6 bg-blue-50 rounded-lg p-5 border border-blue-100">
+                <h3 class="text-lg font-semibold text-blue-800 mb-3 flex items-center">
+                    <i class="fas fa-info-circle mr-2"></i> نصائح للمبتدئين
+                </h3>
+                <ul class="space-y-2">
+                    <li class="flex items-start"><i class="fas fa-check text-green-500 mt-1 mr-2"></i> ابدأ بإضافة الفئات أولاً قبل إضافة العناصر لتنظيم المخزون بشكل أفضل.</li>
+                    <li class="flex items-start"><i class="fas fa-check text-green-500 mt-1 mr-2"></i> استخدم نظام ترميز منطقي لرموز SKU لتسهيل تتبع العناصر (مثل: CAT001، CAT002).</li>
+                    <li class="flex items-start"><i class="fas fa-check text-green-500 mt-1 mr-2"></i> قم بتحديث أسعار وتكاليف العناصر بانتظام للحفاظ على دقة التقارير المالية.</li>
+                    <li class="flex items-start"><i class="fas fa-check text-green-500 mt-1 mr-2"></i> استخدم وظيفة البحث والتصفية للعثور بسرعة على العناصر في قوائم كبيرة.</li>
+                </ul>
+            </div>
+
+            <!-- Contact Support -->
+            <div class="mt-6 text-center p-4 border rounded-lg bg-gray-50">
+                <p class="text-gray-700 mb-2">هل تحتاج إلى مساعدة إضافية في إدارة العناصر؟</p>
+                <a href="/contact-support" class="inline-flex items-center text-blue-600 hover:text-blue-800">
+                    <i class="fas fa-headset mr-1"></i> اتصل بفريق الدعم
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tips and Tutorial Section 2: Bill of Materials -->
+    <div class="mt-8 bg-white rounded-lg shadow-md overflow-hidden mx-4">
+        <div class="bg-blue-50 p-4 border-b border-blue-100">
+            <h2 class="text-xl font-bold text-blue-800 flex items-center">
+                <i class="fas fa-lightbulb mr-2"></i> نصائح وإرشادات لإدارة قوائم المواد
+            </h2>
+        </div>
+
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">نصائح مفيدة</h3>
+                    <ul class="space-y-3 text-gray-700">
+                        <li class="flex"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> قم بتسمية قوائم المواد بشكل واضح ومميز لسهولة العثور عليها لاحقاً.</li>
+                        <li class="flex"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> تأكد من تحديث كميات المكونات بشكل دوري للحصول على تقديرات دقيقة.</li>
+                        <li class="flex"><i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i> استخدم وحدات قياس موحدة لجميع المكونات المتشابهة لتجنب الأخطاء.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">كيفية استخدام نظام قوائم المواد</h3>
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <h4 class="font-medium text-blue-700 mb-2">1. إنشاء قائمة مواد جديدة</h4>
+                            <p class="text-gray-700">انقر على زر "إضافة قائمة" واختر المنتج النهائي من القائمة المنسدلة.</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <h4 class="font-medium text-blue-700 mb-2">2. إضافة المكونات</h4>
+                            <p class="text-gray-700">بعد إنشاء القائمة، انقر على "إضافة مكون" لإضافة المواد الخام.</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <h4 class="font-medium text-blue-700 mb-2">3. بدء عملية الإنتاج</h4>
+                            <p class="text-gray-700">انقر على زر "إنتاج" وحدد الكمية المطلوبة والمستودع المناسب.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Common Questions -->
+            <div class="mt-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">أسئلة شائعة</h3>
+                <div class="space-y-3">
+                    <div x-data="{ open: false }" class="border border-gray-200 rounded-lg overflow-hidden">
+                        <button @click="open = !open" class="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 transition-colors text-right">
+                            <span class="font-medium">كيف يمكنني تعديل مكونات قائمة المواد؟</span>
+                            <i class="fas" :class="open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div x-show="open" class="p-4 bg-white">
+                            <p class="text-gray-700">انقر على أيقونة التعديل بجانب المكون لتغيير الكمية أو المكون نفسه.</p>
+                        </div>
+                    </div>
+                    <div x-data="{ open: false }" class="border border-gray-200 rounded-lg overflow-hidden">
+                        <button @click="open = !open" class="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 transition-colors text-right">
+                            <span class="font-medium">ماذا يحدث عند نفاد المكونات؟</span>
+                            <i class="fas" :class="open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div x-show="open" class="p-4 bg-white">
+                            <p class="text-gray-700">سيظهر تنبيه إذا كانت المكونات غير كافية، ولن تتم العملية حتى يتم توفيرها.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW SECTION: Warehouse Layout Tips -->
+    <div class="mt-10 bg-white rounded-lg shadow-md overflow-hidden mx-4">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="fas fa-lightbulb mr-2"></i> نصائح وإرشادات استخدام تخطيط المستودع
+            </h2>
+        </div>
+        
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="border rounded-lg p-4 bg-blue-50 hover:bg-blue-100 transition-colors">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-2 flex items-center">
+                        <i class="fas fa-warehouse mr-2"></i> إدارة المستودعات
+                    </h3>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>أضف مستودعًا جديدًا بالنقر على زر "إضافة مستودع" في الأعلى.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>حدد المستودع من القائمة المنسدلة لعرض أقسامه.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>يمكنك تعديل أو حذف المستودع من خلال الأزرار المخصصة.</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="border rounded-lg p-4 bg-teal-50 hover:bg-teal-100 transition-colors">
+                    <h3 class="text-lg font-semibold text-teal-800 mb-2 flex items-center">
+                        <i class="fas fa-th-large mr-2"></i> إدارة الأقسام
+                    </h3>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>أضف قسمًا جديدًا بالنقر على زر "إضافة قسم" في الأعلى.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>حدد عدد الصفوف والأعمدة حسب حجم القسم الفعلي في المستودع.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>انقر على أي قسم في القائمة لعرض فتحاته وتفاصيله.</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="border rounded-lg p-4 bg-emerald-50 hover:bg-emerald-100 transition-colors">
+                    <h3 class="text-lg font-semibold text-emerald-800 mb-2 flex items-center">
+                        <i class="fas fa-cubes mr-2"></i> إدارة الفتحات والعناصر
+                    </h3>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>أضف فتحة جديدة بالنقر على زر "إضافة عنصر" في الأعلى.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>انقر على أيقونة التعديل في أي فتحة لتغيير العنصر أو الكمية.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>الفتحات الفارغة تظهر باللون الرمادي، والفتحات التي تحتوي على عناصر تظهر باللون الأزرق.</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="border rounded-lg p-4 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+                    <h3 class="text-lg font-semibold text-indigo-800 mb-2 flex items-center">
+                        <i class="fas fa-question-circle mr-2"></i> أسئلة شائعة
+                    </h3>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <i class="fas fa-question text-indigo-500 mt-1 mr-2"></i>
+                            <div>
+                                <span class="font-medium">كيف أنظم المستودع بشكل فعال؟</span>
+                                <p class="text-sm mt-1">قسّم المستودع إلى أقسام منطقية حسب نوع المنتج أو معدل الدوران.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-question text-indigo-500 mt-1 mr-2"></i>
+                            <div>
+                                <span class="font-medium">هل يمكنني نقل العناصر بين الفتحات؟</span>
+                                <p class="text-sm mt-1">نعم، قم بتعديل الفتحة المصدر لإزالة العنصر ثم أضفه إلى الفتحة الهدف.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Advanced Tips -->
+            <div class="mt-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                    <i class="fas fa-star mr-2 text-yellow-500"></i> نصائح متقدمة
+                </h3>
+                
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <ul class="space-y-3">
+                        <li class="flex items-start">
+                            <i class="fas fa-lightbulb text-yellow-600 mt-1 mr-2"></i>
+                            <span>ضع العناصر سريعة الدوران في مواقع يسهل الوصول إليها لتحسين كفاءة العمل.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-lightbulb text-yellow-600 mt-1 mr-2"></i>
+                            <span>استخدم نظام ترميز لوني أو تسمية واضحة للأقسام لتسهيل العثور على العناصر.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-lightbulb text-yellow-600 mt-1 mr-2"></i>
+                            <span>قم بمراجعة تخطيط المستودع دوريًا وتحديثه بناءً على تغيرات المخزون واحتياجات العمل.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

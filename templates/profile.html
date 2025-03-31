@@ -1,197 +1,787 @@
+
 {% extends "base.html" %}
 
-{% block title %}User Profile - Katilo{% endblock %}
+{% block title %}الملف الشخصي - كاتيلو{% endblock %}
+
+{% block styles %}
+<style>
+    .profile-header {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        border-radius: 1rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .profile-image-container {
+        border: 4px solid white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .tab-active {
+        color: #3b82f6;
+        border-bottom: 2px solid #3b82f6;
+    }
+    
+    .form-input {
+        transition: all 0.3s ease;
+    }
+    
+    .form-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+    
+    .card-hover {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .card-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .business-card-preview {
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        transition: transform 0.3s ease;
+    }
+    
+    .business-card-preview:hover {
+        transform: scale(1.02);
+    }
+    
+    .btn-gradient {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        transition: all 0.3s ease;
+    }
+    
+    .btn-gradient:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .profile-stat {
+        border-right: 1px solid #e5e7eb;
+    }
+    
+    .profile-stat:last-child {
+        border-right: none;
+    }
+    
+    @media (max-width: 768px) {
+        .profile-stat {
+            border-right: none;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .profile-stat:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div x-data="profileManager()">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">User Profile</h1>
-    </div>
-    
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Profile Summary Card -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">Profile Summary</h3>
-            </div>
-            <div class="p-6 flex flex-col items-center">
-                <div class="w-32 h-32 rounded-full bg-gray-200 mb-4 overflow-hidden">
+    <!-- Profile Header -->
+    <div class="profile-header text-white p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-center">
+            <!-- Profile Image -->
+            <div class="relative mb-4 md:mb-0 md:ml-6">
+                <div class="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden profile-image-container bg-white/20 flex items-center justify-center relative group">
                     <template x-if="profile.profile_image">
-                        <img :src="profile.profile_image" alt="Profile" class="w-full h-full object-cover">
+                        <img :src="profile.profile_image" alt="صورة الملف الشخصي" class="w-full h-full object-cover">
                     </template>
                     <template x-if="!profile.profile_image">
-                        <div class="w-full h-full flex items-center justify-center text-gray-400">
-                            <i class="fas fa-user text-4xl"></i>
-                        </div>
+                        <i class="fas fa-user text-white/70 text-4xl"></i>
                     </template>
+                    
+                    <!-- Image upload overlay -->
+                    <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                         @click="$refs.profileImageInput.click()">
+                        <i class="fas fa-camera text-white text-xl"></i>
+                    </div>
+                    <input type="file" x-ref="profileImageInput" @change="handleProfileImageUpload" class="hidden" accept="image/*">
                 </div>
-                
-                <h2 class="text-xl font-bold" x-text="profile.username"></h2>
-                <p class="text-gray-500 mb-2" x-text="profile.email"></p>
-                
-                <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mb-4" x-text="profile.role"></div>
-                
-                <div class="w-full space-y-2">
-                    <div class="flex items-center">
-                        <i class="fas fa-phone-alt w-6 text-gray-400"></i>
-                        <span class="ml-2" x-text="profile.phone || 'Not provided'"></span>
+            </div>
+            
+            <!-- User Info -->
+            <div class="text-center md:text-right">
+                <h1 class="text-2xl md:text-3xl font-bold" x-text="profile.username"></h1>
+                <p class="text-blue-100 mb-2" x-text="profile.email"></p>
+                <div class="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
+                    <span class="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium" x-text="profile.role"></span>
+                    <span class="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium" x-text="profile.department || 'بدون قسم'"></span>
+                </div>
+            </div>
+            
+            <!-- Stats -->
+            <div class="flex-grow flex justify-end mt-4 md:mt-0">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                    <div class="profile-stat px-4">
+                        <div class="text-2xl font-bold">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="text-sm text-blue-100">تاريخ التوظيف</div>
+                        <div class="text-lg" x-text="profile.hire_date || 'غير محدد'"></div>
                     </div>
-                    <div class="flex items-center">
-                        <i class="fas fa-building w-6 text-gray-400"></i>
-                        <span class="ml-2" x-text="profile.department || 'Not provided'"></span>
+                    
+                    <div class="profile-stat px-4">
+                        <div class="text-2xl font-bold">
+                            <i class="fas fa-briefcase"></i>
+                        </div>
+                        <div class="text-sm text-blue-100">المنصب</div>
+                        <div class="text-lg" x-text="profile.position || 'غير محدد'"></div>
                     </div>
-                    <div class="flex items-center">
-                        <i class="fas fa-briefcase w-6 text-gray-400"></i>
-                        <span class="ml-2" x-text="profile.position || 'Not provided'"></span>
+                    
+                    <div class="profile-stat px-4">
+                        <div class="text-2xl font-bold">
+                            <i class="fas fa-id-card"></i>
+                        </div>
+                        <div class="text-sm text-blue-100">رقم الهوية</div>
+                        <div class="text-lg" x-text="profile.identification_number || 'غير محدد'"></div>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Profile Edit Form -->
-        <div class="bg-white rounded-lg shadow lg:col-span-2">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">Edit Profile</h3>
+        <!-- Business Card Button -->
+        <div class="mt-6 flex justify-end">
+            <a href="/api/auth/business-card" target="_blank" 
+               class="bg-white text-blue-700 px-4 py-2 rounded-lg shadow-md hover:bg-blue-50 transition-all flex items-center">
+                <i class="fas fa-id-card ml-2"></i>
+                تحميل بطاقة العمل
+            </a>
+        </div>
+    </div>
+    
+    <!-- Tabs Navigation -->
+    <div class="mb-6 border-b">
+        <div class="flex overflow-x-auto">
+            <button @click="activeTab = 'personal'" 
+                    :class="{'tab-active': activeTab === 'personal'}"
+                    class="px-4 py-2 font-medium text-gray-600 hover:text-blue-600 focus:outline-none">
+                <i class="fas fa-user ml-2"></i>
+                المعلومات الشخصية
+            </button>
+            
+            <button @click="activeTab = 'contact'" 
+                    :class="{'tab-active': activeTab === 'contact'}"
+                    class="px-4 py-2 font-medium text-gray-600 hover:text-blue-600 focus:outline-none">
+                <i class="fas fa-address-book ml-2"></i>
+                معلومات الاتصال
+            </button>
+            
+            <button @click="activeTab = 'security'" 
+                    :class="{'tab-active': activeTab === 'security'}"
+                    class="px-4 py-2 font-medium text-gray-600 hover:text-blue-600 focus:outline-none">
+                <i class="fas fa-shield-alt ml-2"></i>
+                الأمان
+            </button>
+            
+            <button @click="activeTab = 'business-card'" 
+                    :class="{'tab-active': activeTab === 'business-card'}"
+                    class="px-4 py-2 font-medium text-gray-600 hover:text-blue-600 focus:outline-none">
+                <i class="fas fa-id-card ml-2"></i>
+                بطاقة العمل
+            </button>
+        </div>
+    </div>
+    
+    <!-- Tab Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Sidebar -->
+        <div>
+            <!-- Profile Summary Card -->
+            <div class="bg-white rounded-lg shadow mb-6 card-hover">
+                <div class="border-b px-6 py-4">
+                    <h3 class="text-lg font-semibold">ملخص الملف الشخصي</h3>
+                </div>
+                <div class="p-6">
+                    <div class="space-y-3">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ml-3">
+                                <i class="fas fa-phone-alt"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-500">رقم الهاتف</div>
+                                <div class="font-medium" x-text="profile.phone || 'غير متوفر'"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ml-3">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-500">القسم</div>
+                                <div class="font-medium" x-text="profile.department || 'غير متوفر'"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ml-3">
+                                <i class="fas fa-briefcase"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-500">المنصب</div>
+                                <div class="font-medium" x-text="profile.position || 'غير متوفر'"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ml-3">
+                                <i class="fas fa-flag"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-500">الجنسية</div>
+                                <div class="font-medium" x-text="profile.nationality || 'غير متوفر'"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ml-3">
+                                <i class="fas fa-birthday-cake"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-500">تاريخ الميلاد</div>
+                                <div class="font-medium" x-text="profile.birthdate || 'غير متوفر'"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="p-6">
-                <form @submit.prevent="updateProfile">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                            <input type="text" x-model="formData.username" disabled
-                                   class="w-full border rounded-lg px-3 py-2 bg-gray-100">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                            <input type="email" x-model="formData.email" disabled
-                                   class="w-full border rounded-lg px-3 py-2 bg-gray-100">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                            <input type="text" x-model="formData.phone"
-                                   class="w-full border rounded-lg px-3 py-2">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                            <input type="text" x-model="formData.department"
-                                   class="w-full border rounded-lg px-3 py-2">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Position</label>
-                            <input type="text" x-model="formData.position"
-                                   class="w-full border rounded-lg px-3 py-2">
-                        </div>
-                    </div>
-                    
-                    <div class="border-t pt-4 mt-4">
-                        <h4 class="font-medium mb-2">Change Password</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                                <input type="password" x-model="formData.password"
-                                       class="w-full border rounded-lg px-3 py-2">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                                <input type="password" x-model="formData.password_confirm"
-                                       class="w-full border rounded-lg px-3 py-2">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex justify-end mt-4">
-                        <button type="submit" 
-                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
-                            Save Changes
-                        </button>
-                    </div>
-                </form>
+            
+            <!-- Emergency Contact Card -->
+            <div class="bg-white rounded-lg shadow card-hover">
+                <div class="border-b px-6 py-4">
+                    <h3 class="text-lg font-semibold">جهة اتصال للطوارئ</h3>
+                </div>
+                <div class="p-6">
+    <div class="space-y-3">
+        <div class="flex items-center">
+            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ml-3">
+                <i class="fas fa-user"></i>
+            </div>
+            <div>
+                <div class="text-sm text-gray-500">الاسم</div>
+                <div class="font-medium" x-text="profile.emergency_contact?.name || 'غير متوفر'"></div>
+            </div>
+        </div>
+        
+        <div class="flex items-center">
+            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ml-3">
+                <i class="fas fa-phone-alt"></i>
+            </div>
+            <div>
+                <div class="text-sm text-gray-500">رقم الهاتف</div>
+                <div class="font-medium" x-text="profile.emergency_contact?.phone || 'غير متوفر'"></div>
+            </div>
+        </div>
+        
+        <div class="flex items-center">
+            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ml-3">
+                <i class="fas fa-user-friends"></i>
+            </div>
+            <div>
+                <div class="text-sm text-gray-500">صلة القرابة</div>
+                <div class="font-medium" x-text="profile.emergency_contact?.relation || 'غير متوفر'"></div>
             </div>
         </div>
     </div>
+</div>
+</div>
+</div>
+
+<!-- Main Content Area -->
+<div class="lg:col-span-2">
+<!-- Personal Information Tab -->
+<div x-show="activeTab === 'personal'" class="bg-white rounded-lg shadow">
+<div class="border-b px-6 py-4 flex justify-between items-center">
+    <h3 class="text-lg font-semibold">المعلومات الشخصية</h3>
+    <button @click="editMode.personal = !editMode.personal" class="text-blue-600 hover:text-blue-800">
+        <i class="fas" :class="editMode.personal ? 'fa-times' : 'fa-edit'"></i>
+        <span x-text="editMode.personal ? 'إلغاء' : 'تعديل'"></span>
+    </button>
+</div>
+<div class="p-6">
+    <form @submit.prevent="updatePersonalInfo">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">اسم المستخدم</label>
+                <input type="text" x-model="formData.username" disabled
+                       class="w-full border rounded-lg px-3 py-2 bg-gray-100 form-input">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">البريد الإلكتروني</label>
+                <input type="email" x-model="formData.email" disabled
+                       class="w-full border rounded-lg px-3 py-2 bg-gray-100 form-input">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">رقم الهوية</label>
+                <input type="text" x-model="formData.identification_number" :disabled="!editMode.personal"
+                       class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.personal ? 'bg-gray-100' : ''">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">الجنس</label>
+                <select x-model="formData.gender" :disabled="!editMode.personal"
+                        class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.personal ? 'bg-gray-100' : ''">
+                    <option value="">اختر الجنس</option>
+                    <option value="male">ذكر</option>
+                    <option value="female">أنثى</option>
+                    <option value="other">آخر</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">الجنسية</label>
+                <input type="text" x-model="formData.nationality" :disabled="!editMode.personal"
+                       class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.personal ? 'bg-gray-100' : ''">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">تاريخ الميلاد</label>
+                <input type="date" x-model="formData.birthdate" :disabled="!editMode.personal"
+                       class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.personal ? 'bg-gray-100' : ''">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">تاريخ التوظيف</label>
+                <input type="date" x-model="formData.hire_date" :disabled="!editMode.personal"
+                       class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.personal ? 'bg-gray-100' : ''">
+            </div>
+        </div>
+        
+        <div x-show="editMode.personal" class="flex justify-end mt-4">
+            <button type="submit" 
+                    class="btn-gradient text-white px-4 py-2 rounded-lg">
+                حفظ التغييرات
+            </button>
+        </div>
+    </form>
+</div>
+</div>
+
+<!-- Contact Information Tab -->
+<div x-show="activeTab === 'contact'" class="bg-white rounded-lg shadow">
+<div class="border-b px-6 py-4 flex justify-between items-center">
+    <h3 class="text-lg font-semibold">معلومات الاتصال</h3>
+    <button @click="editMode.contact = !editMode.contact" class="text-blue-600 hover:text-blue-800">
+        <i class="fas" :class="editMode.contact ? 'fa-times' : 'fa-edit'"></i>
+        <span x-text="editMode.contact ? 'إلغاء' : 'تعديل'"></span>
+    </button>
+</div>
+<div class="p-6">
+    <form @submit.prevent="updateContactInfo">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">رقم الهاتف</label>
+                <input type="text" x-model="formData.phone" :disabled="!editMode.contact"
+                       class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.contact ? 'bg-gray-100' : ''">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">القسم</label>
+                <input type="text" x-model="formData.department" :disabled="!editMode.contact"
+                       class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.contact ? 'bg-gray-100' : ''">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">المنصب</label>
+                <input type="text" x-model="formData.position" :disabled="!editMode.contact"
+                       class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.contact ? 'bg-gray-100' : ''">
+            </div>
+            
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">العنوان</label>
+                <textarea x-model="formData.address" rows="3" :disabled="!editMode.contact"
+                          class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.contact ? 'bg-gray-100' : ''"></textarea>
+            </div>
+        </div>
+        
+        <div class="border-t pt-4 mt-2">
+            <h4 class="font-medium mb-2">جهة الاتصال في حالات الطوارئ</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">الاسم</label>
+                    <input type="text" x-model="formData.emergency_contact.name" :disabled="!editMode.contact"
+                           class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.contact ? 'bg-gray-100' : ''">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">رقم الهاتف</label>
+                    <input type="text" x-model="formData.emergency_contact.phone" :disabled="!editMode.contact"
+                           class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.contact ? 'bg-gray-100' : ''">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">صلة القرابة</label>
+                    <input type="text" x-model="formData.emergency_contact.relation" :disabled="!editMode.contact"
+                           class="w-full border rounded-lg px-3 py-2 form-input" :class="!editMode.contact ? 'bg-gray-100' : ''">
+                </div>
+            </div>
+        </div>
+        
+        <div x-show="editMode.contact" class="flex justify-end mt-4">
+            <button type="submit" 
+                    class="btn-gradient text-white px-4 py-2 rounded-lg">
+                حفظ التغييرات
+            </button>
+        </div>
+    </form>
+</div>
+</div>
+
+<!-- Security Tab -->
+<div x-show="activeTab === 'security'" class="bg-white rounded-lg shadow">
+<div class="border-b px-6 py-4">
+    <h3 class="text-lg font-semibold">الأمان</h3>
+</div>
+<div class="p-6">
+    <form @submit.prevent="updatePassword">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">كلمة المرور الجديدة</label>
+                <input type="password" x-model="formData.password"
+                       class="w-full border rounded-lg px-3 py-2 form-input">
+                <p class="text-xs text-gray-500 mt-1">يجب أن تكون كلمة المرور 6 أحرف على الأقل</p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">تأكيد كلمة المرور</label>
+                <input type="password" x-model="formData.password_confirm"
+                       class="w-full border rounded-lg px-3 py-2 form-input">
+            </div>
+        </div>
+        
+        <div class="flex justify-end mt-4">
+            <button type="submit" 
+                    class="btn-gradient text-white px-4 py-2 rounded-lg">
+                تغيير كلمة المرور
+            </button>
+        </div>
+    </form>
+</div>
+</div>
+
+<!-- Business Card Tab -->
+<div x-show="activeTab === 'business-card'" class="bg-white rounded-lg shadow">
+<div class="border-b px-6 py-4">
+    <h3 class="text-lg font-semibold">بطاقة العمل</h3>
+</div>
+<div class="p-6">
+    <div class="text-center mb-6">
+        <p class="text-gray-600 mb-4">يمكنك تحميل بطاقة العمل الخاصة بك بالضغط على الزر أدناه. تحتوي البطاقة على معلومات الاتصال الخاصة بك ورمز QR لمشاركتها بسهولة.</p>
+        
+        <button @click="previewBusinessCard" class="btn-gradient text-white px-6 py-3 rounded-lg flex items-center mx-auto">
+            <i class="fas fa-eye ml-2"></i>
+            معاينة بطاقة العمل
+        </button>
+    </div>
+    
+    <div class="mt-8 border-t pt-6">
+        <h4 class="font-medium mb-4 text-center">نصائح لاستخدام بطاقة العمل</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+<div class="bg-blue-50 p-4 rounded-lg text-center">
+    <div class="text-blue-600 text-2xl mb-2">
+        <i class="fas fa-share-alt"></i>
+    </div>
+    <h5 class="font-medium mb-1">مشاركة البطاقة</h5>
+    <p class="text-sm text-gray-600">يمكنك مشاركة بطاقة العمل مع العملاء والزملاء عبر البريد الإلكتروني أو وسائل التواصل الاجتماعي.</p>
+</div>
+
+<div class="bg-blue-50 p-4 rounded-lg text-center">
+    <div class="text-blue-600 text-2xl mb-2">
+        <i class="fas fa-qrcode"></i>
+    </div>
+    <h5 class="font-medium mb-1">رمز QR</h5>
+    <p class="text-sm text-gray-600">يمكن للآخرين مسح رمز QR على بطاقتك لحفظ معلومات الاتصال الخاصة بك مباشرة على هواتفهم.</p>
+</div>
+
+<div class="bg-blue-50 p-4 rounded-lg text-center">
+    <div class="text-blue-600 text-2xl mb-2">
+        <i class="fas fa-print"></i>
+    </div>
+    <h5 class="font-medium mb-1">طباعة البطاقة</h5>
+    <p class="text-sm text-gray-600">يمكنك طباعة البطاقة على ورق مقوى بحجم بطاقة العمل القياسي (90 × 50 مم).</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Business Card Preview Modal -->
+<div x-show="showBusinessCardModal" 
+class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+x-transition:enter="transition ease-out duration-300"
+x-transition:enter-start="opacity-0"
+x-transition:enter-end="opacity-100"
+x-transition:leave="transition ease-in duration-200"
+x-transition:leave-start="opacity-100"
+x-transition:leave-end="opacity-0"
+@click.self="showBusinessCardModal = false">
+
+<div class="bg-white rounded-xl shadow-2xl p-6 max-w-3xl w-full mx-4"
+x-transition:enter="transition ease-out duration-300"
+x-transition:enter-start="opacity-0 transform scale-95"
+x-transition:enter-end="opacity-100 transform scale-100"
+x-transition:leave="transition ease-in duration-200"
+x-transition:leave-start="opacity-100 transform scale-100"
+x-transition:leave-end="opacity-0 transform scale-95">
+
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-xl font-bold text-gray-800">معاينة بطاقة العمل</h3>
+<button @click="showBusinessCardModal = false" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+<i class="fas fa-times text-xl"></i>
+</button>
+</div>
+
+<div class="relative overflow-hidden rounded-lg shadow-lg business-card-preview">
+<img :src="businessCardPreviewUrl" alt="معاينة بطاقة العمل" class="w-full h-auto">
+<div x-show="isLoading" class="absolute inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+<div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white"></div>
+</div>
+</div>
+
+<div class="flex flex-col md:flex-row justify-between mt-6 gap-4">
+<a :href="'/api/auth/business-card'" download class="btn-gradient text-white px-4 py-2 rounded-lg flex items-center justify-center">
+<i class="fas fa-download ml-2"></i>
+تحميل البطاقة
+</a>
+<button @click="showBusinessCardModal = false" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors">
+إغلاق
+</button>
+</div>
+</div>
+</div>
 </div>
 
 {% block scripts %}
 <script>
 function profileManager() {
-    return {
-        profile: {},
-        formData: {
-            username: '',
-            email: '',
-            phone: '',
-            department: '',
-            position: '',
-            password: '',
-            password_confirm: ''
-        },
-        
-        async init() {
-            try {
-                const profileData = await fetchAPI('/api/auth/profile');
-                this.profile = profileData;
-                
-                // Initialize form data
-                this.formData = {
-                    username: profileData.username,
-                    email: profileData.email,
-                    phone: profileData.phone || '',
-                    department: profileData.department || '',
-                    position: profileData.position || '',
-                    password: '',
-                    password_confirm: ''
-                };
-            } catch (error) {
-                console.error('Error loading profile:', error);
-            }
-        },
-        
-        async updateProfile() {
-            // Validate password if provided
-            if (this.formData.password) {
-                if (this.formData.password !== this.formData.password_confirm) {
-                    showNotification('Passwords do not match', 'error');
-                    return;
-                }
-                
-                if (this.formData.password.length < 6) {
-                    showNotification('Password must be at least 6 characters', 'error');
-                    return;
-                }
-            }
-            
-            try {
-                // Only send fields that can be updated
-                const updateData = {
-                    phone: this.formData.phone,
-                    department: this.formData.department,
-                    position: this.formData.position
-                };
-                
-                if (this.formData.password) {
-                    updateData.password = this.formData.password;
-                }
-                
-                await fetchAPI('/api/auth/profile', 'PUT', updateData);
-                showNotification('Profile updated successfully');
-                
-                // Refresh profile data
-                const profileData = await fetchAPI('/api/auth/profile');
-                this.profile = profileData;
-                
-                // Clear password fields
-                this.formData.password = '';
-                this.formData.password_confirm = '';
-            } catch (error) {
-                console.error('Error updating profile:', error);
-            }
-        }
-    };
+return {
+profile: {},
+formData: {
+username: '',
+email: '',
+phone: '',
+department: '',
+position: '',
+identification_number: '',
+gender: '',
+nationality: '',
+birthdate: '',
+hire_date: '',
+address: '',
+emergency_contact: {
+name: '',
+phone: '',
+relation: ''
+},
+password: '',
+password_confirm: ''
+},
+activeTab: 'personal',
+editMode: {
+personal: false,
+contact: false
+},
+showBusinessCardModal: false,
+businessCardPreviewUrl: '',
+isLoading: false,
+
+async init() {
+try {
+const profileData = await fetchAPI('/api/auth/profile');
+this.profile = profileData;
+
+// Initialize form data
+this.formData = {
+username: profileData.username,
+email: profileData.email,
+phone: profileData.phone || '',
+department: profileData.department || '',
+position: profileData.position || '',
+identification_number: profileData.identification_number || '',
+gender: profileData.gender || '',
+nationality: profileData.nationality || '',
+birthdate: profileData.birthdate || '',
+hire_date: profileData.hire_date || '',
+address: profileData.address || '',
+emergency_contact: profileData.emergency_contact || {
+name: '',
+phone: '',
+relation: ''
+},
+password: '',
+password_confirm: ''
+};
+} catch (error) {
+console.error('Error loading profile:', error);
+showNotification('فشل في تحميل بيانات الملف الشخصي', 'error');
+}
+},
+
+async handleProfileImageUpload(event) {
+const file = event.target.files[0];
+if (!file) return;
+
+// Validate file type
+if (!file.type.match('image.*')) {
+showNotification('الرجاء اختيار ملف صورة', 'error');
+return;
+}
+
+// Validate file size (max 5MB)
+if (file.size > 5 * 1024 * 1024) {
+showNotification('يجب أن يكون حجم الصورة أقل من 5 ميجابايت', 'error');
+return;
+}
+
+try {
+const formData = new FormData();
+formData.append('profile_image', file);
+
+// Show loading indicator
+showNotification('جاري رفع الصورة...', 'info');
+
+const response = await fetch('/api/auth/profile/image', {
+method: 'POST',
+body: formData,
+credentials: 'same-origin'
+});
+
+if (!response.ok) {
+const errorData = await response.json().catch(() => ({ message: 'فشل في رفع الصورة' }));
+throw new Error(errorData.message);
+}
+
+const data = await response.json();
+this.profile.profile_image = data.profile_image;
+showNotification('تم تحديث صورة الملف الشخصي بنجاح');
+} catch (error) {
+console.error('Error uploading profile image:', error);
+showNotification(error.message || 'فشل في رفع الصورة', 'error');
+}
+},
+
+async previewBusinessCard() {
+try {
+this.isLoading = true;
+this.showBusinessCardModal = true;
+
+// Add timestamp to prevent caching
+this.businessCardPreviewUrl = '/api/auth/business-card?' + new Date().getTime();
+
+// Create an image object to detect when loading is complete
+const img = new Image();
+img.onload = () => {
+this.isLoading = false;
+};
+img.onerror = () => {
+this.isLoading = false;
+showNotification('فشل في تحميل معاينة البطاقة', 'error');
+};
+img.src = this.businessCardPreviewUrl;
+} catch (error) {
+this.isLoading = false;
+console.error('Error previewing business card:', error);
+showNotification('فشل في معاينة بطاقة العمل', 'error');
+}
+},
+
+async updatePersonalInfo() {
+try {
+// Prepare update data
+const updateData = {
+identification_number: this.formData.identification_number,
+gender: this.formData.gender,
+nationality: this.formData.nationality,
+birthdate: this.formData.birthdate,
+hire_date: this.formData.hire_date
+};
+
+await fetchAPI('/api/auth/profile', 'PUT', updateData);
+showNotification('تم تحديث المعلومات الشخصية بنجاح');
+
+// Refresh profile data
+const profileData = await fetchAPI('/api/auth/profile');
+this.profile = profileData;
+
+// Exit edit mode
+this.editMode.personal = false;
+} catch (error) {
+console.error('Error updating personal info:', error);
+showNotification('فشل في تحديث المعلومات الشخصية', 'error');
+}
+},
+
+async updateContactInfo() {
+try {
+// Prepare update data
+const updateData = {
+phone: this.formData.phone,
+department: this.formData.department,
+position: this.formData.position,
+address: this.formData.address,
+emergency_contact: this.formData.emergency_contact
+};
+
+await fetchAPI('/api/auth/profile', 'PUT', updateData);
+showNotification('تم تحديث معلومات الاتصال بنجاح');
+
+// Refresh profile data
+const profileData = await fetchAPI('/api/auth/profile');
+this.profile = profileData;
+
+// Exit edit mode
+this.editMode.contact = false;
+} catch (error) {
+console.error('Error updating contact info:', error);
+showNotification('فشل في تحديث معلومات الاتصال', 'error');
+}
+},
+
+async updatePassword() {
+// Validate password
+if (!this.formData.password) {
+showNotification('الرجاء إدخال كلمة المرور الجديدة', 'error');
+return;
+}
+
+if (this.formData.password !== this.formData.password_confirm) {
+showNotification('كلمات المرور غير متطابقة', 'error');
+return;
+}
+
+if (this.formData.password.length < 6) {
+showNotification('يجب أن تكون كلمة المرور 6 أحرف على الأقل', 'error');
+return;
+}
+
+try {
+await fetchAPI('/api/auth/profile', 'PUT', {
+password: this.formData.password
+});
+
+showNotification('تم تغيير كلمة المرور بنجاح');
+
+// Clear password fields
+this.formData.password = '';
+this.formData.password_confirm = '';
+} catch (error) {
+console.error('Error updating password:', error);
+showNotification('فشل في تغيير كلمة المرور', 'error');
+}
+}
+};
 }
 </script>
 {% endblock %}

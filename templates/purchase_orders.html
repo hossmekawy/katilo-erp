@@ -1,0 +1,1001 @@
+{% extends 'base.html' %}
+
+{% block title %}طلبات الشراء - نظام كاتيلو{% endblock %}
+
+{% block page_header %}إدارة طلبات الشراء{% endblock %}
+
+{% block content %}
+<div x-data="purchaseOrdersApp()" class="space-y-6">
+    <!-- Header with actions -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h2 class="text-xl font-bold text-gray-800">طلبات الشراء</h2>
+            <p class="text-sm text-gray-600">إدارة طلبات الشراء من الموردين</p>
+        </div>
+        
+        <div class="flex flex-col sm:flex-row gap-3">
+            <button @click="showCreateModal = true" class="btn btn-primary flex items-center justify-center gap-2">
+                <i class="fas fa-plus"></i>
+                <span>طلب شراء جديد</span>
+            </button>
+            
+            <button @click="showBulkCreateModal = true" class="btn bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2">
+                <i class="fas fa-layer-group"></i>
+                <span>إنشاء طلبات متعددة</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Filters and search -->
+    <div class="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+        <div class="flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">بحث</label>
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="search" 
+                        x-model="searchQuery"
+                        @input="searchPurchaseOrders"
+                        placeholder="ابحث عن طلب شراء أو مورد..." 
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    >
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="w-full md:w-48">
+                <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                <select 
+                    id="status-filter" 
+                    x-model="statusFilter"
+                    @change="filterByStatus"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                >
+                    <option value="">جميع الحالات</option>
+                    <option value="Pending">قيد الانتظار</option>
+                    <option value="Approved">تمت الموافقة</option>
+                    <option value="Received">تم الاستلام</option>
+                    <option value="Cancelled">ملغي</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Purchase Orders Table -->
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الطلب
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المورد
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ الطلب
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            عدد العناصر
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المبلغ الإجمالي
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="purchaseOrders.length === 0">
+                        <tr>
+                            <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                                <div class="py-8">
+                                    <i class="fas fa-shopping-cart text-gray-300 text-5xl mb-4"></i>
+                                    <p class="font-medium">لا توجد طلبات شراء</p>
+                                    <p class="text-gray-400 mt-1">قم بإنشاء طلب شراء جديد للبدء</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-for="order in purchaseOrders" :key="order.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                                <a :href="'/purchase-orders/' + order.id" class="hover:underline" x-text="'#' + order.id"></a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="order.supplier_name"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="formatDate(order.order_date)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="{
+                                          'bg-yellow-100 text-yellow-800': order.status === 'Pending',
+                                          'bg-blue-100 text-blue-800': order.status === 'Approved',
+                                          'bg-green-100 text-green-800': order.status === 'Received',
+                                          'bg-red-100 text-red-800': order.status === 'Cancelled'
+                                      }">
+                                    <span x-text="translateStatus(order.status)"></span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="order.items_count"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(order.total_amount)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex items-center space-x-3 space-x-reverse">
+                                    <a :href="'/purchase-orders/' + order.id" class="text-blue-600 hover:text-blue-900">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    
+                                    <template x-if="order.status === 'Pending'">
+                                        <button @click="approveOrder(order.id)" class="text-green-600 hover:text-green-900">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </template>
+                                    
+                                    <template x-if="order.status === 'Pending' || order.status === 'Approved'">
+                                        <button @click="openReceiveModal(order)" class="text-indigo-600 hover:text-indigo-900">
+                                            <i class="fas fa-truck-loading"></i>
+                                        </button>                                        
+                                    </template>
+                                    
+                                    <template x-if="order.status === 'Pending'">
+                                        <button @click="cancelOrder(order.id)" class="text-red-600 hover:text-red-900">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </template>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Create Purchase Order Modal -->
+    <div x-show="showCreateModal" 
+         class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         x-cloak>
+        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" 
+             @click.away="showCreateModal = false">
+            <div class="flex items-center justify-between px-6 py-4 border-b">
+                <h3 class="text-lg font-medium text-gray-900">إنشاء طلب شراء جديد</h3>
+                <button @click="showCreateModal = false" class="text-gray-400 hover:text-gray-500">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-8rem)]">
+                <div class="space-y-4">
+                    <!-- Supplier Selection -->
+                    <div>
+                        <label for="supplier" class="block text-sm font-medium text-gray-700 mb-1">المورد</label>
+                        <select 
+                            id="supplier" 
+                            x-model="newOrder.supplier_id"
+                            @change="loadSupplierItems"
+                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                        >
+                            <option value="">اختر المورد</option>
+                            <template x-for="supplier in suppliers" :key="supplier.id">
+                                <option :value="supplier.id" x-text="supplier.supplier_name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    
+                    <!-- Items Table -->
+                    <div class="mt-4">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">العناصر</h4>
+                        
+                        <div class="border border-gray-200 rounded-md overflow-hidden">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            العنصر
+                                        </th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            الكمية
+                                        </th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            السعر
+                                        </th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            المجموع
+                                        </th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <span class="sr-only">إجراءات</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <template x-for="(item, index) in newOrder.items" :key="index">
+                                        <tr>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                                <select 
+                                                    x-model="item.item_id"
+                                                    @change="updateItemPrice(index)"
+                                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                                >
+                                                    <option value="">اختر العنصر</option>
+                                                    <template x-for="supplierItem in supplierItems" :key="supplierItem.item_id">
+                                                        <option :value="supplierItem.item_id" x-text="supplierItem.item_name"></option>
+                                                    </template>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                                <input 
+                                                    type="number" 
+                                                    x-model="item.quantity_ordered"
+                                                    min="1"
+                                                    class="block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                                >
+                                            </td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+    <input 
+        type="number" 
+        x-model="item.unit_price"
+        min="0"
+        step="0.01"
+        class="block w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+    >
+</td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+    <span x-text="formatCurrency(item.quantity_ordered * item.unit_price)"></span>
+</td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+    <button @click="removeItem(index)" class="text-red-600 hover:text-red-900">
+        <i class="fas fa-trash"></i>
+    </button>
+</td>
+</tr>
+</template>
+
+<tr x-show="newOrder.items.length === 0">
+<td colspan="5" class="px-4 py-3 text-center text-sm text-gray-500">
+لا توجد عناصر مضافة
+</td>
+</tr>
+</tbody>
+<tfoot class="bg-gray-50">
+<tr>
+<td colspan="5" class="px-4 py-3">
+<button 
+    @click="addItem"
+    class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+>
+    <i class="fas fa-plus mr-1"></i>
+    إضافة عنصر
+</button>
+</td>
+</tr>
+</tfoot>
+</table>
+</div>
+</div>
+
+<!-- Total -->
+<div class="mt-4 flex justify-end">
+<div class="text-right">
+<p class="text-sm text-gray-500">المجموع الكلي</p>
+<p class="text-lg font-medium text-gray-900" x-text="formatCurrency(calculateTotal())"></p>
+</div>
+</div>
+</div>
+</div>
+
+<div class="px-6 py-4 bg-gray-50 border-t flex justify-end space-x-3 space-x-reverse">
+<button 
+@click="showCreateModal = false"
+class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+>
+إلغاء
+</button>
+<button 
+@click="createPurchaseOrder"
+class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+:disabled="!isFormValid"
+:class="{'opacity-50 cursor-not-allowed': !isFormValid}"
+>
+إنشاء الطلب
+</button>
+</div>
+</div>
+</div>
+
+<!-- Receive Items Modal -->
+<div x-show="showReceiveModal" 
+class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50"
+x-transition:enter="transition ease-out duration-300"
+x-transition:enter-start="opacity-0"
+x-transition:enter-end="opacity-100"
+x-transition:leave="transition ease-in duration-200"
+x-transition:leave-start="opacity-100"
+x-transition:leave-end="opacity-0"
+x-cloak>
+<div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" 
+@click.away="showReceiveModal = false">
+<div class="flex items-center justify-between px-6 py-4 border-b">
+<h3 class="text-lg font-medium text-gray-900">استلام العناصر</h3>
+<button @click="showReceiveModal = false" class="text-gray-400 hover:text-gray-500">
+<i class="fas fa-times"></i>
+</button>
+</div>
+
+<div class="p-6 overflow-y-auto max-h-[calc(90vh-8rem)]">
+<div class="space-y-4">
+<!-- Warehouse Selection -->
+<div>
+<label for="warehouse" class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+<select 
+id="warehouse" 
+x-model="receiveData.warehouse_id"
+class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+>
+<option value="">اختر المستودع</option>
+<template x-for="warehouse in warehouses" :key="warehouse.id">
+<option :value="warehouse.id" x-text="warehouse.name"></option>
+</template>
+</select>
+</div>
+
+<!-- Items Table -->
+<div class="mt-4">
+<h4 class="text-sm font-medium text-gray-700 mb-2">العناصر المستلمة</h4>
+
+<div class="border border-gray-200 rounded-md overflow-hidden">
+<table class="min-w-full divide-y divide-gray-200">
+<thead class="bg-gray-50">
+<tr>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+العنصر
+</th>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+الكمية المطلوبة
+</th>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+الكمية المستلمة سابقاً
+</th>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+الكمية المستلمة الآن
+</th>
+</tr>
+</thead>
+<tbody class="bg-white divide-y divide-gray-200">
+<template x-for="item in receiveData.items" :key="item.detail_id">
+<tr>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900" x-text="item.item_name"></td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900" x-text="item.quantity_ordered"></td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900" x-text="item.quantity_received"></td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+    <input 
+        type="number" 
+        x-model="item.quantity_receiving"
+        :max="item.quantity_ordered - item.quantity_received"
+        min="0"
+        class="block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+    >
+</td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+
+<div class="px-6 py-4 bg-gray-50 border-t flex justify-end space-x-3 space-x-reverse">
+<button 
+@click="showReceiveModal = false"
+class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+>
+إلغاء
+</button>
+<button 
+@click="receiveItems"
+class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+:disabled="!isReceiveFormValid"
+:class="{'opacity-50 cursor-not-allowed': !isReceiveFormValid}"
+>
+تأكيد الاستلام
+</button>
+</div>
+</div>
+</div>
+
+<!-- Bulk Create Modal -->
+<div x-show="showBulkCreateModal" 
+class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50"
+x-transition:enter="transition ease-out duration-300"
+x-transition:enter-start="opacity-0"
+x-transition:enter-end="opacity-100"
+x-transition:leave="transition ease-in duration-200"
+x-transition:leave-start="opacity-100"
+x-transition:leave-end="opacity-0"
+x-cloak>
+<div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" 
+@click.away="showBulkCreateModal = false">
+<div class="flex items-center justify-between px-6 py-4 border-b">
+<h3 class="text-lg font-medium text-gray-900">إنشاء طلبات شراء متعددة</h3>
+<button @click="showBulkCreateModal = false" class="text-gray-400 hover:text-gray-500">
+<i class="fas fa-times"></i>
+</button>
+</div>
+
+<div class="p-6 overflow-y-auto max-h-[calc(90vh-8rem)]">
+<div class="space-y-4">
+<p class="text-sm text-gray-600">
+إنشاء طلبات شراء للعناصر منخفضة المخزون من أفضل الموردين
+</p>
+
+<!-- Low Stock Items -->
+<div class="mt-4">
+<h4 class="text-sm font-medium text-gray-700 mb-2">العناصر منخفضة المخزون</h4>
+
+<div class="border border-gray-200 rounded-md overflow-hidden">
+<table class="min-w-full divide-y divide-gray-200">
+<thead class="bg-gray-50">
+<tr>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+<input 
+    type="checkbox" 
+    x-model="selectAllItems"
+    @change="toggleAllItems"
+    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+>
+</th>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+العنصر
+</th>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+المخزون الحالي
+</th>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+حد إعادة الطلب
+</th>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+أفضل مورد
+</th>
+<th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+الكمية المطلوبة
+</th>
+</tr>
+</thead>
+<tbody class="bg-white divide-y divide-gray-200">
+<template x-for="item in lowStockItems" :key="item.id">
+<tr>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+    <input 
+        type="checkbox" 
+        x-model="item.selected"
+        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+    >
+</td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900" x-text="item.name"></td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900" x-text="item.quantity"></td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900" x-text="item.reorder_level"></td>
+
+
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900" x-text="item.best_supplier ? item.best_supplier.supplier_name : 'لا يوجد'"></td>
+<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+    <input 
+        type="number" 
+        x-model="item.order_quantity"
+        min="1"
+        :disabled="!item.selected || !item.best_supplier"
+        class="block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+        :class="{'opacity-50': !item.selected || !item.best_supplier}"
+    >
+</td>
+</tr>
+</template>
+
+<tr x-show="lowStockItems.length === 0">
+<td colspan="6" class="px-4 py-3 text-center text-sm text-gray-500">
+لا توجد عناصر منخفضة المخزون
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+
+<div class="px-6 py-4 bg-gray-50 border-t flex justify-end space-x-3 space-x-reverse">
+<button 
+@click="showBulkCreateModal = false"
+class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+>
+إلغاء
+</button>
+<button 
+@click="createBulkPurchaseOrders"
+class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+:disabled="!isBulkFormValid"
+:class="{'opacity-50 cursor-not-allowed': !isBulkFormValid}"
+>
+إنشاء الطلبات
+</button>
+</div>
+</div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function purchaseOrdersApp() {
+return {
+purchaseOrders: [],
+suppliers: [],
+warehouses: [],
+supplierItems: [],
+lowStockItems: [],
+searchQuery: '',
+statusFilter: '',
+showCreateModal: false,
+showReceiveModal: false,
+showBulkCreateModal: false,
+selectAllItems: false,
+
+newOrder: {
+supplier_id: '',
+items: []
+},
+
+receiveData: {
+order_id: null,
+warehouse_id: '',
+items: []
+},
+
+init() {
+this.fetchPurchaseOrders();
+this.fetchSuppliers();
+this.fetchWarehouses();
+this.fetchLowStockItems();
+},
+
+get isFormValid() {
+return this.newOrder.supplier_id && 
+this.newOrder.items.length > 0 && 
+this.newOrder.items.every(item => 
+item.item_id && 
+item.quantity_ordered > 0 && 
+item.unit_price > 0
+);
+},
+
+get isReceiveFormValid() {
+return this.receiveData.warehouse_id && 
+this.receiveData.items.some(item => item.quantity_receiving > 0);
+},
+
+get isBulkFormValid() {
+return this.lowStockItems.some(item => 
+item.selected && 
+item.best_supplier && 
+item.order_quantity > 0
+);
+},
+
+async fetchPurchaseOrders() {
+try {
+const response = await fetch('/api/purchase-orders');
+if (!response.ok) throw new Error('Failed to fetch purchase orders');
+this.purchaseOrders = await response.json();
+} catch (error) {
+console.error('Error fetching purchase orders:', error);
+showNotification(error.message, 'error');
+}
+},
+
+async fetchSuppliers() {
+try {
+const response = await fetch('/api/suppliers');
+if (!response.ok) throw new Error('Failed to fetch suppliers');
+this.suppliers = await response.json();
+} catch (error) {
+console.error('Error fetching suppliers:', error);
+showNotification(error.message, 'error');
+}
+},
+
+async fetchWarehouses() {
+try {
+const response = await fetch('/api/warehouses');
+if (!response.ok) throw new Error('Failed to fetch warehouses');
+this.warehouses = await response.json();
+} catch (error) {
+console.error('Error fetching warehouses:', error);
+showNotification(error.message, 'error');
+}
+},
+
+async fetchLowStockItems() {
+try {
+const response = await fetch('/api/dashboard/low-stock');
+if (!response.ok) throw new Error('Failed to fetch low stock items');
+const items = await response.json();
+
+// Fetch best supplier for each item
+this.lowStockItems = await Promise.all(items.map(async item => {
+try {
+const suppliersResponse = await fetch(`/api/items/${item.id}/low-stock-suppliers`);
+if (!suppliersResponse.ok) throw new Error('Failed to fetch suppliers');
+const suppliers = await suppliersResponse.json();
+
+return {
+...item,
+selected: false,
+best_supplier: suppliers.length > 0 ? suppliers[0] : null,
+order_quantity: Math.max(item.reorder_level - item.quantity, 1)
+};
+} catch (error) {
+console.error(`Error fetching suppliers for item ${item.id}:`, error);
+return {
+...item,
+selected: false,
+best_supplier: null,
+order_quantity: Math.max(item.reorder_level - item.quantity, 1)
+};
+}
+}));
+} catch (error) {
+console.error('Error fetching low stock items:', error);
+showNotification(error.message, 'error');
+}
+},
+
+async loadSupplierItems() {
+if (!this.newOrder.supplier_id) {
+this.supplierItems = [];
+return;
+}
+
+try {
+const response = await fetch(`/api/suppliers/${this.newOrder.supplier_id}/items`);
+if (!response.ok) throw new Error('Failed to fetch supplier items');
+this.supplierItems = await response.json();
+} catch (error) {
+console.error('Error fetching supplier items:', error);
+showNotification(error.message, 'error');
+}
+},
+
+addItem() {
+this.newOrder.items.push({
+item_id: '',
+quantity_ordered: 1,
+unit_price: 0
+});
+},
+
+removeItem(index) {
+this.newOrder.items.splice(index, 1);
+},
+
+updateItemPrice(index) {
+const itemId = this.newOrder.items[index].item_id;
+if (!itemId) return;
+
+const supplierItem = this.supplierItems.find(si => si.item_id == itemId);
+if (supplierItem) {
+this.newOrder.items[index].unit_price = supplierItem.cost;
+}
+},
+
+calculateTotal() {
+return this.newOrder.items.reduce((total, item) => {
+return total + (item.quantity_ordered * item.unit_price);
+}, 0);
+},
+
+async createPurchaseOrder() {
+if (!this.isFormValid) return;
+
+try {
+const response = await fetch('/api/purchase-orders', {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json'
+},
+body: JSON.stringify(this.newOrder)
+});
+
+if (!response.ok) {
+const error = await response.json();
+throw new Error(error.message || 'Failed to create purchase order');
+}
+
+const result = await response.json();
+
+// Reset form and close modal
+this.newOrder = {
+supplier_id: '',
+items: []
+};
+this.showCreateModal = false;
+
+// Refresh purchase orders
+this.fetchPurchaseOrders();
+
+showNotification('تم إنشاء طلب الشراء بنجاح', 'success');
+} catch (error) {
+console.error('Error creating purchase order:', error);
+showNotification(error.message, 'error');
+}
+},
+
+async approveOrder(orderId) {
+try {
+const response = await fetch(`/api/purchase-orders/${orderId}`, {
+method: 'PUT',
+headers: {
+'Content-Type': 'application/json'
+},
+body: JSON.stringify({ status: 'Approved' })
+});
+
+if (!response.ok) {
+const error = await response.json();
+throw new Error(error.message || 'Failed to approve purchase order');
+}
+
+// Refresh purchase orders
+this.fetchPurchaseOrders();
+
+showNotification('تمت الموافقة على طلب الشراء بنجاح', 'success');
+} catch (error) {
+console.error('Error approving purchase order:', error);
+showNotification(error.message, 'error');
+}
+},
+
+async cancelOrder(orderId) {
+if (!confirm('هل أنت متأكد من إلغاء طلب الشراء هذا؟')) return;
+
+try {
+const response = await fetch(`/api/purchase-orders/${orderId}/cancel`, {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json'
+}
+});
+
+if (!response.ok) {
+const error = await response.json();
+throw new Error(error.message || 'Failed to cancel purchase order');
+}
+
+// Refresh purchase orders
+this.fetchPurchaseOrders();
+
+showNotification('تم إلغاء طلب الشراء بنجاح', 'success');
+} catch (error) {
+console.error('Error cancelling purchase order:', error);
+showNotification(error.message, 'error');
+}
+},
+
+openReceiveModal(order) {
+console.log("Opening receive modal for order:", order); // Add this for debugging
+this.receiveData = {
+order_id: order.id,
+warehouse_id: '',
+items: []
+};
+
+fetch(`/api/purchase-orders/${order.id}`)
+.then(response => {
+if (!response.ok) throw new Error('Failed to fetch purchase order details');
+return response.json();
+})
+.then(orderDetails => {
+this.receiveData.items = orderDetails.details.map(detail => ({
+detail_id: detail.id,
+item_id: detail.item_id,
+item_name: detail.item_name,
+quantity_ordered: detail.quantity_ordered,
+quantity_received: detail.quantity_received,
+quantity_receiving: 0
+}));
+
+this.showReceiveModal = true;
+})
+.catch(error => {
+console.error('Error fetching purchase order details:', error);
+showNotification(error.message, 'error');
+});
+},
+
+
+async receiveItems() {
+if (!this.isReceiveFormValid) return;
+
+const itemsToReceive = this.receiveData.items
+.filter(item => item.quantity_receiving > 0)
+.map(item => ({
+detail_id: item.detail_id,
+quantity_received: Number(item.quantity_receiving)
+}));
+
+try {
+const response = await fetch(`/api/purchase-orders/${this.receiveData.order_id}/receive`, {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json'
+},
+body: JSON.stringify({
+warehouse_id: this.receiveData.warehouse_id,
+items: itemsToReceive
+})
+});
+
+if (!response.ok) {
+const error = await response.json();
+throw new Error(error.message || 'Failed to receive items');
+}
+
+const result = await response.json();
+
+// Reset form and close modal
+this.receiveData = {
+order_id: null,
+warehouse_id: '',
+items: []
+};
+this.showReceiveModal = false;
+
+// Refresh purchase orders
+this.fetchPurchaseOrders();
+
+showNotification(result.message || 'تم استلام العناصر بنجاح', 'success');
+} catch (error) {
+console.error('Error receiving items:', error);
+showNotification(error.message, 'error');
+}
+},
+
+toggleAllItems() {
+this.lowStockItems.forEach(item => {
+item.selected = this.selectAllItems;
+});
+},
+
+async createBulkPurchaseOrders() {
+if (!this.isBulkFormValid) return;
+
+// Group selected items by supplier
+const supplierOrders = {};
+
+this.lowStockItems.forEach(item => {
+if (item.selected && item.best_supplier && item.order_quantity > 0) {
+const supplierId = item.best_supplier.supplier_id;
+
+if (!supplierOrders[supplierId]) {
+supplierOrders[supplierId] = {
+supplier_id: supplierId,
+items: []
+};
+
+}
+                        
+supplierOrders[supplierId].items.push({
+    item_id: item.id,
+    quantity_ordered: item.order_quantity,
+    unit_price: item.best_supplier.cost
+});
+}
+});
+
+try {
+const response = await fetch('/api/purchase-orders/bulk-create', {
+method: 'POST',
+headers: {
+    'Content-Type': 'application/json'
+},
+body: JSON.stringify({
+    orders: Object.values(supplierOrders)
+})
+});
+
+if (!response.ok) {
+const error = await response.json();
+throw new Error(error.message || 'Failed to create bulk purchase orders');
+}
+
+const result = await response.json();
+
+// Reset form and close modal
+this.selectAllItems = false;
+this.lowStockItems.forEach(item => {
+item.selected = false;
+});
+this.showBulkCreateModal = false;
+
+// Refresh purchase orders
+this.fetchPurchaseOrders();
+
+showNotification(result.message || 'تم إنشاء طلبات الشراء بنجاح', 'success');
+} catch (error) {
+console.error('Error creating bulk purchase orders:', error);
+showNotification(error.message, 'error');
+}
+},
+
+async searchPurchaseOrders() {
+if (this.searchQuery.length < 2 && !this.statusFilter) {
+return this.fetchPurchaseOrders();
+}
+
+try {
+let url = '/api/purchase-orders/search?';
+if (this.searchQuery.length >= 2) {
+url += `q=${encodeURIComponent(this.searchQuery)}`;
+}
+
+if (this.statusFilter) {
+url += `${this.searchQuery.length >= 2 ? '&' : ''}status=${encodeURIComponent(this.statusFilter)}`;
+}
+
+const response = await fetch(url);
+if (!response.ok) throw new Error('Failed to search purchase orders');
+
+this.purchaseOrders = await response.json();
+} catch (error) {
+console.error('Error searching purchase orders:', error);
+showNotification(error.message, 'error');
+}
+},
+
+filterByStatus() {
+this.searchPurchaseOrders();
+},
+
+formatDate(dateString) {
+if (!dateString) return '';
+const date = new Date(dateString);
+return date.toLocaleDateString('ar-EG', {
+year: 'numeric',
+month: 'short',
+day: 'numeric'
+});
+},
+
+formatCurrency(amount) {
+if (amount === undefined || amount === null) return '';
+return new Intl.NumberFormat('ar-EG', {
+style: 'currency',
+currency: 'EGP'
+}).format(amount);
+},
+
+translateStatus(status) {
+const statusMap = {
+'Pending': 'قيد الانتظار',
+'Approved': 'تمت الموافقة',
+'Received': 'تم الاستلام',
+'Cancelled': 'ملغي'
+};
+
+return statusMap[status] || status;
+}
+};
+}
+</script>
+{% endblock %}

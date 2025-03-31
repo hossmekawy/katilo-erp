@@ -7,11 +7,11 @@
 ✅# INVENTORY & TRANSACTIONS
     ✅Inventory
     ✅InventoryTransaction
-# MANUFACTURING (BOM)
-    BOM ---> BOMDetail
-# SUPPLIER MANAGEMENT
-    Supplier
-    SupplierItem
+ ✅# MANUFACTURING (BOM)
+     ✅BOM --->  ✅BOMDetail
+✅# SUPPLIER MANAGEMENT
+    ✅Supplier
+    ✅SupplierItem
 # PURCHASE ORDERS (PO)
     PurchaseOrder
     PurchaseOrderDetail
@@ -31,8 +31,8 @@
     MaintenanceLog
 # SHIPPING AND LOGISTICS
     Shipment ---> ShipmentDetail
-# ADVANCED USER PERMISSIONS (RBAC)
-    Permission ---> RolePermission
+#  ✅ADVANCED USER PERMISSIONS (RBAC)
+     ✅Permission --->  ✅RolePermission
 # DOCUMENT MANAGEMENT
     Document 
 # PRODUCTION PLANNING & SCHEDULING

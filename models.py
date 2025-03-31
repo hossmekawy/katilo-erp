@@ -216,33 +216,6 @@ class BOMDetail(db.Model):
     def __repr__(self):
         return f'<BOMDetail for BOM {self.bom_id} Component {self.component_item_id}>'
 
-##############################################################################
-# SUPPLIER MANAGEMENT
-##############################################################################
-
-class Supplier(db.Model):
-    __tablename__ = 'suppliers'
-    id = db.Column('SupplierID', db.Integer, primary_key=True)
-    supplier_name = db.Column('SupplierName', db.String(100), nullable=False)
-    contact_info = db.Column('ContactInfo', db.Text)
-    payment_terms = db.Column('PaymentTerms', db.String(50))
-    rating = db.Column('Rating', db.Float)
-
-    supplier_items = db.relationship('SupplierItem', backref='supplier', lazy=True)
-
-    def __repr__(self):
-        return f"<Supplier {self.supplier_name}>"
-
-class SupplierItem(db.Model):
-    __tablename__ = 'supplier_items'
-    id = db.Column('SupplierItemID', db.Integer, primary_key=True)
-    supplier_id = db.Column('SupplierID', db.Integer, db.ForeignKey('suppliers.SupplierID'), nullable=False)
-    item_id = db.Column('ItemID', db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
-    supplier_sku = db.Column('SupplierSKU', db.String(50))
-    cost = db.Column('Cost', db.Float, nullable=False)
-
-    def __repr__(self):
-        return f"<SupplierItem Supplier {self.supplier_id}, Item {self.item_id}>"
 
 ##############################################################################
 # PURCHASE ORDERS (PO)
@@ -278,6 +251,77 @@ class PurchaseOrderDetail(db.Model):
 
     def __repr__(self):
         return f"<PODetail {self.id} PO {self.po_id} Item {self.item_id}>"
+
+##############################################################################
+# SUPPLIER MANAGEMENT
+##############################################################################
+class SupplierPayment(db.Model):
+    __tablename__ = 'supplier_payments'
+    id = db.Column('PaymentID', db.Integer, primary_key=True)
+    supplier_id = db.Column('SupplierID', db.Integer, db.ForeignKey('suppliers.SupplierID'), nullable=False)
+    amount = db.Column('Amount', db.Float, nullable=False)
+    payment_date = db.Column('PaymentDate', db.DateTime, default=datetime.utcnow)
+    payment_method = db.Column('PaymentMethod', db.String(50))
+    reference = db.Column('Reference', db.String(100))
+    notes = db.Column('Notes', db.Text)
+    created_by = db.Column('CreatedBy', db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column('CreatedAt', db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    supplier = db.relationship('Supplier', backref='payments', lazy=True)
+    created_by_user = db.relationship('User', backref='supplier_payments_created', lazy=True)
+    
+    def __repr__(self):
+        return f"<SupplierPayment {self.id} Supplier {self.supplier_id} Amount {self.amount}>"
+    
+class SupplierLedgerEntry(db.Model):
+    __tablename__ = 'supplier_ledger'
+    id = db.Column('EntryID', db.Integer, primary_key=True)
+    supplier_id = db.Column('SupplierID', db.Integer, db.ForeignKey('suppliers.SupplierID'), nullable=False)
+    entry_date = db.Column('EntryDate', db.DateTime, default=datetime.utcnow)
+    description = db.Column('Description', db.String(255))
+    reference_type = db.Column('ReferenceType', db.String(50))  # 'purchase_order', 'payment', etc.
+    reference_id = db.Column('ReferenceID', db.Integer)
+    debit = db.Column('Debit', db.Float, default=0)  # Amount owed to supplier
+    credit = db.Column('Credit', db.Float, default=0)  # Amount paid to supplier
+    
+    # Relationships
+    supplier = db.relationship('Supplier', backref='ledger_entries', lazy=True)
+    
+    def __repr__(self):
+        return f"<SupplierLedgerEntry {self.id} Supplier {self.supplier_id} Debit {self.debit} Credit {self.credit}>"
+
+class Supplier(db.Model):
+    __tablename__ = 'suppliers'
+    id = db.Column('SupplierID', db.Integer, primary_key=True)
+    supplier_name = db.Column('SupplierName', db.String(100), nullable=False)
+    contact_info = db.Column('ContactInfo', db.Text)
+    payment_terms = db.Column('PaymentTerms', db.String(50))
+    rating = db.Column('Rating', db.Float)
+    email = db.Column('Email', db.String(100))
+    phone = db.Column('Phone', db.String(50))
+    address = db.Column('Address', db.Text)
+    tax_id = db.Column('TaxID', db.String(50))
+    website = db.Column('Website', db.String(100))
+    contact_person = db.Column('ContactPerson', db.String(100))
+    notes = db.Column('Notes', db.Text)
+    supplier_items = db.relationship('SupplierItem', backref='supplier', lazy=True)
+
+    def __repr__(self):
+        return f"<Supplier {self.supplier_name}>"
+
+class SupplierItem(db.Model):
+    __tablename__ = 'supplier_items'
+    id = db.Column('SupplierItemID', db.Integer, primary_key=True)
+    supplier_id = db.Column('SupplierID', db.Integer, db.ForeignKey('suppliers.SupplierID'), nullable=False)
+    item_id = db.Column('ItemID', db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
+    supplier_sku = db.Column('SupplierSKU', db.String(50))
+    cost = db.Column('Cost', db.Float, nullable=False)
+
+    def __repr__(self):
+        return f"<SupplierItem Supplier {self.supplier_id}, Item {self.item_id}>"
+
+
 
 ##############################################################################
 # SALES ORDERS AND CUSTOMER MANAGEMENT
