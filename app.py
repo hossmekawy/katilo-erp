@@ -11,7 +11,10 @@ from routes.warehouse_routes import warehouse_bp
 from routes.profile_routes import profile_bp
 from routes.quality_control import quality_bp
 from routes.production_routes import production_bp
+from routes.chatbot_routes import chatbot_bp 
 from flask_migrate import Migrate
+from dotenv import load_dotenv
+import os 
 import socket
 import webbrowser
 import urllib.request
@@ -75,9 +78,10 @@ app = Flask(__name__)
 # App configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///katilo.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your-secret-key'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-default-secret-key')
 app.config['UPLOAD_FOLDER'] = 'static/uploads/support'
 app.config['PROFILE_UPLOAD_FOLDER'] = 'static/uploads/profiles'
+app.config['GEMINI_API_KEY'] = os.getenv("GEMINI_API_KEY")
 # Initialize extensions
 db.init_app(app)
 login_manager = LoginManager()
@@ -99,6 +103,7 @@ app.register_blueprint(warehouse_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(quality_bp)
 app.register_blueprint(production_bp)
+app.register_blueprint(chatbot_bp)
 # Create database tables
 
 migrate = Migrate(app, db)
@@ -867,6 +872,10 @@ def transactions_page():
 def tips_page():
     return render_template('tips.html')
 
+@app.route('/chat-assistant')
+@login_required
+def chat_assistant():
+    return render_template('chat.html')
 
 
 
@@ -890,6 +899,7 @@ def admin_roles_page():
 
 
 def check_internet():
+    # ... (keep existing function) ...
     try:
         urllib.request.urlopen('http://google.com', timeout=1)
         return True
@@ -897,20 +907,27 @@ def check_internet():
         return False
 
 
-
-
 if __name__ == '__main__':
-    
-    
+    # --- Check for Gemini API Key before starting ---
+    if not os.getenv("GEMINI_API_KEY"):
+        print("\n" + "="*50)
+        print(" FATAL ERROR: Gemini API Key not found! ")
+        print(" Please set the GEMINI_API_KEY in your .env file.")
+        print(" Chatbot functionality will NOT work.")
+        print("="*50 + "\n")
+        # Decide if you want to exit or just warn
+        # exit(1) # Uncomment to force exit if key is missing
+
     hostname = socket.gethostname()
     local_ip = socket.gethostbyname(hostname)
-    
+
     if check_internet():
-        print("internet connection successful")
+        print("Internet connection successful")
     else:
-        print("No internet connection")
-    
+        print("No internet connection (required for Gemini)") # Warn about Gemini
+
     port = 5000
     url = f"http://{local_ip}:{port}"
-    webbrowser.open(url)
+    print(f" * Katilo System running on {url}")
+    # webbrowser.open(url) # Keep or remove auto-open as preferred
     app.run(host='0.0.0.0', port=port, debug=True)

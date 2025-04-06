@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}مساعد كاتيلو الذكي{% endblock %}
+
+{% block page_header %}مساعد كاتيلو الذكي{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">مساعد كاتيلو الذكي</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto" x-data="chatInterface()">
+    <!-- Chat Container -->
+    <div class="card bg-white shadow-md rounded-xl overflow-hidden">
+        <!-- Chat Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex items-center">
+            <div class="bg-white/20 w-10 h-10 rounded-full flex items-center justify-center">
+                <i class="fas fa-robot text-white"></i>
+            </div>
+            <div class="mr-3">
+                <h3 class="text-white font-bold">Hamla Guys</h3>
+                <p class="text-blue-100 text-sm">مساعد كاتيلو الذكي</p>
+            </div>
+        </div>
+        
+        <!-- Chat Messages -->
+        <div class="p-4 h-96 overflow-y-auto" id="chat-messages" x-ref="chatContainer">
+            <!-- Welcome Message -->
+            <div class="flex mb-4">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
+                    <i class="fas fa-robot text-blue-600"></i>
+                </div>
+                <div class="mr-3 bg-gray-100 rounded-lg py-2 px-4 max-w-3xl">
+                    <p class="text-gray-700">مرحباً! أنا Hamla Guys، مساعد كاتيلو الذكي. كيف يمكنني مساعدتك اليوم؟ يمكنك سؤالي عن المخزون، المنتجات، الموردين، أو أي شيء آخر متعلق بنظام كاتيلو.</p>
+                </div>
+            </div>
+            
+            <!-- Dynamic Messages -->
+            <template x-for="(message, index) in messages" :key="index">
+                <div class="flex mb-4" :class="{'justify-end': message.sender === 'user'}">
+                    <!-- Bot Message -->
+                    <template x-if="message.sender === 'bot'">
+                        <div class="flex">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
+                                <i class="fas fa-robot text-blue-600"></i>
+                            </div>
+                            <div class="mr-3 bg-gray-100 rounded-lg py-2 px-4 max-w-3xl">
+                                <p class="text-gray-700 whitespace-pre-wrap" x-html="formatMessage(message.text)"></p>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <!-- User Message -->
+                    <template x-if="message.sender === 'user'">
+                        <div class="flex">
+                            <div class="ml-3 bg-blue-600 rounded-lg py-2 px-4 max-w-3xl">
+                                <p class="text-white" x-text="message.text"></p>
+                                <template x-if="message.image">
+                                    <div class="mt-2 rounded overflow-hidden">
+                                        <img :src="message.image" class="max-h-40 max-w-full" />
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center">
+                                <span class="text-white font-semibold">{{ current_user.username[0].upper() }}</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+            
+            <!-- Loading Indicator -->
+            <div class="flex mb-4" x-show="isLoading">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
+                    <i class="fas fa-robot text-blue-600"></i>
+                </div>
+                <div class="mr-3 bg-gray-100 rounded-lg py-3 px-4">
+                    <div class="flex space-x-2 space-x-reverse">
+                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Image Preview -->
+        <div class="px-4 pb-2" x-show="imagePreview">
+            <div class="relative inline-block">
+                <img :src="imagePreview" class="h-20 rounded border border-gray-300" />
+                <button @click="removeImage" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Chat Input -->
+        <div class="border-t border-gray-200 p-4">
+            <form @submit.prevent="sendMessage" class="flex items-center">
+                <label for="image-upload" class="cursor-pointer text-gray-500 hover:text-blue-600 ml-2">
+                    <i class="fas fa-image text-lg"></i>
+                    <input type="file" id="image-upload" class="hidden" accept="image/*" @change="handleImageUpload" />
+                </label>
+                
+                <input 
+                    type="text" 
+                    x-model="userInput" 
+                    @keydown.enter="sendMessage"
+                    placeholder="اكتب سؤالك هنا..."
+                    class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                
+                <button type="submit" class="bg-blue-600 text-white rounded-lg p-2 mr-2 hover:bg-blue-700 transition duration-200">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Suggested Questions -->
+    <div class="mt-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-3">أسئلة مقترحة</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button @click="askSuggestedQuestion('ما هي حالة المخزون الحالية؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200">
+                <i class="fas fa-boxes-stacked text-blue-600 ml-2"></i>
+                ما هي حالة المخزون الحالية؟
+            </button>
+            <button @click="askSuggestedQuestion('من هم أهم الموردين لدينا؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200">
+                <i class="fas fa-truck text-blue-600 ml-2"></i>
+                من هم أهم الموردين لدينا؟
+            </button>
+            <button @click="askSuggestedQuestion('ما هي أحدث طلبات الشراء؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200">
+                <i class="fas fa-shopping-cart text-blue-600 ml-2"></i>
+                ما هي أحدث طلبات الشراء؟
+            </button>
+            <button @click="askSuggestedQuestion('ما هي التصنيفات الموجودة في النظام؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200">
+                <i class="fas fa-tags text-blue-600 ml-2"></i>
+                ما هي التصنيفات الموجودة في النظام؟
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function chatInterface() {
+        return {
+            userInput: '',
+            messages: [],
+            isLoading: false,
+            imagePreview: null,
+            imageData: null,
+            
+            init() {
+                // Scroll to bottom whenever messages change
+                this.$watch('messages', () => {
+                    this.scrollToBottom();
+                });
+            },
+            
+            scrollToBottom() {
+                setTimeout(() => {
+                    const container = this.$refs.chatContainer;
+                    container.scrollTop = container.scrollHeight;
+                }, 100);
+            },
+            
+            formatMessage(text) {
+                // First convert asterisk bullet points to proper HTML formatting
+                let formattedText = text;
+                
+                // Replace patterns like "**Title:** Content" with bold titles
+                formattedText = formattedText.replace(/\*\*(.*?):\*\*/g, '<strong>$1:</strong>');
+                
+                // Replace lines starting with asterisks (like "* Item: value") with list items
+                formattedText = formattedText.replace(/^\s*\*\s*(.*?)$/gm, '<li>$1</li>');
+                
+                // Wrap consecutive list items in ul tags
+                if (formattedText.includes('<li>')) {
+                    formattedText = formattedText.replace(
+                        /(<li>.*?<\/li>(\s*\n*\s*)?)+/g, 
+                        match => `<ul class="list-disc list-inside my-2">${match}</ul>`
+                    );
+                }
+                
+                // Convert URLs to clickable links
+                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                formattedText = formattedText.replace(urlRegex, url => `<a href="${url}" target="_blank" class="text-blue-600 underline">${url}</a>`);
+                
+                return formattedText;
+            },
+            
+            handleImageUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                // Check file type
+                if (!file.type.match('image.*')) {
+                    showNotification('يرجى اختيار ملف صورة صالح', 'error');
+                    return;
+                }
+                
+                // Check file size (max 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    showNotification('حجم الصورة كبير جدًا. الحد الأقصى هو 5 ميجابايت', 'error');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.imagePreview = e.target.result;
+                    this.imageData = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            },
+            
+            removeImage() {
+                this.imagePreview = null;
+                this.imageData = null;
+                document.getElementById('image-upload').value = '';
+            },
+            
+            askSuggestedQuestion(question) {
+                this.userInput = question;
+                this.sendMessage();
+            },
+            
+            async sendMessage() {
+                if (!this.userInput.trim() && !this.imageData) return;
+                
+                const userMessage = this.userInput.trim();
+                this.messages.push({
+                    text: userMessage,
+                    sender: 'user',
+                    image: this.imagePreview
+                });
+                
+                this.isLoading = true;
+                this.userInput = '';
+                const imageDataToSend = this.imageData;
+                this.imagePreview = null;
+                this.imageData = null;
+                document.getElementById('image-upload').value = '';
+                
+                try {
+                    const response = await fetch('/api/chatbot/ask', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            query: userMessage,
+                            image_data: imageDataToSend
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.messages.push({
+                            text: data.response,
+                            sender: 'bot'
+                        });
+                    } else {
+                        this.messages.push({
+                            text: data.error || 'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.',
+                            sender: 'bot'
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    this.messages.push({
+                        text: 'حدث خطأ في الاتصال. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.',
+                        sender: 'bot'
+                    });
+                } finally {
+                    this.isLoading = false;
+                    this.scrollToBottom();
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}

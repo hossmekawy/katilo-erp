@@ -321,6 +321,10 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
                                 <i class="fas fa-star text-xs"></i>
                             </span>
                         </a>
+                        <a href="/chat-assistant" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/chat-assistant' %}active{% endif %}">
+                            <i class="fas fa-robot"></i>
+                            <span>المساعد الذكي</span>
+                        </a>
                     </div>
                 </div>
                 {% endif %}
@@ -644,6 +648,10 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
                 <a href="/tips" class="block py-2.5 px-4 rounded-lg transition-colors duration-200 {% if request.path == '/tips' %}bg-blue-600 text-white{% else %}bg-gray-50 text-gray-700 hover:bg-blue-100 hover:text-blue-600{% endif %}">
                     <i class="fas fa-lightbulb mr-2"></i>
                     <span>دليل</span>
+                </a>
+                <a href="/chat-assistant" class="sidebar-item block py-2.5 px-4 rounded-lg {% if request.path == '/chat-assistant' %}active{% endif %}">
+                    <i class="fas fa-robot"></i>
+                    <span>المساعد الذكي</span>
                 </a>
             </div>
         </div>
