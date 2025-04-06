@@ -33,3 +33,4 @@ Werkzeug[watchdog]==2.3.7
 
 # For base64 encoding/decoding
 # (part of Python standard library, no need to install)
+flask_migrate
