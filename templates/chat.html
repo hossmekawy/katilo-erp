@@ -16,14 +16,21 @@
     <!-- Chat Container -->
     <div class="card bg-white shadow-md rounded-xl overflow-hidden">
         <!-- Chat Header -->
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex items-center">
-            <div class="bg-white/20 w-10 h-10 rounded-full flex items-center justify-center">
-                <i class="fas fa-robot text-white"></i>
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="bg-white/20 w-10 h-10 rounded-full flex items-center justify-center">
+                    <i class="fas fa-robot text-white"></i>
+                </div>
+                <div class="mr-3">
+                    <h3 class="text-white font-bold">Hamla Guys</h3>
+                    <p class="text-blue-100 text-sm">مساعد كاتيلو الذكي</p>
+                </div>
             </div>
-            <div class="mr-3">
-                <h3 class="text-white font-bold">Hamla Guys</h3>
-                <p class="text-blue-100 text-sm">مساعد كاتيلو الذكي</p>
-            </div>
+            <!-- Clear Chat Button -->
+            <button @click="clearChat" class="text-white hover:text-blue-200 transition duration-200 flex items-center">
+                <i class="fas fa-trash-alt mr-1"></i>
+                <span class="text-sm">مسح المحادثة</span>
+            </button>
         </div>
         
         <!-- Chat Messages -->
@@ -33,8 +40,12 @@
                 <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
                     <i class="fas fa-robot text-blue-600"></i>
                 </div>
-                <div class="mr-3 bg-gray-100 rounded-lg py-2 px-4 max-w-3xl">
+                <div class="mr-3 bg-gray-100 rounded-lg py-2 px-4 max-w-3xl relative group">
                     <p class="text-gray-700">مرحباً! أنا Hamla Guys، مساعد كاتيلو الذكي. كيف يمكنني مساعدتك اليوم؟ يمكنك سؤالي عن المخزون، المنتجات، الموردين، أو أي شيء آخر متعلق بنظام كاتيلو.</p>
+                    <button @click="copyToClipboard('مرحباً! أنا Hamla Guys، مساعد كاتيلو الذكي. كيف يمكنني مساعدتك اليوم؟ يمكنك سؤالي عن المخزون، المنتجات، الموردين، أو أي شيء آخر متعلق بنظام كاتيلو.')" 
+                            class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-gray-500 hover:text-blue-600">
+                        <i class="fas fa-copy"></i>
+                    </button>
                 </div>
             </div>
             
@@ -47,8 +58,12 @@
                             <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
                                 <i class="fas fa-robot text-blue-600"></i>
                             </div>
-                            <div class="mr-3 bg-gray-100 rounded-lg py-2 px-4 max-w-3xl">
+                            <div class="mr-3 bg-gray-100 rounded-lg py-2 px-4 max-w-3xl relative group">
                                 <p class="text-gray-700 whitespace-pre-wrap" x-html="formatMessage(message.text)"></p>
+                                <button @click="copyToClipboard(message.text)" 
+                                        class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-gray-500 hover:text-blue-600">
+                                    <i class="fas fa-copy"></i>
+                                </button>
                             </div>
                         </div>
                     </template>
@@ -56,13 +71,17 @@
                     <!-- User Message -->
                     <template x-if="message.sender === 'user'">
                         <div class="flex">
-                            <div class="ml-3 bg-blue-600 rounded-lg py-2 px-4 max-w-3xl">
+                            <div class="ml-3 bg-blue-600 rounded-lg py-2 px-4 max-w-3xl relative group">
                                 <p class="text-white" x-text="message.text"></p>
                                 <template x-if="message.image">
                                     <div class="mt-2 rounded overflow-hidden">
                                         <img :src="message.image" class="max-h-40 max-w-full" />
                                     </div>
                                 </template>
+                                <button @click="copyToClipboard(message.text)" 
+                                        class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-white/70 hover:text-white">
+                                    <i class="fas fa-copy"></i>
+                                </button>
                             </div>
                             <div class="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center">
                                 <span class="text-white font-semibold">{{ current_user.username[0].upper() }}</span>
@@ -100,7 +119,7 @@
         <!-- Chat Input -->
         <div class="border-t border-gray-200 p-4">
             <form @submit.prevent="sendMessage" class="flex items-center">
-                <label for="image-upload" class="cursor-pointer text-gray-500 hover:text-blue-600 ml-2">
+                <label for="image-upload" class="cursor-pointer text-gray-500 hover:text-blue-600 ml-2 transition duration-200">
                     <i class="fas fa-image text-lg"></i>
                     <input type="file" id="image-upload" class="hidden" accept="image/*" @change="handleImageUpload" />
                 </label>
@@ -113,7 +132,7 @@
                     class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 
-                <button type="submit" class="bg-blue-600 text-white rounded-lg p-2 mr-2 hover:bg-blue-700 transition duration-200">
+                <button type="submit" class="bg-blue-600 text-white rounded-lg p-2 mr-2 hover:bg-blue-700 transition duration-200 flex items-center justify-center w-10 h-10">
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </form>
@@ -124,19 +143,19 @@
     <div class="mt-6">
         <h3 class="text-lg font-semibold text-gray-700 mb-3">أسئلة مقترحة</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <button @click="askSuggestedQuestion('ما هي حالة المخزون الحالية؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200">
+            <button @click="askSuggestedQuestion('ما هي حالة المخزون الحالية؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200 hover:shadow-sm">
                 <i class="fas fa-boxes-stacked text-blue-600 ml-2"></i>
                 ما هي حالة المخزون الحالية؟
             </button>
-            <button @click="askSuggestedQuestion('من هم أهم الموردين لدينا؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200">
+            <button @click="askSuggestedQuestion('من هم أهم الموردين لدينا؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200 hover:shadow-sm">
                 <i class="fas fa-truck text-blue-600 ml-2"></i>
                 من هم أهم الموردين لدينا؟
             </button>
-            <button @click="askSuggestedQuestion('ما هي أحدث طلبات الشراء؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200">
+            <button @click="askSuggestedQuestion('ما هي أحدث طلبات الشراء؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200 hover:shadow-sm">
                 <i class="fas fa-shopping-cart text-blue-600 ml-2"></i>
                 ما هي أحدث طلبات الشراء؟
             </button>
-            <button @click="askSuggestedQuestion('ما هي التصنيفات الموجودة في النظام؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200">
+            <button @click="askSuggestedQuestion('ما هي التصنيفات الموجودة في النظام؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200 hover:shadow-sm">
                 <i class="fas fa-tags text-blue-600 ml-2"></i>
                 ما هي التصنيفات الموجودة في النظام؟
             </button>
@@ -229,6 +248,63 @@
                 this.sendMessage();
             },
             
+            clearChat() {
+                if (confirm('هل أنت متأكد من رغبتك في مسح المحادثة؟')) {
+                    this.messages = [];
+                    showNotification('تم مسح المحادثة بنجاح', 'success');
+                }
+            },
+            
+            copyToClipboard(text) {
+                // Create a temporary element to handle HTML content properly
+                const tempElement = document.createElement('div');
+                tempElement.innerHTML = text;
+                const cleanText = tempElement.textContent || tempElement.innerText || text;
+                
+                // Use the Clipboard API with fallback
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(cleanText)
+                        .then(() => {
+                            showNotification('تم نسخ النص بنجاح', 'success');
+                        })
+                        .catch(err => {
+                            console.error('فشل في نسخ النص: ', err);
+                            this.fallbackCopyTextToClipboard(cleanText);
+                        });
+                } else {
+                    // Fallback for browsers that don't support clipboard API
+                    this.fallbackCopyTextToClipboard(cleanText);
+                }
+            },
+            
+            fallbackCopyTextToClipboard(text) {
+                // Fallback method using textarea
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                
+                // Make the textarea out of viewport
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        showNotification('تم نسخ النص بنجاح', 'success');
+                    } else {
+                        showNotification('فشل في نسخ النص', 'error');
+                    }
+                } catch (err) {
+                    console.error('فشل في نسخ النص: ', err);
+                    showNotification('فشل في نسخ النص', 'error');
+                }
+                
+                document.body.removeChild(textArea);
+            },
+            
             async sendMessage() {
                 if (!this.userInput.trim() && !this.imageData) return;
                 
@@ -285,4 +361,46 @@
         };
     }
 </script>
+
+<!-- Notification System -->
+<script>
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `fixed bottom-4 left-4 px-6 py-3 rounded-lg shadow-lg text-white flex items-center transition-all duration-300 transform translate-y-0 opacity-100 z-50 ${
+            type === 'success' ? 'bg-green-600' : 
+            type === 'error' ? 'bg-red-600' : 
+            type === 'warning' ? 'bg-yellow-600' : 'bg-blue-600'
+        }`;
+        
+        // Icon based on notification type
+        const iconClass = type === 'success' ? 'fa-check-circle' : 
+                          type === 'error' ? 'fa-exclamation-circle' : 
+                          type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+        
+        notification.innerHTML = `
+            <i class="fas ${iconClass} mr-2"></i>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Animate in
+        setTimeout(() => {
+            notification.style.opacity = '1';
+            notification.style.transform = 'translateY(0)';
+        }, 10);
+        
+        // Animate out and remove
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 300);
+        }, 3000);
+    }
+</script>
 {% endblock %}
+
+
