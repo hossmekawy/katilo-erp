@@ -1,0 +1,561 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة طلبات التقارير - نظام كاتيلو{% endblock %}
+
+{% block page_header %}إدارة طلبات التقارير{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/admin" class="text-blue-600 hover:text-blue-800">الإدارة</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">طلبات التقارير</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="card p-6" x-data="adminReportsPage()">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-semibold">إدارة طلبات التقارير</h2>
+        
+        <div class="flex space-x-3 space-x-reverse">
+            <div class="relative">
+                <select x-model="statusFilter" @change="filterReports" class="pr-10 pl-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">كل الطلبات</option>
+                    <option value="Pending">قيد الانتظار</option>
+                    <option value="Approved">تمت الموافقة</option>
+                    <option value="Generated">تم الإنشاء</option>
+                    <option value="Declined">مرفوض</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <i class="fas fa-filter text-gray-400"></i>
+                </div>
+            </div>
+            
+            <a href="/request-report" class="btn btn-primary">
+                <i class="fas fa-plus ml-2"></i> إنشاء تقرير
+            </a>
+        </div>
+    </div>
+    
+    <!-- Loading State -->
+    <div x-show="isLoading" class="py-12 flex justify-center">
+        <div class="flex flex-col items-center">
+            <i class="fas fa-spinner fa-spin text-blue-500 text-3xl mb-4"></i>
+            <p class="text-gray-600">جاري تحميل طلبات التقارير...</p>
+        </div>
+    </div>
+    
+    <!-- Empty State -->
+    <div x-show="!isLoading && reports.length === 0" class="py-12 flex justify-center">
+        <div class="flex flex-col items-center text-center max-w-md">
+            <div class="bg-blue-100 text-blue-600 rounded-full w-16 h-16 flex items-center justify-center mb-4">
+                <i class="fas fa-clipboard-list text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">لا توجد طلبات تقارير</h3>
+            <p class="text-gray-600 mb-4">لا توجد طلبات تقارير مطابقة للفلتر الحالي.</p>
+            <button @click="statusFilter = 'all'; filterReports()" class="btn bg-blue-100 text-blue-700 hover:bg-blue-200">
+                عرض كل الطلبات
+            </button>
+        </div>
+    </div>
+    
+    <!-- Pending Reports Section -->
+    <div x-show="!isLoading && pendingReports.length > 0 && statusFilter !== 'Generated' && statusFilter !== 'Approved' && statusFilter !== 'Declined'" class="mb-8">
+        <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+            <span class="bg-yellow-100 text-yellow-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">
+                <span x-text="pendingReports.length"></span>
+            </span>
+            طلبات تقارير قيد الانتظار
+        </h3>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            اسم التقرير
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            نوع التقرير
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            مقدم الطلب
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ الطلب
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="report in pendingReports" :key="report.id">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="report.report_name"></div>
+                                <div class="text-xs text-gray-500" x-show="report.description" x-text="report.description"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="report.report_type"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="report.requester_name"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="formatDate(report.requested_at)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button @click="viewReportDetails(report)"
+                                        class="text-gray-600 hover:text-gray-900 ml-3">
+                                    <i class="fas fa-eye"></i> عرض
+                                </button>
+                                <button @click="approveReport(report.id)"
+                                        class="text-green-600 hover:text-green-900 ml-3">
+                                    <i class="fas fa-check"></i> موافقة
+                                </button>
+                                <button @click="declineReport(report.id)"
+                                        class="text-red-600 hover:text-red-900">
+                                    <i class="fas fa-times"></i> رفض
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Processed Reports Section -->
+    <div x-show="!isLoading && (processedReports.length > 0 || statusFilter === 'Generated' || statusFilter === 'Approved' || statusFilter === 'Declined')">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">
+            التقارير المعالجة
+            <span class="text-sm font-normal text-gray-500" x-show="statusFilter === 'all'">
+                (آخر 50 تقرير)
+            </span>
+        </h3>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            اسم التقرير
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            نوع التقرير
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            مقدم الطلب
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ المعالجة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="report in processedReports" :key="report.id">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="report.report_name"></div>
+                                <div class="text-xs text-gray-500" x-show="report.description" x-text="report.description"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="report.report_type"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="report.requester_name"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="{
+                                          'bg-blue-100 text-blue-800': report.status === 'Approved',
+                                          'bg-green-100 text-green-800': report.status === 'Generated',
+                                          'bg-red-100 text-red-800': report.status === 'Declined'
+                                      }">
+                                    <span x-text="getStatusText(report.status)"></span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="formatDate(report.processed_at)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button @click="viewReportDetails(report)"
+                                        class="text-gray-600 hover:text-gray-900 ml-3">
+                                    <i class="fas fa-eye"></i> عرض
+                                </button>
+                                
+                                <a x-show="report.status === 'Generated'" :href="'/download-report/' + report.id" 
+                                   class="text-blue-600 hover:text-blue-900 ml-3">
+                                    <i class="fas fa-download"></i> تنزيل
+                                </a>
+                                
+                                <button x-show="report.status === 'Approved' || report.status === 'Generated'"
+                                        @click="regenerateReport(report.id)"
+                                        class="text-green-600 hover:text-green-900">
+                                    <i class="fas fa-sync-alt"></i> إعادة إنشاء
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Report Details Modal -->
+    <div x-show="showDetailsModal" 
+         class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         x-cloak>
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 overflow-hidden"
+             @click.away="showDetailsModal = false"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform scale-95"
+             x-transition:enter-end="opacity-100 transform scale-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform scale-100"
+             x-transition:leave-end="opacity-0 transform scale-95">
+            
+            <div class="bg-blue-600 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold" x-text="selectedReport.report_name"></h3>
+                <button @click="showDetailsModal = false" class="text-white hover:text-blue-100">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">نوع التقرير</h4>
+                        <p class="text-gray-900" x-text="selectedReport.report_type"></p>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">حالة التقرير</h4>
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                              :class="{
+                                  'bg-yellow-100 text-yellow-800': selectedReport.status === 'Pending',
+                                  'bg-blue-100 text-blue-800': selectedReport.status === 'Approved',
+                                  'bg-green-100 text-green-800': selectedReport.status === 'Generated',
+                                  'bg-red-100 text-red-800': selectedReport.status === 'Declined'
+                              }">
+                            <span x-text="getStatusText(selectedReport.status)"></span>
+                        </span>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">مقدم الطلب</h4>
+                        <p class="text-gray-900" x-text="selectedReport.requester_name"></p>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">تاريخ الطلب</h4>
+                        <p class="text-gray-900" x-text="formatDate(selectedReport.requested_at)"></p>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">صيغة التقرير</h4>
+                        <p class="text-gray-900" x-text="selectedReport.format"></p>
+                    </div>
+                    
+                    <div x-show="selectedReport.processed_at">
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">تاريخ المعالجة</h4>
+                        <p class="text-gray-900" x-text="formatDate(selectedReport.processed_at)"></p>
+                    </div>
+                </div>
+                
+                <div class="mb-6" x-show="selectedReport.description">
+                    <h4 class="text-sm font-medium text-gray-500 mb-1">وصف التقرير</h4>
+                    <p class="text-gray-900" x-text="selectedReport.description"></p>
+                </div>
+                <div class="mb-6" x-show="selectedReport.filters && Object.keys(selectedReport.filters).length > 0">
+                    <h4 class="text-sm font-medium text-gray-500 mb-1">خيارات التصفية</h4>
+                    <div class="bg-gray-50 rounded-lg p-3 text-sm">
+                        <template x-for="(value, key) in selectedReport.filters" :key="key">
+                            <div class="mb-1 last:mb-0">
+                                <span class="font-medium" x-text="formatFilterKey(key)"></span>: 
+                                <span x-text="value"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- Admin Notes Section -->
+                <div class="mb-6" x-show="selectedReport.status === 'Pending'">
+                    <h4 class="text-sm font-medium text-gray-500 mb-1">ملاحظات المشرف</h4>
+                    <textarea x-model="adminNotes" rows="3" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="أضف ملاحظات للمستخدم (اختياري)"></textarea>
+                </div>
+                
+                <div class="mb-6" x-show="selectedReport.admin_notes">
+                    <h4 class="text-sm font-medium text-gray-500 mb-1">ملاحظات المشرف</h4>
+                    <p class="text-gray-900 whitespace-pre-line" x-text="selectedReport.admin_notes"></p>
+                </div>
+                
+                <div class="flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showDetailsModal = false" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                        إغلاق
+                    </button>
+                    
+                    <template x-if="selectedReport.status === 'Pending'">
+                        <div class="flex space-x-3 space-x-reverse">
+                            <button @click="declineReportWithNotes(selectedReport.id)"
+                                    class="btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500">
+                                <i class="fas fa-times ml-2"></i> رفض
+                            </button>
+                            
+                            <button @click="approveReportWithNotes(selectedReport.id)"
+                                    class="btn bg-green-600 text-white hover:bg-green-700 focus:ring-green-500">
+                                <i class="fas fa-check ml-2"></i> موافقة
+                            </button>
+                        </div>
+                    </template>
+                    
+                    <template x-if="selectedReport.status === 'Approved' || selectedReport.status === 'Generated'">
+                        <div class="flex space-x-3 space-x-reverse">
+                            <a x-show="selectedReport.status === 'Generated'" :href="'/download-report/' + selectedReport.id" 
+                               class="btn btn-primary">
+                                <i class="fas fa-download ml-2"></i> تنزيل التقرير
+                            </a>
+                            
+                            <button @click="regenerateReport(selectedReport.id)"
+                                    class="btn bg-green-600 text-white hover:bg-green-700 focus:ring-green-500">
+                                <i class="fas fa-sync-alt ml-2"></i> إعادة إنشاء
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function adminReportsPage() {
+        return {
+            reports: [],
+            pendingReports: [],
+            processedReports: [],
+            isLoading: true,
+            showDetailsModal: false,
+            selectedReport: {},
+            adminNotes: '',
+            statusFilter: 'all',
+            
+            async init() {
+                await this.loadReports();
+            },
+            
+            async loadReports() {
+                this.isLoading = true;
+                
+                try {
+                    const response = await fetch('/api/reports/admin/requests');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.reports = data.reports;
+                        this.filterReports();
+                    } else {
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: data.message || 'حدث خطأ أثناء تحميل طلبات التقارير', 
+                                type: 'error' 
+                            }
+                        }));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { 
+                            message: 'حدث خطأ في الاتصال بالخادم', 
+                            type: 'error' 
+                        }
+                    }));
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+            
+            filterReports() {
+                if (this.statusFilter === 'all') {
+                    this.pendingReports = this.reports.filter(report => report.status === 'Pending');
+                    this.processedReports = this.reports.filter(report => report.status !== 'Pending');
+                } else {
+                    this.pendingReports = this.statusFilter === 'Pending' ? 
+                        this.reports.filter(report => report.status === 'Pending') : [];
+                    this.processedReports = this.reports.filter(report => report.status === this.statusFilter);
+                }
+            },
+            
+            formatDate(dateString) {
+                if (!dateString) return '';
+                const date = new Date(dateString);
+                return new Intl.DateTimeFormat('ar-EG', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(date);
+            },
+            
+            getStatusText(status) {
+                const statusMap = {
+                    'Pending': 'قيد الانتظار',
+                    'Approved': 'تمت الموافقة',
+                    'Generated': 'تم الإنشاء',
+                    'Declined': 'مرفوض'
+                };
+                
+                return statusMap[status] || status;
+            },
+            
+            formatFilterKey(key) {
+                const keyMap = {
+                    'warehouse_id': 'المستودع',
+                    'category_id': 'التصنيف',
+                    'supplier_id': 'المورد',
+                    'min_quantity': 'الحد الأدنى للكمية',
+                    'max_quantity': 'الحد الأقصى للكمية',
+                    'transaction_type': 'نوع المعاملة',
+                    'status': 'الحالة'
+                };
+                
+                return keyMap[key] || key;
+            },
+            
+            viewReportDetails(report) {
+                this.selectedReport = report;
+                this.adminNotes = report.admin_notes || '';
+                this.showDetailsModal = true;
+            },
+            
+            async approveReport(reportId) {
+                await this.processReport(reportId, 'approve');
+            },
+            
+            async declineReport(reportId) {
+                await this.processReport(reportId, 'decline');
+            },
+            
+            async approveReportWithNotes(reportId) {
+                await this.processReport(reportId, 'approve', this.adminNotes);
+                this.showDetailsModal = false;
+            },
+            
+            async declineReportWithNotes(reportId) {
+                await this.processReport(reportId, 'decline', this.adminNotes);
+                this.showDetailsModal = false;
+            },
+            
+            async processReport(reportId, action, notes = '') {
+                try {
+                    const response = await fetch(`/api/reports/admin/${action}/${reportId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ notes })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Show success notification
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: data.message, 
+                                type: 'success' 
+                            }
+                        }));
+                        
+                        // Reload reports
+                        await this.loadReports();
+                    } else {
+                        // Show error notification
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: data.message || `حدث خطأ أثناء ${action === 'approve' ? 'الموافقة على' : 'رفض'} التقرير`, 
+                                type: 'error' 
+                            }
+                        }));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { 
+                            message: 'حدث خطأ في الاتصال بالخادم', 
+                            type: 'error' 
+                        }
+                    }));
+                }
+            },
+            
+            async regenerateReport(reportId) {
+                try {
+                    const response = await fetch(`/api/reports/regenerate/${reportId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Show success notification
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: data.message, 
+                                type: 'success' 
+                            }
+                        }));
+                        
+                        // Reload reports
+                        await this.loadReports();
+                        
+                        // Update selected report if modal is open
+                        if (this.showDetailsModal && this.selectedReport.id === reportId) {
+                            this.selectedReport = data.report;
+                        }
+                    } else {
+                        // Show error notification
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: data.message || 'حدث خطأ أثناء إعادة إنشاء التقرير', 
+                                type: 'error' 
+                            }
+                        }));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { 
+                            message: 'حدث خطأ في الاتصال بالخادم', 
+                            type: 'error' 
+                        }
+                    }));
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}
+

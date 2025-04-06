@@ -1,0 +1,608 @@
+{% extends 'base.html' %}
+
+{% block title %}وصفات الجبن - نظام كاتيلو{% endblock %}
+
+{% block page_header %}وصفات الجبن{% endblock %}
+
+{% block content %}
+<div x-data="cheeseRecipes()">
+    <div class="mb-6 flex justify-between items-center">
+        <h2 class="text-xl font-bold text-gray-800">وصفات الجبن</h2>
+        <button 
+            @click="openCreateModal()"
+            class="btn btn-primary flex items-center">
+            <i class="fas fa-plus ml-2"></i>
+            وصفة جديدة
+        </button>
+    </div>
+
+    <div class="card">
+        <!-- Recipes Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            #
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المنتج النهائي
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الوصف
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ الإنشاء
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            آخر تحديث
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin ml-2"></i>
+                                جاري التحميل...
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loading && recipes.length === 0">
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                لا توجد وصفات جبن
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="recipe in recipes" :key="recipe.id">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="recipe.id"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="recipe.product_name"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="recipe.description || '-'"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(recipe.created_at)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(recipe.updated_at)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2 space-x-reverse">
+                                    <button @click="viewRecipeDetails(recipe)" class="text-blue-600 hover:text-blue-900">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button @click="editRecipe(recipe)" class="text-indigo-600 hover:text-indigo-900">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button @click="confirmDeleteRecipe(recipe)" class="text-red-600 hover:text-red-900">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Create/Edit Recipe Modal -->
+        <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div 
+                    x-show="showModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0" 
+                    x-transition:enter-end="opacity-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100" 
+                    x-transition:leave-end="opacity-0"
+                    class="fixed inset-0 transition-opacity" 
+                    @click="showModal = false">
+                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">​</span>
+
+                <div 
+                    x-show="showModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                            <span x-text="editMode ? 'تعديل وصفة الجبن' : 'إضافة وصفة جبن جديدة'"></span>
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">المنتج النهائي</label>
+                                <select 
+                                    x-model="formData.final_product_id"
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="">اختر المنتج</option>
+                                    <template x-for="product in products" :key="product.id">
+                                        <option :value="product.id" x-text="product.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
+                                <textarea 
+                                    x-model="formData.description"
+                                    rows="3"
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-md font-medium text-gray-800 mb-2">المكونات</h4>
+                                <div class="space-y-3">
+                                    <template x-for="(component, index) in formData.components" :key="index">
+                                        <div class="flex items-start space-x-2 space-x-reverse">
+                                            <div class="flex-grow grid grid-cols-3 gap-2">
+                                                <div class="col-span-3 sm:col-span-1">
+                                                    <select 
+                                                        x-model="component.component_item_id"
+                                                        class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                                        <option value="">اختر المكون</option>
+                                                        <template x-for="item in ingredients" :key="item.id">
+                                                            <option :value="item.id" x-text="item.name"></option>
+                                                        </template>
+                                                    </select>
+                                                </div>
+                                                <div class="col-span-3 sm:col-span-1">
+                                                    <input 
+                                                        type="number" 
+                                                        x-model="component.quantity_required"
+                                                        min="0.01"
+                                                        step="0.01"
+                                                        placeholder="الكمية"
+                                                        class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                                </div>
+                                                <div class="col-span-3 sm:col-span-1">
+                                                    <input 
+                                                        type="text" 
+                                                        x-model="component.unit_of_measure"
+                                                        placeholder="وحدة القياس"
+                                                        class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                                </div>
+                                            </div>
+                                            <button 
+                                                type="button"
+                                                @click="removeComponent(index)"
+                                                class="flex-shrink-0 text-red-500 hover:text-red-700">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </template>
+                                    
+                                    <button 
+                                        type="button"
+                                        @click="addComponent()"
+                                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        <i class="fas fa-plus ml-2"></i>
+                                        إضافة مكون
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button 
+                            type="button"
+                            @click="saveRecipe()"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            <span x-text="editMode ? 'تحديث' : 'إضافة'"></span>
+                        </button>
+                        <button 
+                            type="button"
+                            @click="showModal = false"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Recipe Details Modal -->
+        <div x-show="showDetailsModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div 
+                    x-show="showDetailsModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0" 
+                    x-transition:enter-end="opacity-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100" 
+                    x-transition:leave-end="opacity-0"
+                    class="fixed inset-0 transition-opacity" 
+                    @click="showDetailsModal = false">
+                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">​</span>
+
+                <div 
+                    x-show="showDetailsModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                            تفاصيل وصفة الجبن
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-sm text-gray-500">المنتج النهائي</p>
+                                    <p class="font-medium" x-text="selectedRecipe.product_name"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">تاريخ الإنشاء</p>
+                                    <p class="font-medium" x-text="formatDate(selectedRecipe.created_at)"></p>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <p class="text-sm text-gray-500">الوصف</p>
+                                <p class="font-medium" x-text="selectedRecipe.description || '-'"></p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-md font-medium text-gray-900 mb-2">المكونات</h4>
+                                <div class="border rounded-md overflow-hidden">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المكون</th>
+                                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الكمية</th>
+                                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وحدة القياس</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            <template x-if="detailsLoading">
+                                                <tr>
+                                                    <td colspan="3" class="px-4 py-2 text-center text-gray-500">
+                                                        <i class="fas fa-spinner fa-spin ml-2"></i>
+                                                        جاري التحميل...
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <template x-if="!detailsLoading && recipeDetails.length === 0">
+                                                <tr>
+                                                    <td colspan="3" class="px-4 py-2 text-center text-gray-500">
+                                                        لا توجد مكونات لهذه الوصفة
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <template x-for="detail in recipeDetails" :key="detail.id">
+                                                <tr>
+                                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900" x-text="detail.component_name"></td>
+                                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900" x-text="detail.quantity_required"></td>
+                                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900" x-text="detail.unit_of_measure"></td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button 
+                            type="button"
+                            @click="showDetailsModal = false"
+                            class="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            إغلاق
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div x-show="showDeleteModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div 
+                    x-show="showDeleteModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0" 
+                    x-transition:enter-end="opacity-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100" 
+                    x-transition:leave-end="opacity-0"
+                    class="fixed inset-0 transition-opacity" 
+                    @click="showDeleteModal = false">
+                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+
+                <div 
+                    x-show="showDeleteModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                                <i class="fas fa-exclamation-triangle text-red-600"></i>
+                            </div>
+                            <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                                <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                    حذف وصفة الجبن
+                                </h3>
+                                <div class="mt-2">
+                                    <p class="text-sm text-gray-500">
+                                        هل أنت متأكد من رغبتك في حذف هذه الوصفة؟ لا يمكن التراجع عن هذا الإجراء.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button 
+                            type="button"
+                            @click="deleteRecipe()"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            حذف
+                        </button>
+                        <button 
+                            type="button"
+                            @click="showDeleteModal = false"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function cheeseRecipes() {
+        return {
+            loading: true,
+            recipes: [],
+            products: [],
+            ingredients: [],
+            showModal: false,
+            showDetailsModal: false,
+            showDeleteModal: false,
+            editMode: false,
+            detailsLoading: false,
+            recipeDetails: [],
+            selectedRecipe: {},
+            formData: {
+                final_product_id: '',
+                description: '',
+                components: []
+            },
+            
+            init() {
+                this.loadRecipes();
+                this.loadProducts();
+                this.loadIngredients();
+            },
+            
+            loadRecipes() {
+                this.loading = true;
+                fetchAPI('/api/cheese-recipes')
+                    .then(data => {
+                        this.recipes = data;
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('Error loading recipes:', error);
+                        this.loading = false;
+                    });
+            },
+            
+            loadProducts() {
+                fetchAPI('/api/items')
+                    .then(data => {
+                        // Filter for cheese products if needed
+                        this.products = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading products:', error);
+                    });
+            },
+            
+            loadIngredients() {
+                fetchAPI('/api/items')
+                    .then(data => {
+                        // All items can be ingredients
+                        this.ingredients = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading ingredients:', error);
+                    });
+            },
+            
+            openCreateModal() {
+                this.editMode = false;
+                this.formData = {
+                    final_product_id: '',
+                    description: '',
+                    components: [this.newComponent()]
+                };
+                this.showModal = true;
+            },
+            
+            editRecipe(recipe) {
+                this.editMode = true;
+                this.formData = {
+                    id: recipe.id,
+                    final_product_id: recipe.final_product_id,
+                    description: recipe.description || '',
+                    components: []
+                };
+                
+                // Load recipe details
+                this.detailsLoading = true;
+                fetchAPI(`/api/cheese-recipes/${recipe.id}/details`)
+                    .then(data => {
+                        this.formData.components = data.map(detail => {
+                            return {
+                                id: detail.id,
+                                component_item_id: detail.component_item_id,
+                                quantity_required: detail.quantity_required,
+                                unit_of_measure: detail.unit_of_measure
+                            };
+                        });
+                        
+                        if (this.formData.components.length === 0) {
+                            this.formData.components.push(this.newComponent());
+                        }
+                        
+                        this.detailsLoading = false;
+                    })
+                    .catch(error => {
+                        console.error('Error loading recipe details:', error);
+                        this.detailsLoading = false;
+                        this.formData.components.push(this.newComponent());
+                    });
+                
+                this.showModal = true;
+            },
+            
+            saveRecipe() {
+                // Validate form
+                if (!this.formData.final_product_id) {
+                    showNotification('يرجى اختيار المنتج النهائي', 'error');
+                    return;
+                }
+                
+                // Validate components
+                let valid = true;
+                this.formData.components.forEach(component => {
+                    if (!component.component_item_id || !component.quantity_required) {
+                        valid = false;
+                    }
+                });
+                
+                if (!valid) {
+                    showNotification('يرجى إكمال جميع بيانات المكونات', 'error');
+                    return;
+                }
+                
+                // Prepare data for API
+                const recipeData = {
+                    final_product_id: this.formData.final_product_id,
+                    description: this.formData.description,
+                    components: this.formData.components.map(c => ({
+                        component_item_id: c.component_item_id,
+                        quantity_required: c.quantity_required,
+                        unit_of_measure: c.unit_of_measure
+                    }))
+                };
+                
+                if (this.editMode) {
+                    recipeData.id = this.formData.id;
+                }
+                
+                const url = this.editMode ? `/api/boms/${this.formData.id}` : '/api/boms';
+                const method = this.editMode ? 'PUT' : 'POST';
+                
+                fetchAPI(url, method, recipeData)
+                    .then(data => {
+                        showNotification(this.editMode ? 'تم تحديث الوصفة بنجاح' : 'تم إنشاء الوصفة بنجاح', 'success');
+                        this.showModal = false;
+                        this.loadRecipes();
+                    })
+                    .catch(error => {
+                        console.error('Error saving recipe:', error);
+                        showNotification('حدث خطأ أثناء حفظ الوصفة', 'error');
+                    });
+            },
+            
+            viewRecipeDetails(recipe) {
+                this.selectedRecipe = recipe;
+                this.detailsLoading = true;
+                this.recipeDetails = [];
+                
+                fetchAPI(`/api/cheese-recipes/${recipe.id}/details`)
+                .then(data => {
+                    this.recipeDetails = data;
+                    this.detailsLoading = false;
+                })
+                .catch(error => {
+                    console.error('Error loading recipe details:', error);
+                    this.detailsLoading = false;
+                });
+            
+            this.showDetailsModal = true;
+        },
+        
+        confirmDeleteRecipe(recipe) {
+            this.selectedRecipe = recipe;
+            this.showDeleteModal = true;
+        },
+        
+        deleteRecipe() {
+            fetchAPI(`/api/boms/${this.selectedRecipe.id}`, 'DELETE')
+                .then(() => {
+                    showNotification('تم حذف الوصفة بنجاح', 'success');
+                    this.showDeleteModal = false;
+                    this.loadRecipes();
+                })
+                .catch(error => {
+                    console.error('Error deleting recipe:', error);
+                    showNotification('حدث خطأ أثناء حذف الوصفة', 'error');
+                });
+        },
+        
+        addComponent() {
+            this.formData.components.push(this.newComponent());
+        },
+        
+        removeComponent(index) {
+            if (this.formData.components.length > 1) {
+                this.formData.components.splice(index, 1);
+            } else {
+                showNotification('يجب أن تحتوي الوصفة على مكون واحد على الأقل', 'error');
+            }
+        },
+        
+        newComponent() {
+            return {
+                component_item_id: '',
+                quantity_required: 1,
+                unit_of_measure: ''
+            };
+        },
+        
+        formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ar-EG');
+        }
+    };
+}
+</script>
+{% endblock %}
+
+

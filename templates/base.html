@@ -152,10 +152,17 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
                         </button>
                         
                         <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+
                             <a href="/inventory-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/inventory-management' %}active{% endif %}">
                                 <i class="fas fa-box-open"></i>
                                 <span>المخزون</span>
                             </a>
+                            <!-- Add this inside the Inventory Management section -->
+                            <a href="/quality-inspections" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/quality-inspections' %}active{% endif %}">
+                                <i class="fas fa-clipboard-check"></i>
+                                <span>فحص الجودة</span>
+                            </a>
+
                             <a href="/warehouse-layout" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/warehouse-layout' %}active{% endif %}">
                                 <i class="fas fa-th"></i>
                                 <span>تخطيط المستودع</span>
@@ -192,6 +199,53 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
                             </a>
                         </div>
                     </div>
+                    <!-- Add this inside the sidebar navigation, after the Products Management Section -->
+<!-- Production Management Section -->
+<div x-data="{ open: {{ 'true' if request.path in ['/production-management', '/production-scheduling', '/cheese-recipes', '/batch-tracking', '/aging-monitoring', '/worker-productivity', '/production-processes', '/bom-management'] else 'false' }} }">
+    <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+        <div class="flex items-center">
+            <i class="fas fa-industry"></i>
+            <span class="mr-2">إدارة الإنتاج</span>
+        </div>
+        <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+    </button>
+    
+    <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+        <a href="/production-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/production-management' %}active{% endif %}">
+            <i class="fas fa-tasks"></i>
+            <span>لوحة الإنتاج</span>
+        </a>
+        <a href="/production-scheduling" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/production-scheduling' %}active{% endif %}">
+            <i class="fas fa-calendar-alt"></i>
+            <span>جدولة الإنتاج</span>
+        </a>
+        <a href="/bom-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/bom-management' %}active{% endif %}">
+            <i class="fas fa-clipboard-list"></i>
+            <span>قوائم المواد</span>
+        </a>
+        <a href="/cheese-recipes" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/cheese-recipes' %}active{% endif %}">
+            <i class="fas fa-cheese"></i>
+            <span>وصفات الجبن</span>
+        </a>
+        <a href="/batch-tracking" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/batch-tracking' %}active{% endif %}">
+            <i class="fas fa-barcode"></i>
+            <span>تتبع دفعات الإنتاج</span>
+        </a>
+        <a href="/production-processes" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/production-processes' %}active{% endif %}">
+            <i class="fas fa-cogs"></i>
+            <span>مراحل الإنتاج</span>
+        </a>
+        <a href="/aging-monitoring" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/aging-monitoring' %}active{% endif %}">
+            <i class="fas fa-temperature-high"></i>
+            <span>مراقبة التعتيق</span>
+        </a>
+        <a href="/worker-productivity" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/worker-productivity' %}active{% endif %}">
+            <i class="fas fa-user-clock"></i>
+            <span>إنتاجية العمال</span>
+        </a>
+    </div>
+</div>
+
                     
                     <!-- Suppliers Management Section -->
                     <div x-data="{ open: {{ 'true' if request.path in ['/suppliers-management', '/supplier-accounts', '/purchase-orders'] else 'false' }} }">
@@ -466,6 +520,53 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
                 </a>
             </div>
         </div>
+        <!-- Add this inside the mobile navigation -->
+<!-- Production Management Section -->
+<div x-data="{ open: {{ 'true' if request.path in ['/production-management', '/production-scheduling', '/cheese-recipes', '/batch-tracking', '/aging-monitoring', '/worker-productivity', '/production-processes', '/bom-management'] else 'false' }} }">
+    <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
+        <div class="flex items-center">
+            <i class="fas fa-industry"></i>
+            <span class="mr-2">إدارة الإنتاج</span>
+        </div>
+        <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-left'"></i>
+    </button>
+    
+    <div x-show="open" class="mt-1 mr-4 border-r border-white/20 pr-2">
+        <a href="/production-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/production-management' %}active{% endif %}">
+            <i class="fas fa-tasks"></i>
+            <span>لوحة الإنتاج</span>
+        </a>
+        <a href="/production-scheduling" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/production-scheduling' %}active{% endif %}">
+            <i class="fas fa-calendar-alt"></i>
+            <span>جدولة الإنتاج</span>
+        </a>
+        <a href="/bom-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/bom-management' %}active{% endif %}">
+            <i class="fas fa-clipboard-list"></i>
+            <span>قوائم المواد</span>
+        </a>
+        <a href="/cheese-recipes" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/cheese-recipes' %}active{% endif %}">
+            <i class="fas fa-cheese"></i>
+            <span>وصفات الجبن</span>
+        </a>
+        <a href="/batch-tracking" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/batch-tracking' %}active{% endif %}">
+            <i class="fas fa-barcode"></i>
+            <span>تتبع دفعات الإنتاج</span>
+        </a>
+        <a href="/production-processes" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/production-processes' %}active{% endif %}">
+            <i class="fas fa-cogs"></i>
+            <span>مراحل الإنتاج</span>
+        </a>
+        <a href="/aging-monitoring" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/aging-monitoring' %}active{% endif %}">
+            <i class="fas fa-temperature-high"></i>
+            <span>مراقبة التعتيق</span>
+        </a>
+        <a href="/worker-productivity" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/worker-productivity' %}active{% endif %}">
+            <i class="fas fa-user-clock"></i>
+            <span>إنتاجية العمال</span>
+        </a>
+    </div>
+</div>
+
         
         <!-- Suppliers Management Section -->
         <div x-data="{ open: {{ 'true' if request.path in ['/suppliers-management', '/supplier-accounts', '/purchase-orders'] else 'false' }} }">
@@ -808,6 +909,7 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
                             'purchase-orders': 'طلبات الشراء',
                             'supplier-accounts': 'حسابات الموردين',
                             'suppliers-management':'إدارة الموردين',
+                            'quality-inspections': 'فحوصات الجودة',
                         };
                         
                         return {

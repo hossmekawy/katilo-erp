@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+
+{% block title %}فحص جودة المواد - نظام كاتيلو{% endblock %}
+
+{% block page_header %}فحص جودة المواد{% endblock %}
+
+{% block content %}
+<div x-data="qualityInspectionsApp()">
+    <!-- Header with stats and filters -->
+    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-4 space-x-reverse">
+                <div class="relative">
+                    <input type="text" x-model="searchQuery" placeholder="بحث..." 
+                           class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+                
+                <select x-model="statusFilter" class="border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">جميع الحالات</option>
+                    <option value="Passed">ناجح</option>
+                    <option value="Failed">فاشل</option>
+                    <option value="Partially Passed">ناجح جزئياً</option>
+                    <option value="Pending">قيد الانتظار</option>
+                </select>
+            </div>
+            
+            <div class="flex space-x-2 space-x-reverse">
+                <button @click="refreshData()" class="btn btn-outline-primary">
+                    <i class="fas fa-sync-alt mr-1"></i> تحديث
+                </button>
+                <a href="/purchase-orders" class="btn btn-primary">
+                    <i class="fas fa-clipboard-list mr-1"></i> طلبات الشراء
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stats cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-xl shadow-sm p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-sm text-gray-500">إجمالي الفحوصات</div>
+                    <div class="text-2xl font-bold mt-1" x-text="stats.total || 0"></div>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <i class="fas fa-clipboard-check text-blue-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-sm text-gray-500">ناجح</div>
+                    <div class="text-2xl font-bold mt-1 text-green-600" x-text="stats.passed || 0"></div>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <i class="fas fa-check text-green-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-sm text-gray-500">فاشل</div>
+                    <div class="text-2xl font-bold mt-1 text-red-600" x-text="stats.failed || 0"></div>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <i class="fas fa-times text-red-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-sm text-gray-500">قيد الانتظار</div>
+                    <div class="text-2xl font-bold mt-1 text-yellow-600" x-text="stats.pending || 0"></div>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <i class="fas fa-clock text-yellow-600"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Inspections table -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الفحص
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم طلب الشراء
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المادة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ الفحص
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المفتش
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            معايير الفحص
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            إجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="inspections.length === 0">
+                        <tr>
+                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                                <div class="flex flex-col items-center py-6">
+                                    <i class="fas fa-clipboard-check text-gray-300 text-5xl mb-3"></i>
+                                    <p class="text-gray-500 text-lg">لا توجد فحوصات جودة</p>
+                                    <p class="text-gray-400 text-sm mt-1">قم بإنشاء فحص جودة جديد من خلال طلب شراء</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-for="inspection in filteredInspections" :key="inspection.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="inspection.id"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <a :href="'/purchase-orders/' + inspection.purchase_order_id" class="text-blue-600 hover:text-blue-800" x-text="inspection.purchase_order_id"></a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="inspection.item_name"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="formatDate(inspection.inspection_date)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="inspection.inspector_name"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="{
+                                          'bg-green-100 text-green-800': inspection.status === 'Passed',
+                                          'bg-red-100 text-red-800': inspection.status === 'Failed',
+                                          'bg-yellow-100 text-yellow-800': inspection.status === 'Partially Passed',
+                                          'bg-gray-100 text-gray-800': inspection.status === 'Pending'
+                                      }"
+                                      x-text="translateStatus(inspection.status)"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex items-center">
+                                    <span x-text="inspection.passed_criteria_count"></span>
+                                    <span class="mx-1">/</span>
+                                    <span x-text="inspection.criteria_count"></span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <a :href="'/quality-inspections/' + inspection.id" class="text-blue-600 hover:text-blue-900 ml-3">
+                                    <i class="fas fa-eye"></i> عرض
+                                </a>
+                                <button @click="editInspection(inspection)" class="text-indigo-600 hover:text-indigo-900 ml-3">
+                                    <i class="fas fa-edit"></i> تعديل
+                                </button>
+                                <button @click="printInspection(inspection.id)" class="text-gray-600 hover:text-gray-900">
+                                    <i class="fas fa-print"></i> طباعة
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Edit Inspection Modal -->
+    <div x-show="showEditModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-screen overflow-y-auto" @click.away="showEditModal = false">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium">تعديل فحص الجودة</h3>
+                    <button @click="showEditModal = false" class="text-gray-400 hover:text-gray-500">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">المادة</label>
+                            <div class="text-gray-900 font-medium" x-text="currentInspection.item_name"></div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">تاريخ الفحص</label>
+                            <div class="text-gray-900" x-text="formatDate(currentInspection.inspection_date)"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">حالة الفحص</label>
+                        <select x-model="currentInspection.status" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option value="Pending">قيد الانتظار</option>
+                            <option value="Passed">ناجح</option>
+                            <option value="Failed">فاشل</option>
+                            <option value="Partially Passed">ناجح جزئياً</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                        <textarea x-model="currentInspection.notes" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <div class="flex justify-between items-center">
+                            <label class="block text-sm font-medium text-gray-700">معايير الفحص</label>
+                            <button @click="addCriterion()" class="text-sm text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-plus"></i> إضافة معيار
+                            </button>
+                        </div>
+                        
+                        <div class="mt-2 border rounded-lg overflow-hidden">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المعيار</th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">القيمة المتوقعة</th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">القيمة الفعلية</th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الأهمية</th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النتيجة</th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <template x-for="(criterion, index) in currentInspection.criteria" :key="index">
+                                        <tr>
+                                            <td class="px-4 py-2">
+                                                <input type="text" x-model="criterion.name" class="block w-full border-0 p-0 focus:ring-0 text-sm">
+                                            </td>
+                                            <td class="px-4 py-2">
+                                                <input type="text" x-model="criterion.expected_value" class="block w-full border-0 p-0 focus:ring-0 text-sm">
+                                            </td>
+                                            <td class="px-4 py-2">
+                                                <input type="text" x-model="criterion.actual_value" class="block w-full border-0 p-0 focus:ring-0 text-sm">
+                                            </td>
+                                            <td class="px-4 py-2">
+                                                <select x-model="criterion.importance" class="block w-full border-0 p-0 focus:ring-0 text-sm">
+                                                    <option value="Critical">حرج</option>
+                                                    <option value="Major">رئيسي</option>
+                                                    <option value="Minor">ثانوي</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-2">
+                                                <div class="flex items-center">
+                                                    <input type="checkbox" x-model="criterion.passed" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                                    <span class="mr-2 text-sm" x-text="criterion.passed ? 'ناجح' : 'فاشل'"></span>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-2 text-right">
+                                                <button @click="removeCriterion(index)" class="text-red-600 hover:text-red-800">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showEditModal = false" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        إلغاء
+                    </button>
+                    <button @click="saveInspection()" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        حفظ التغييرات
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function qualityInspectionsApp() {
+        return {
+            inspections: [],
+            stats: {
+                total: 0,
+                passed: 0,
+                failed: 0,
+                pending: 0,
+                partiallyPassed: 0
+            },
+            searchQuery: '',
+            statusFilter: '',
+            showEditModal: false,
+            currentInspection: {
+                id: null,
+                item_name: '',
+                inspection_date: '',
+                status: '',
+                notes: '',
+                criteria: []
+            },
+            
+            init() {
+                this.fetchInspections();
+            },
+            
+            fetchInspections() {
+                fetchAPI('/api/quality-inspections')
+                    .then(data => {
+                        this.inspections = data;
+                        this.calculateStats();
+                    })
+                    .catch(error => {
+                        console.error('Error fetching inspections:', error);
+                    });
+            },
+            
+            calculateStats() {
+                this.stats.total = this.inspections.length;
+                this.stats.passed = this.inspections.filter(i => i.status === 'Passed').length;
+                this.stats.failed = this.inspections.filter(i => i.status === 'Failed').length;
+                this.stats.pending = this.inspections.filter(i => i.status === 'Pending').length;
+                this.stats.partiallyPassed = this.inspections.filter(i => i.status === 'Partially Passed').length;
+            },
+            
+            get filteredInspections() {
+                return this.inspections.filter(inspection => {
+                    // Apply search filter
+                    const matchesSearch = this.searchQuery === '' || 
+                        inspection.item_name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                        inspection.inspector_name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                        inspection.id.toString().includes(this.searchQuery);
+                    
+                    // Apply status filter
+                    const matchesStatus = this.statusFilter === '' || inspection.status === this.statusFilter;
+                    
+                    return matchesSearch && matchesStatus;
+                });
+            },
+            
+            refreshData() {
+                this.fetchInspections();
+                showNotification('تم تحديث البيانات بنجاح');
+            },
+            
+            formatDate(dateString) {
+                if (!dateString) return '';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ar-EG', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            },
+            
+            translateStatus(status) {
+                const statusMap = {
+                    'Passed': 'ناجح',
+                    'Failed': 'فاشل',
+                    'Partially Passed': 'ناجح جزئياً',
+                    'Pending': 'قيد الانتظار'
+                };
+                return statusMap[status] || status;
+            },
+            
+            editInspection(inspection) {
+                // Fetch full inspection details including criteria
+                fetchAPI(`/api/quality-inspections/${inspection.id}`)
+                    .then(data => {
+                        this.currentInspection = data;
+                        this.showEditModal = true;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching inspection details:', error);
+                        showNotification('حدث خطأ أثناء تحميل بيانات الفحص', 'error');
+                    });
+            },
+            
+            addCriterion() {
+                this.currentInspection.criteria.push({
+                    name: '',
+                    expected_value: '',
+                    actual_value: '',
+                    passed: false,
+                    importance: 'Major'
+                });
+            },
+            
+            removeCriterion(index) {
+                this.currentInspection.criteria.splice(index, 1);
+            },
+            
+            saveInspection() {
+                // Validate form
+                if (!this.currentInspection.status) {
+                    showNotification('يرجى تحديد حالة الفحص', 'error');
+                    return;
+                }
+                
+                // Send update request
+                fetchAPI(`/api/quality-inspections/${this.currentInspection.id}`, 'PUT', {
+                    status: this.currentInspection.status,
+                    notes: this.currentInspection.notes,
+                    criteria: this.currentInspection.criteria
+                })
+                .then(response => {
+                    showNotification('تم تحديث فحص الجودة بنجاح');
+                    this.showEditModal = false;
+                    this.fetchInspections(); // Refresh data
+                })
+                .catch(error => {
+                    console.error('Error updating inspection:', error);
+                    showNotification('حدث خطأ أثناء تحديث بيانات الفحص', 'error');
+                });
+            },
+            
+            printInspection(id) {
+                window.open(`/api/quality-inspections/${id}/pdf`, '_blank');
+            }
+        };
+    }
+</script>
+{% endblock %}
+

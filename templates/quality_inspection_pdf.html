@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقرير فحص الجودة</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+        
+        * {
+            font-family: 'Tajawal', sans-serif;
+        }
+        
+        body {
+            padding: 20px;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 15px;
+        }
+        
+        .logo-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .logo {
+            max-width: 150px;
+            max-height: 60px;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1e40af;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .inspection-number {
+            font-size: 16px;
+            font-weight: 500;
+            color: #4b5563;
+            text-align: center;
+        }
+        
+        .info-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .info-block {
+            width: 48%;
+        }
+        
+        .info-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #1e40af;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 5px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .info-label {
+            font-weight: 500;
+            color: #6b7280;
+        }
+        
+        .info-value {
+            font-weight: 400;
+        }
+        
+        .notes {
+            margin-top: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .notes-content {
+            background-color: #f9fafb;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th {
+            background-color: #f3f4f6;
+            padding: 10px;
+            text-align: right;
+            font-weight: 500;
+            border: 1px solid #e5e7eb;
+        }
+        
+        td {
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .status-passed {
+            color: #047857;
+            background-color: #d1fae5;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-failed {
+            color: #b91c1c;
+            background-color: #fee2e2;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-partial {
+            color: #92400e;
+            background-color: #fef3c7;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-pending {
+            color: #4b5563;
+            background-color: #f3f4f6;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .importance-critical {
+            color: #b91c1c;
+            background-color: #fee2e2;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .importance-major {
+            color: #92400e;
+            background-color: #fef3c7;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .importance-minor {
+            color: #1e40af;
+            background-color: #dbeafe;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            margin-bottom: 30px;
+        }
+        
+        .signature-block {
+            width: 45%;
+            text-align: center;
+        }
+        
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 50px;
+            margin-bottom: 10px;
+        }
+        
+        .signature-title {
+            font-weight: bold;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo-container">
+            {% if logo_src %}
+            <img src="{{ logo_src }}" alt="شعار الشركة" class="logo">
+            {% endif %}
+        </div>
+        <div class="title">تقرير فحص جودة المواد</div>
+        <div class="inspection-number">رقم الفحص: {{ inspection.id }}</div>
+    </div>
+    
+    <div class="info-section">
+        <div class="info-block">
+            <div class="info-title">معلومات الفحص</div>
+            <div class="info-row">
+                <span class="info-label">رقم الفحص:</span>
+                <span class="info-value">{{ inspection.id }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">تاريخ الفحص:</span>
+                <span class="info-value">{{ inspection.inspection_date.strftime('%Y-%m-%d %H:%M') }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">المفتش:</span>
+                <span class="info-value">{{ inspection.inspector_name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">حالة الفحص:</span>
+                <span class="info-value">
+                    {% if inspection.status == 'Passed' %}
+                    <span class="status-passed">ناجح</span>
+                    {% elif inspection.status == 'Failed' %}
+                    <span class="status-failed">فاشل</span>
+                    {% elif inspection.status == 'Partially Passed' %}
+                    <span class="status-partial">ناجح جزئياً</span>
+                    {% else %}
+                    <span class="status-pending">قيد الانتظار</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        
+        <div class="info-block">
+            <div class="info-title">معلومات المادة</div>
+            <div class="info-row">
+                <span class="info-label">رقم طلب الشراء:</span>
+                <span class="info-value">{{ inspection.purchase_order_id }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">اسم المادة:</span>
+                <span class="info-value">{{ inspection.item_name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">رقم المادة:</span>
+                <span class="info-value">{{ inspection.item_id }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="notes">
+        <div class="info-title">ملاحظات</div>
+        <div class="notes-content">
+            {{ inspection.notes or 'لا توجد ملاحظات' }}
+        </div>
+    </div>
+    
+    <div class="info-title">معايير الفحص</div>
+    <table>
+        <thead>
+            <tr>
+                <th>المعيار</th>
+                <th>القيمة المتوقعة</th>
+                <th>القيمة الفعلية</th>
+                <th>الأهمية</th>
+                <th>النتيجة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if inspection.criteria %}
+                {% for criterion in inspection.criteria %}
+                <tr>
+                    <td>{{ criterion.name }}</td>
+                    <td>{{ criterion.expected_value }}</td>
+                    <td>{{ criterion.actual_value }}</td>
+                    <td>
+                        {% if criterion.importance == 'Critical' %}
+                        <span class="importance-critical">حرج</span>
+                        {% elif criterion.importance == 'Major' %}
+                        <span class="importance-major">رئيسي</span>
+                        {% else %}
+                        <span class="importance-minor">ثانوي</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if criterion.passed %}
+                        <span class="status-passed">ناجح</span>
+                        {% else %}
+                        <span class="status-failed">فاشل</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center;">لا توجد معايير فحص مسجلة</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+    
+    <!-- Added signature blocks -->
+    <div class="signatures">
+        <div class="signature-block">
+            <div class="signature-line"></div>
+            <div class="signature-title">توقيع مدير الجودة</div>
+        </div>
+        
+        <div class="signature-block">
+            <div class="signature-line"></div>
+            <div class="signature-title">توقيع المستلم</div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>تم إنشاء هذا التقرير بواسطة: {{ current_user.username }} | تاريخ الإنشاء: {{ generated_date }}</p>
+        <p>نظام كاتيلو لإدارة المخزون © {{ generated_date.split('-')[0] }}</p>
+    </div>
+</body>
+</html>

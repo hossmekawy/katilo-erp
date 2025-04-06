@@ -369,6 +369,14 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
+            <!-- Quality Inspection Option -->
+            <div class="mt-4 flex items-center">
+                <input type="checkbox" id="createQualityInspection" x-model="receiveData.createQualityInspection" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <label for="createQualityInspection" class="mr-2 block text-sm text-gray-900">
+                    إنشاء فحص جودة للمواد المستلمة
+                </label>
+            </div>
+
             
             <div class="p-6 overflow-y-auto max-h-[calc(90vh-8rem)]">
                 <div class="space-y-4">
@@ -709,7 +717,9 @@
                         quantity_ordered: detail.quantity_ordered,
                         quantity_received: detail.quantity_received,
                         quantity_receiving: 0
-                    }))
+                    })),
+                    createQualityInspection: false
+
                 };
                 
                 this.showReceiveModal = true;
@@ -734,7 +744,8 @@
                         },
                         body: JSON.stringify({
                             warehouse_id: this.receiveData.warehouse_id,
-                            items: itemsToReceive
+                            items: itemsToReceive,
+                            create_quality_inspection: this.receiveData.createQualityInspection  // Add this line
                         })
                     });
                     
@@ -748,13 +759,27 @@
                     // Reset form and close modal
                     this.receiveData = {
                         warehouse_id: '',
-                        items: []
+                        items: [],
+                        createQualityInspection: false
                     };
                     this.showReceiveModal = false;
                     
                     // Refresh order details
                     this.fetchOrderDetails();
                     
+                    if (result.quality_inspections && result.quality_inspections.length > 0) {
+                        // Create a notification with links
+                        const message = `${result.message} - <span class="font-bold">فحوصات الجودة:</span> `;
+                        const links = result.quality_inspections.map(insp => 
+                            `<a href="/quality-inspections/${insp.id}" class="text-white underline" target="_blank">${insp.item_name}</a>`
+                        ).join(', ');
+                        
+                        showNotification(message + links, 'success', 8000);
+                    } else {
+                        showNotification(result.message || 'تم استلام العناصر بنجاح', 'success');
+                    }
+
+
                     showNotification(result.message || 'تم استلام العناصر بنجاح', 'success');
                 } catch (error) {
                     console.error('Error receiving items:', error);

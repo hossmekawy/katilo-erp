@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, request, jsonify, render_template, sen
 from flask_login import login_required, current_user
 import pdfkit
 from models import (
-    db, Supplier, SupplierItem, Item, Inventory, 
+    Category, QualityInspection, QualityInspectionCriteria, db, Supplier, SupplierItem, Item, Inventory, 
     InventoryTransaction, Warehouse, PurchaseOrder, PurchaseOrderDetail,SupplierLedgerEntry,SupplierPayment,
 )
 from datetime import datetime
@@ -566,6 +566,7 @@ def create_bulk_purchase_orders():
     }), 201
 
 
+# Modify the receive_purchase_order function to include quality inspection option
 @purchase_order_bp.route('/api/purchase-orders/<int:id>/receive', methods=['POST'])
 @login_required
 def receive_purchase_order(id):
@@ -580,6 +581,7 @@ def receive_purchase_order(id):
     data = request.get_json()
     warehouse_id = data.get('warehouse_id')
     items_to_receive = data.get('items', [])
+    create_quality_inspection = data.get('create_quality_inspection', False)
     
     # Validate required fields
     if not warehouse_id:
@@ -594,6 +596,8 @@ def receive_purchase_order(id):
         return jsonify({'message': 'المستودع غير موجود'}), 400
     
     try:
+        created_inspections = []
+        
         # Process each received item
         for item_data in items_to_receive:
             detail_id = item_data.get('detail_id')
@@ -642,6 +646,71 @@ def receive_purchase_order(id):
                 reference=f'PO#{purchase_order.id}'
             )
             db.session.add(transaction)
+            
+            # Create quality inspection if requested
+            if create_quality_inspection:
+                # Get the item for inspection criteria
+                item = Item.query.get(po_detail.item_id)
+                
+                # Create inspection record
+                inspection = QualityInspection(
+                    purchase_order_detail_id=po_detail.id,
+                    inspector_id=current_user.id,
+                    status='Pending',
+                    notes=f'تم إنشاء فحص الجودة تلقائياً عند استلام المواد من طلب الشراء #{purchase_order.id}'
+                )
+                
+                db.session.add(inspection)
+                db.session.flush()  # Get ID without committing
+                
+                # Add default inspection criteria based on item type
+                default_criteria = []
+                
+                # Add general criteria for all items
+                default_criteria.append({
+                    'name': 'المظهر الخارجي',
+                    'expected_value': 'سليم',
+                    'importance': 'Major'
+                })
+                
+                default_criteria.append({
+                    'name': 'التغليف',
+                    'expected_value': 'سليم',
+                    'importance': 'Minor'
+                })
+                
+                # Add specific criteria based on item category if available
+                if item and item.category_id:
+                    category = Category.query.get(item.category_id)
+                    if category:
+                        if 'خام' in category.name or 'مواد' in category.name:
+                            default_criteria.append({
+                                'name': 'نقاء المادة',
+                                'expected_value': 'عالي',
+                                'importance': 'Critical'
+                            })
+                            default_criteria.append({
+                                'name': 'الرطوبة',
+                                'expected_value': 'منخفضة',
+                                'importance': 'Major'
+                            })
+                
+                # Add the criteria to the inspection
+                for criterion in default_criteria:
+                    inspection_criterion = QualityInspectionCriteria(
+                        inspection_id=inspection.id,
+                        criterion_name=criterion['name'],
+                        expected_value=criterion['expected_value'],
+                        actual_value='',
+                        passed=False,
+                        importance=criterion['importance']
+                    )
+                    db.session.add(inspection_criterion)
+                
+                created_inspections.append({
+                    'id': inspection.id,
+                    'item_name': item.name if item else f'Item #{po_detail.item_id}'
+                })
         
         # Check if all items are fully received
         all_received = all(
@@ -655,18 +724,22 @@ def receive_purchase_order(id):
         
         db.session.commit()
         
-        return jsonify({
+        response_data = {
             'message': 'تم استلام العناصر بنجاح',
             'status': purchase_order.status
-        })
+        }
+        
+        # Add inspection info to response if any were created
+        if created_inspections:
+            response_data['quality_inspections'] = created_inspections
+            response_data['message'] += ' وتم إنشاء فحوصات الجودة'
+        
+        return jsonify(response_data)
         
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'حدث خطأ أثناء استلام العناصر: {str(e)}'}), 500
-    
-    
-    # API endpoint to get all suppliers with financial summary
-    
+
 @purchase_order_bp.route('/api/supplier-accounts/<int:supplier_id>/payments', methods=['POST'])
 @login_required
 def add_supplier_payment(supplier_id):

@@ -9,6 +9,9 @@ from routes.support_routes import support_bp
 from routes.supplier_accounts import supplier_accounts_bp
 from routes.warehouse_routes import warehouse_bp
 from routes.profile_routes import profile_bp
+from routes.quality_control import quality_bp
+from routes.production_routes import production_bp
+from flask_migrate import Migrate
 import socket
 import webbrowser
 import urllib.request
@@ -94,7 +97,12 @@ app.register_blueprint(purchase_order_bp)
 app.register_blueprint(supplier_accounts_bp)
 app.register_blueprint(warehouse_bp)
 app.register_blueprint(profile_bp)
+app.register_blueprint(quality_bp)
+app.register_blueprint(production_bp)
 # Create database tables
+
+migrate = Migrate(app, db)
+
 with app.app_context():
     db.create_all()
     

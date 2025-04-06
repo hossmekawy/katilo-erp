@@ -17,7 +17,22 @@ sales_order_status_enum = SAEnum('Pending', 'Shipped', 'Delivered', 'Cancelled',
 qc_status_enum = SAEnum('Passed', 'Failed', 'Retest', name='qc_status_enum')
 production_run_status_enum = SAEnum('Planned', 'In Progress', 'Completed', name='production_run_status_enum')
 document_category_enum = SAEnum('Recipe', 'Certification', 'Manual', 'Other', name='document_category_enum')
+report_type_enum = SAEnum(
+    'Inventory', 'Transactions', 'Suppliers', 'SupplierAccounts', 
+    'Production', 'QualityControl', 'Warehouses', 'Items',
+    'Categories', 'PurchaseOrders', 'BOM', 'Custom',
+    name='report_type_enum'
+)
 
+report_status_enum = SAEnum(
+    'Pending', 'Approved', 'Declined', 'Generated',
+    name='report_status_enum'
+)
+
+report_format_enum = SAEnum(
+    'PDF', 'Excel', 'CSV',
+    name='report_format_enum'
+)
 # Additional enumerations for new features
 waste_reason_enum = SAEnum('Expired', 'Spoiled', 'Damaged', 'Other', name='waste_reason_enum')
 compliance_status_enum = SAEnum('Passed', 'Warning', 'Failed', name='compliance_status_enum')
@@ -543,6 +558,75 @@ class Document(db.Model):
     def __repr__(self):
         return f"<Document {self.title}>"
 
+class ReportRequest(db.Model):
+    __tablename__ = 'report_requests'
+    id = db.Column(db.Integer, primary_key=True)
+    report_type = db.Column(report_type_enum, nullable=False)
+    report_name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    requested_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    requested_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(report_status_enum, default='Pending')
+    format = db.Column(report_format_enum, default='PDF')
+    
+    # Filters stored as JSON
+    filters = db.Column(db.JSON, default={})
+    
+    # Date range for report
+    date_from = db.Column(db.DateTime)
+    date_to = db.Column(db.DateTime)
+    
+    # For admin processing
+    processed_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    processed_at = db.Column(db.DateTime)
+    admin_notes = db.Column(db.Text)
+    
+    # Generated report file path
+    report_file_path = db.Column(db.String(255))
+    
+    # Relationships
+    requester = db.relationship('User', foreign_keys=[requested_by], backref='requested_reports')
+    processor = db.relationship('User', foreign_keys=[processed_by], backref='processed_reports')
+    
+    def __repr__(self):
+        return f"<ReportRequest {self.id}: {self.report_name} ({self.status})>"
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'report_type': self.report_type,
+            'report_name': self.report_name,
+            'description': self.description,
+            'requested_by': self.requested_by,
+            'requested_at': self.requested_at.isoformat() if self.requested_at else None,
+            'status': self.status,
+            'format': self.format,
+            'filters': self.filters,
+            'date_from': self.date_from.isoformat() if self.date_from else None,
+            'date_to': self.date_to.isoformat() if self.date_to else None,
+            'processed_by': self.processed_by,
+            'processed_at': self.processed_at.isoformat() if self.processed_at else None,
+            'admin_notes': self.admin_notes,
+            'report_file_path': self.report_file_path
+        }
+
+class ReportTemplate(db.Model):
+    __tablename__ = 'report_templates'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    report_type = db.Column(report_type_enum, nullable=False)
+    description = db.Column(db.Text)
+    template_config = db.Column(db.JSON, nullable=False)  # Columns, formatting, etc.
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_default = db.Column(db.Boolean, default=False)
+    
+    # Relationship
+    creator = db.relationship('User', backref='created_templates')
+    
+    def __repr__(self):
+        return f"<ReportTemplate {self.id}: {self.name}>"
+
 ##############################################################################
 # PRODUCTION PLANNING & SCHEDULING
 ##############################################################################
@@ -578,6 +662,65 @@ class ProductionRunDetail(db.Model):
 
     def __repr__(self):
         return f"<ProductionRunDetail {self.id} Run {self.production_run_id} Item {self.item_id}>"
+    
+    
+class ProductionProcess(db.Model):
+    __tablename__ = 'production_processes'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)  # Changed from 'batches.id' to 'batches.BatchID'
+    process_type = db.Column(db.String(50), nullable=False)  # pasteurization, curdling, draining, etc.
+    start_time = db.Column(db.DateTime)
+    end_time = db.Column(db.DateTime)
+    temperature = db.Column(db.Float)
+    humidity = db.Column(db.Float)
+    ph_level = db.Column(db.Float)
+    notes = db.Column(db.Text)
+    operator_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    batch = db.relationship('Batch', backref=db.backref('processes', lazy=True))
+    operator = db.relationship('User', backref=db.backref('production_processes', lazy=True))
+
+class AgingRecord(db.Model):
+    __tablename__ = 'aging_records'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)  # Changed from 'batches.id' to 'batches.BatchID'
+    aging_room = db.Column(db.String(50), nullable=False)
+    temperature = db.Column(db.Float, nullable=False)
+    humidity = db.Column(db.Float, nullable=False)
+    appearance = db.Column(db.String(100))
+    texture = db.Column(db.String(100))
+    aroma = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    inspector_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    batch = db.relationship('Batch', backref=db.backref('aging_records', lazy=True))
+    inspector = db.relationship('User', backref=db.backref('inspected_aging_records', lazy=True))
+
+class WorkerProductivity(db.Model):
+    __tablename__ = 'worker_productivity'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    production_run_id = db.Column(db.Integer, db.ForeignKey('production_runs.ProductionRunID'), nullable=False)  # Changed from 'production_runs.id' to 'production_runs.ProductionRunID'
+    items_produced = db.Column(db.Integer, default=0)
+    errors_made = db.Column(db.Integer, default=0)
+    hours_worked = db.Column(db.Float, nullable=False)
+    efficiency_score = db.Column(db.Float)
+    notes = db.Column(db.Text)
+    recorded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('productivity_records', lazy=True))
+    production_run = db.relationship('ProductionRun', backref=db.backref('productivity_records', lazy=True))
+    recorder = db.relationship('User', foreign_keys=[recorded_by])
+
 
 ##############################################################################
 # SYSTEM SETTINGS, ROLES, AND USER MANAGEMENT
@@ -1075,4 +1218,29 @@ class TicketResponse(db.Model):
     
     def __repr__(self):
         return f"<TicketResponse {self.id} for Ticket {self.ticket_id}>"
+
+# Add to models.py
+# Add to models.py
+class QualityInspection(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    purchase_order_detail_id = db.Column(db.Integer, db.ForeignKey('purchase_order_details.PODetailID'))
+    inspection_date = db.Column(db.DateTime, default=datetime.utcnow)
+    inspector_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    status = db.Column(db.String(20))  # Passed, Failed, Partially Passed
+    notes = db.Column(db.Text)
+    
+    # Relationships
+    purchase_order_detail = db.relationship('PurchaseOrderDetail', backref='quality_inspections')
+    inspector = db.relationship('User')
+    criteria = db.relationship('QualityInspectionCriteria', backref='inspection', cascade='all, delete-orphan')
+
+
+class QualityInspectionCriteria(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    inspection_id = db.Column(db.Integer, db.ForeignKey('quality_inspection.id'))
+    criterion_name = db.Column(db.String(100))
+    expected_value = db.Column(db.String(100))
+    actual_value = db.Column(db.String(100))
+    passed = db.Column(db.Boolean)
+    importance = db.Column(db.String(20))  # Critical, Major, Minor
 

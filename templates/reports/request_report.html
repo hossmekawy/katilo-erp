@@ -1,0 +1,774 @@
+{% extends "base.html" %}
+
+{% block title %}طلب تقرير جديد - نظام كاتيلو{% endblock %}
+
+{% block page_header %}طلب تقرير جديد{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/reports" class="text-blue-600 hover:text-blue-800">التقارير</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">طلب تقرير جديد</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="card p-6" x-data="requestReportPage()">
+    <h2 class="text-xl font-semibold mb-6">طلب تقرير جديد</h2>
+    
+    <!-- Stepper -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between">
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                     :class="step >= 1 ? 'bg-blue-600' : 'bg-gray-300'">
+                    1
+                </div>
+                <div class="text-sm mt-2" :class="step >= 1 ? 'text-blue-600 font-medium' : 'text-gray-500'">
+                    نوع التقرير
+                </div>
+            </div>
+            
+            <div class="flex-1 h-1 mx-4" :class="step >= 2 ? 'bg-blue-600' : 'bg-gray-300'"></div>
+            
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                     :class="step >= 2 ? 'bg-blue-600' : 'bg-gray-300'">
+                    2
+                </div>
+                <div class="text-sm mt-2" :class="step >= 2 ? 'text-blue-600 font-medium' : 'text-gray-500'">
+                    خيارات التقرير
+                </div>
+            </div>
+            
+            <div class="flex-1 h-1 mx-4" :class="step >= 3 ? 'bg-blue-600' : 'bg-gray-300'"></div>
+            
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                     :class="step >= 3 ? 'bg-blue-600' : 'bg-gray-300'">
+                    3
+                </div>
+                <div class="text-sm mt-2" :class="step >= 3 ? 'text-blue-600 font-medium' : 'text-gray-500'">
+                    تأكيد الطلب
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Step 1: Report Type Selection -->
+    <div x-show="step === 1" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Inventory Report Card -->
+            <div class="border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
+                 :class="reportData.report_type === 'Inventory' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'"
+                 @click="selectReportType('Inventory')">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                    <h3 class="text-lg font-medium mr-3">تقرير المخزون</h3>
+                </div>
+                <p class="text-gray-600 text-sm">عرض حالة المخزون الحالية لجميع العناصر أو تصفية حسب المستودع أو التصنيف.</p>
+            </div>
+            
+            <!-- Transactions Report Card -->
+            <div class="border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
+                 :class="reportData.report_type === 'Transactions' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'"
+                 @click="selectReportType('Transactions')">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                        <i class="fas fa-exchange-alt"></i>
+                    </div>
+                    <h3 class="text-lg font-medium mr-3">تقرير المعاملات</h3>
+                </div>
+                <p class="text-gray-600 text-sm">عرض معاملات المخزون (إدخال/إخراج) خلال فترة زمنية محددة.</p>
+            </div>
+            
+            <!-- Suppliers Report Card -->
+            <div class="border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
+                 :class="reportData.report_type === 'Suppliers' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'"
+                 @click="selectReportType('Suppliers')">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                        <i class="fas fa-truck"></i>
+                    </div>
+                    <h3 class="text-lg font-medium mr-3">تقرير الموردين</h3>
+                </div>
+                <p class="text-gray-600 text-sm">عرض قائمة الموردين مع معلومات الاتصال وتفاصيل التعامل.</p>
+            </div>
+            
+            <!-- Supplier Accounts Report Card -->
+            <div class="border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
+                 :class="reportData.report_type === 'SupplierAccounts' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'"
+                 @click="selectReportType('SupplierAccounts')">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                    </div>
+                    <h3 class="text-lg font-medium mr-3">تقرير حسابات الموردين</h3>
+                </div>
+                <p class="text-gray-600 text-sm">عرض الحسابات المالية للموردين والمدفوعات والمستحقات.</p>
+            </div>
+            
+            <!-- Purchase Orders Report Card -->
+            <div class="border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
+                 :class="reportData.report_type === 'PurchaseOrders' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'"
+                 @click="selectReportType('PurchaseOrders')">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                    <h3 class="text-lg font-medium mr-3">تقرير طلبات الشراء</h3>
+                </div>
+                <p class="text-gray-600 text-sm">عرض طلبات الشراء وحالتها وتفاصيلها خلال فترة زمنية محددة.</p>
+            </div>
+            
+            <!-- Production Report Card -->
+            <div class="border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
+                 :class="reportData.report_type === 'Production' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'"
+                 @click="selectReportType('Production')">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                        <i class="fas fa-industry"></i>
+                    </div>
+                    <h3 class="text-lg font-medium mr-3">تقرير الإنتاج</h3>
+                </div>
+                <p class="text-gray-600 text-sm">عرض عمليات الإنتاج والكميات المنتجة والمواد المستهلكة.</p>
+            </div>
+        </div>
+        
+        <div class="flex justify-end mt-8">
+            <button @click="goToStep(2)" class="btn btn-primary" :disabled="!reportData.report_type">
+                التالي <i class="fas fa-arrow-left mr-2"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Step 2: Report Options -->
+    <div x-show="step === 2" class="space-y-6">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ml-3">
+                    <i class="fas" :class="getReportTypeIcon()"></i>
+                </div>
+                <div>
+                    <h3 class="font-medium text-blue-800">نوع التقرير: <span x-text="getReportTypeName()"></span></h3>
+                    <button @click="goToStep(1)" class="text-sm text-blue-600 hover:underline">
+                        <i class="fas fa-edit ml-1"></i> تغيير
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Report Name and Format -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+                <label for="report_name" class="block text-sm font-medium text-gray-700 mb-1">اسم التقرير</label>
+                <input type="text" id="report_name" x-model="reportData.report_name" 
+                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                       placeholder="أدخل اسمًا وصفيًا للتقرير">
+                <div x-show="errors.report_name" class="text-red-500 text-sm mt-1" x-text="errors.report_name"></div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">صيغة التقرير</label>
+                <div class="flex space-x-4 space-x-reverse">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="format" value="PDF" x-model="reportData.format" class="text-blue-600 focus:ring-blue-500">
+                        <span class="mr-2">PDF</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="format" value="Excel" x-model="reportData.format" class="text-blue-600 focus:ring-blue-500">
+                        <span class="mr-2">Excel</span>
+                    </label>
+                </div>
+                <div x-show="errors.format" class="text-red-500 text-sm mt-1" x-text="errors.format"></div>
+            </div>
+        </div>
+        
+        <!-- Report Description -->
+        <div class="mb-6">
+            <label for="description" class="block text-sm font-medium text-gray-700 mb-1">وصف التقرير (اختياري)</label>
+            <textarea id="description" x-model="reportData.description" rows="3"
+                      class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                      placeholder="أدخل وصفًا اختياريًا للتقرير"></textarea>
+        </div>
+        
+        <!-- Report Filters -->
+        <div class="mb-6">
+            <h3 class="text-lg font-medium mb-3">خيارات التصفية</h3>
+            
+            <!-- Inventory Report Filters -->
+            <div x-show="reportData.report_type === 'Inventory'" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="warehouse_id" class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+                        <select id="warehouse_id" x-model="reportData.filters.warehouse_id"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع المستودعات</option>
+                            <option value="1">المستودع الرئيسي</option>
+                            <option value="2">مستودع المنتجات</option>
+                            <option value="3">مستودع التغليف</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="category_id" class="block text-sm font-medium text-gray-700 mb-1">التصنيف</label>
+                        <select id="category_id" x-model="reportData.filters.category_id"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع التصنيفات</option>
+                            <option value="1">مواد خام</option>
+                            <option value="2">منتجات</option>
+                            <option value="3">تغليف</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="flex items-center">
+                    <input type="checkbox" id="show_low_stock" x-model="reportData.filters.show_low_stock"
+                           class="rounded text-blue-600 focus:ring-blue-500">
+                    <label for="show_low_stock" class="mr-2 text-sm text-gray-700">إظهار العناصر منخفضة المخزون فقط</label>
+                </div>
+            </div>
+            
+            <!-- Transactions Report Filters -->
+            <div x-show="reportData.report_type === 'Transactions'" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label>
+                        <input type="date" id="start_date" x-model="reportData.filters.start_date"
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div>
+                        <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label>
+                        <input type="date" id="end_date" x-model="reportData.filters.end_date"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="transaction_type" class="block text-sm font-medium text-gray-700 mb-1">نوع المعاملة</label>
+                        <select id="transaction_type" x-model="reportData.filters.transaction_type"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع المعاملات</option>
+                            <option value="IN">إدخال</option>
+                            <option value="OUT">إخراج</option>
+                            <option value="TRANSFER">تحويل</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="item_id" class="block text-sm font-medium text-gray-700 mb-1">العنصر</label>
+                        <select id="item_id" x-model="reportData.filters.item_id"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع العناصر</option>
+                            <option value="1">حليب طازج</option>
+                            <option value="2">جبنة بيضاء</option>
+                            <option value="3">عبوات بلاستيكية</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Suppliers Report Filters -->
+            <div x-show="reportData.report_type === 'Suppliers'" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="supplier_id" class="block text-sm font-medium text-gray-700 mb-1">المورد</label>
+                        <select id="supplier_id" x-model="reportData.filters.supplier_id"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع الموردين</option>
+                            <option value="1">شركة الألبان المتحدة</option>
+                            <option value="2">شركة التغليف العالمية</option>
+                            <option value="3">مصنع المواد الأولية</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Supplier Accounts Report Filters -->
+            <div x-show="reportData.report_type === 'SupplierAccounts'" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="supplier_id_accounts" class="block text-sm font-medium text-gray-700 mb-1">المورد</label>
+                        <select id="supplier_id_accounts" x-model="reportData.filters.supplier_id"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع الموردين</option>
+                            <option value="1">شركة الألبان المتحدة</option>
+                            <option value="2">شركة التغليف العالمية</option>
+                            <option value="3">مصنع المواد الأولية</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="balance_type" class="block text-sm font-medium text-gray-700 mb-1">نوع الرصيد</label>
+                        <select id="balance_type" x-model="reportData.filters.balance_type"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="all">الكل</option>
+                            <option value="debit">مدين</option>
+                            <option value="credit">دائن</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="start_date_accounts" class="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label>
+                        <input type="date" id="start_date_accounts" x-model="reportData.filters.start_date"
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div>
+                        <label for="end_date_accounts" class="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label>
+                        <input type="date" id="end_date_accounts" x-model="reportData.filters.end_date"
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Purchase Orders Report Filters -->
+            <div x-show="reportData.report_type === 'PurchaseOrders'" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="start_date_po" class="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label>
+                        <input type="date" id="start_date_po" x-model="reportData.filters.start_date"
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div>
+                        <label for="end_date_po" class="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label>
+                        <input type="date" id="end_date_po" x-model="reportData.filters.end_date"
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="supplier_id_po" class="block text-sm font-medium text-gray-700 mb-1">المورد</label>
+                        <select id="supplier_id_po" x-model="reportData.filters.supplier_id"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع الموردين</option>
+                            <option value="1">شركة الألبان المتحدة</option>
+                            <option value="2">شركة التغليف العالمية</option>
+                            <option value="3">مصنع المواد الأولية</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                        <select id="status" x-model="reportData.filters.status"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع الحالات</option>
+                            <option value="Pending">قيد الانتظار</option>
+                            <option value="Approved">معتمد</option>
+                            <option value="Received">مستلم</option>
+                            <option value="Cancelled">ملغي</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Production Report Filters -->
+            <div x-show="reportData.report_type === 'Production'" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="start_date_prod" class="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label>
+                        <input type="date" id="start_date_prod" x-model="reportData.filters.start_date"
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div>
+                        <label for="end_date_prod" class="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label>
+                        <input type="date" id="end_date_prod" x-model="reportData.filters.end_date"
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="final_product_id" class="block text-sm font-medium text-gray-700 mb-1">المنتج النهائي</label>
+                        <select id="final_product_id" x-model="reportData.filters.final_product_id"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع المنتجات</option>
+                            <option value="2">جبنة بيضاء</option>
+                            <option value="4">جبنة شيدر</option>
+                            <option value="5">زبادي</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="status_prod" class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                        <select id="status_prod" x-model="reportData.filters.status"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">جميع الحالات</option>
+                            <option value="Planned">مخطط</option>
+                            <option value="In Progress">قيد التنفيذ</option>
+                            <option value="Completed">مكتمل</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex justify-between mt-8">
+            <button @click="goToStep(1)" class="btn bg-gray-200 hover:bg-gray-300 text-gray-800">
+                <i class="fas fa-arrow-right ml-2"></i> السابق
+            </button>
+            
+            <button @click="validateAndGoToStep3()" class="btn btn-primary">
+                التالي <i class="fas fa-arrow-left mr-2"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Step 3: Confirmation -->
+    <div x-show="step === 3" class="space-y-6">
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 ml-3">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div>
+                    <h3 class="font-medium text-green-800">مراجعة طلب التقرير</h3>
+                    <p class="text-sm text-green-600">يرجى مراجعة تفاصيل طلب التقرير قبل التأكيد</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                <h3 class="font-medium text-gray-800">تفاصيل التقرير</h3>
+            </div>
+            
+            <div class="p-4">
+                <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+                    <div>
+                        <dt class="text-sm text-gray-500">نوع التقرير</dt>
+                        <dd class="mt-1 text-gray-900" x-text="getReportTypeName()"></dd>
+                    </div>
+                    
+                    <div>
+                        <dt class="text-sm text-gray-500">اسم التقرير</dt>
+                        <dd class="mt-1 text-gray-900" x-text="reportData.report_name"></dd>
+                    </div>
+                    
+                    <div>
+                        <dt class="text-sm text-gray-500">صيغة التقرير</dt>
+                        <dd class="mt-1 text-gray-900" x-text="reportData.format"></dd>
+                    </div>
+                    
+                    <div x-show="reportData.description">
+                        <dt class="text-sm text-gray-500">الوصف</dt>
+                        <dd class="mt-1 text-gray-900" x-text="reportData.description"></dd>
+                    </div>
+                </dl>
+            </div>
+            
+            <div x-show="hasFilters()" class="p-4 border-t border-gray-200">
+                <h3 class="font-medium text-gray-800 mb-3">خيارات التصفية</h3>
+                
+                <!-- Inventory Filters Summary -->
+                <div x-show="reportData.report_type === 'Inventory'" class="space-y-2">
+                    <div x-show="reportData.filters.warehouse_id" class="flex">
+                        <span class="text-sm text-gray-500 ml-2">المستودع:</span>
+                        <span class="text-sm text-gray-900" x-text="getWarehouseName(reportData.filters.warehouse_id)"></span>
+                    </div>
+                    
+                    <div x-show="reportData.filters.category_id" class="flex">
+                        <span class="text-sm text-gray-500 ml-2">التصنيف:</span>
+                        <span class="text-sm text-gray-900" x-text="getCategoryName(reportData.filters.category_id)"></span>
+                    </div>
+                    
+                    <div x-show="reportData.filters.show_low_stock" class="flex">
+                        <span class="text-sm text-gray-500 ml-2">إظهار العناصر منخفضة المخزون فقط:</span>
+                        <span class="text-sm text-gray-900">نعم</span>
+                    </div>
+                </div>
+                
+                <!-- Transactions Filters Summary -->
+                <div x-show="reportData.report_type === 'Transactions'" class="space-y-2">
+                    <div x-show="reportData.filters.start_date" class="flex">
+                        <span class="text-sm text-gray-500 ml-2">من تاريخ:</span>
+                        <span class="text-sm text-gray-900" x-text="reportData.filters.start_date"></span>
+                    </div>
+                    
+                    <div x-show="reportData.filters.end_date" class="flex">
+                        <span class="text-sm text-gray-500 ml-2">إلى تاريخ:</span>
+                        <span class="text-sm text-gray-900" x-text="reportData.filters.end_date"></span>
+                    </div>
+                    
+                    <div x-show="reportData.filters.transaction_type" class="flex">
+                        <span class="text-sm text-gray-500 ml-2">نوع المعاملة:</span>
+                        <span class="text-sm text-gray-900" x-text="getTransactionTypeName(reportData.filters.transaction_type)"></span>
+                    </div>
+                    
+                    <div x-show="reportData.filters.item_id" class="flex">
+                        <span class="text-sm text-gray-500 ml-2">العنصر:</span>
+                        <span class="text-sm text-gray-900" x-text="getItemName(reportData.filters.item_id)"></span>
+                    </div>
+                </div>
+                
+                <!-- Other report types filters summary would be added here -->
+            </div>
+        </div>
+        
+        <div class="flex justify-between mt-8">
+            <button @click="goToStep(2)" class="btn bg-gray-200 hover:bg-gray-300 text-gray-800">
+                <i class="fas fa-arrow-right ml-2"></i> السابق
+            </button>
+            
+            <button @click="submitReportRequest()" class="btn btn-primary" :disabled="isSubmitting">
+                <span x-show="!isSubmitting">تأكيد الطلب</span>
+                <span x-show="isSubmitting" class="flex items-center">
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    جاري المعالجة...
+                </span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Success Message -->
+    <div x-show="step === 4" class="text-center py-8">
+        <div class="w-16 h-16 bg-green-100 rounded-full mx-auto flex items-center justify-center">
+            <i class="fas fa-check text-2xl text-green-600"></i>
+        </div>
+        
+        <h2 class="text-2xl font-bold text-gray-800 mt-4">تم إرسال طلب التقرير بنجاح!</h2>
+        <p class="text-gray-600 mt-2">سيتم معالجة طلبك وإشعارك عند اكتمال التقرير.</p>
+        
+        <div class="mt-8">
+            <a href="/reports" class="btn btn-primary">العودة إلى قائمة التقارير</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function requestReportPage() {
+        return {
+            step: 1,
+            isSubmitting: false,
+            reportData: {
+                report_type: '',
+                report_name: '',
+                format: 'PDF',
+                description: '',
+                filters: {
+                    // Inventory filters
+                    warehouse_id: '',
+                    category_id: '',
+                    show_low_stock: false,
+                    
+                    // Transactions filters
+                    start_date: '',
+                    end_date: '',
+                    transaction_type: '',
+                    item_id: '',
+                    
+                    // Supplier filters
+                    supplier_id: '',
+                    
+                    // Supplier Accounts filters
+                    balance_type: 'all',
+                    
+                    // Purchase Orders filters
+                    status: '',
+                    
+                    // Production filters
+                    final_product_id: ''
+                }
+            },
+            errors: {},
+            
+            goToStep(step) {
+                this.step = step;
+                window.scrollTo(0, 0);
+            },
+            
+            selectReportType(type) {
+                this.reportData.report_type = type;
+                
+                // Set default report name based on type
+                const reportNames = {
+                    'Inventory': 'تقرير المخزون الحالي',
+                    'Transactions': 'تقرير معاملات المخزون',
+                    'Suppliers': 'تقرير الموردين',
+                    'SupplierAccounts': 'تقرير حسابات الموردين',
+                    'PurchaseOrders': 'تقرير طلبات الشراء',
+                    'Production': 'تقرير الإنتاج'
+                };
+                
+                this.reportData.report_name = reportNames[type] || '';
+                
+                // Reset filters
+                this.reportData.filters = {
+                    warehouse_id: '',
+                    category_id: '',
+                    show_low_stock: false,
+                    start_date: '',
+                    end_date: '',
+                    transaction_type: '',
+                    item_id: '',
+                    supplier_id: '',
+                    balance_type: 'all',
+                    status: '',
+                    final_product_id: ''
+                };
+                
+                // Set default dates for reports that need date ranges
+                if (['Transactions', 'SupplierAccounts', 'PurchaseOrders', 'Production'].includes(type)) {
+                    const today = new Date();
+                    const thirtyDaysAgo = new Date();
+                    thirtyDaysAgo.setDate(today.getDate() - 30);
+                    
+                    this.reportData.filters.end_date = today.toISOString().split('T')[0];
+                    this.reportData.filters.start_date = thirtyDaysAgo.toISOString().split('T')[0];
+                }
+            },
+            
+            validateAndGoToStep3() {
+                this.errors = {};
+                
+                // Validate required fields
+                if (!this.reportData.report_name.trim()) {
+                    this.errors.report_name = 'يرجى إدخال اسم للتقرير';
+                }
+                
+                if (!this.reportData.format) {
+                    this.errors.format = 'يرجى اختيار صيغة للتقرير';
+                }
+                
+                // If there are errors, don't proceed
+                if (Object.keys(this.errors).length > 0) {
+                    return;
+                }
+                
+                this.goToStep(3);
+            },
+            
+            async submitReportRequest() {
+                this.isSubmitting = true;
+                
+                try {
+                    const response = await fetch('/api/reports/request', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.reportData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        // Show success message
+                        this.goToStep(4);
+                    } else {
+                        // Handle validation errors
+                        if (data.errors) {
+                            this.errors = data.errors;
+                        } else {
+                            showNotification(data.message || 'حدث خطأ أثناء إرسال الطلب', 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error submitting report request:', error);
+                    showNotification('حدث خطأ أثناء الاتصال بالخادم', 'error');
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+            
+            getReportTypeName() {
+                const reportTypes = {
+                    'Inventory': 'تقرير المخزون',
+                    'Transactions': 'تقرير المعاملات',
+                    'Suppliers': 'تقرير الموردين',
+                    'SupplierAccounts': 'تقرير حسابات الموردين',
+                    'PurchaseOrders': 'تقرير طلبات الشراء',
+                    'Production': 'تقرير الإنتاج'
+                };
+                
+                return reportTypes[this.reportData.report_type] || '';
+            },
+            
+            getReportTypeIcon() {
+                const icons = {
+                    'Inventory': 'fa-boxes',
+                    'Transactions': 'fa-exchange-alt',
+                    'Suppliers': 'fa-truck',
+                    'SupplierAccounts': 'fa-file-invoice-dollar',
+                    'PurchaseOrders': 'fa-shopping-cart',
+                    'Production': 'fa-industry'
+                };
+                
+                return icons[this.reportData.report_type] || 'fa-file-alt';
+            },
+            
+            getWarehouseName(id) {
+                const warehouses = {
+                    '1': 'المستودع الرئيسي',
+                    '2': 'مستودع المنتجات',
+                    '3': 'مستودع التغليف'
+                };
+                
+                return warehouses[id] || id;
+            },
+            
+            getCategoryName(id) {
+                const categories = {
+                    '1': 'مواد خام',
+                    '2': 'منتجات',
+                    '3': 'تغليف'
+                };
+                
+                return categories[id] || id;
+            },
+            
+            getTransactionTypeName(type) {
+                const types = {
+                    'IN': 'إدخال',
+                    'OUT': 'إخراج',
+                    'TRANSFER': 'تحويل'
+                };
+                
+                return types[type] || type;
+            },
+            
+            getItemName(id) {
+                const items = {
+                    '1': 'حليب طازج',
+                    '2': 'جبنة بيضاء',
+                    '3': 'عبوات بلاستيكية',
+                    '4': 'جبنة شيدر',
+                    '5': 'زبادي'
+                };
+                
+                return items[id] || id;
+            },
+            
+            hasFilters() {
+                const filters = this.reportData.filters;
+                
+                // Check if any filter has a value
+                return Object.values(filters).some(value => {
+                    if (typeof value === 'boolean') {
+                        return value;
+                    }
+                    return value !== '' && value !== null && value !== undefined;
+                });
+            }
+        };
+    }
+</script>
+{% endblock %}
+

@@ -1,0 +1,776 @@
+{% extends 'base.html' %}
+
+{% block title %}جدولة الإنتاج - نظام كاتيلو{% endblock %}
+
+{% block page_header %}جدولة الإنتاج{% endblock %}
+
+{% block content %}
+<div x-data="productionScheduling()">
+    <div class="mb-6 flex justify-between items-center">
+        <h2 class="text-xl font-bold text-gray-800">دورات الإنتاج</h2>
+        <button 
+            @click="openCreateModal()"
+            class="btn btn-primary flex items-center">
+            <i class="fas fa-plus ml-2"></i>
+            دورة إنتاج جديدة
+        </button>
+    </div>
+
+    <div class="card">
+        <!-- Production Runs Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            #
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ البدء
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ الانتهاء
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المسؤول
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin ml-2"></i>
+                                جاري التحميل...
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loading && productionRuns.length === 0">
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                لا توجد دورات إنتاج
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="run in productionRuns" :key="run.id">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="run.id"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(run.planned_start_date)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(run.planned_end_date)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span 
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                    :class="{
+                                        'bg-yellow-100 text-yellow-800': run.status === 'Planned',
+                                        'bg-blue-100 text-blue-800': run.status === 'In Progress',
+                                        'bg-green-100 text-green-800': run.status === 'Completed'
+                                    }"
+                                    x-text="getStatusText(run.status)"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="run.responsible_user || '-'"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2 space-x-reverse">
+                                    <button @click="viewDetails(run)" class="text-blue-600 hover:text-blue-900">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button @click="editRun(run)" class="text-indigo-600 hover:text-indigo-900">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button 
+                                        x-show="run.status === 'Planned'"
+                                        @click="startRun(run)" 
+                                        class="text-green-600 hover:text-green-900">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                    <button 
+                                        x-show="run.status === 'In Progress'"
+                                        @click="completeRun(run)" 
+                                        class="text-purple-600 hover:text-purple-900">
+                                        <i class="fas fa-check-circle"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Create/Edit Production Run Modal -->
+        <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div 
+                    x-show="showModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0" 
+                    x-transition:enter-end="opacity-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100" 
+                    x-transition:leave-end="opacity-0"
+                    class="fixed inset-0 transition-opacity" 
+                    @click="showModal = false">
+                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">​</span>
+
+                <div 
+                    x-show="showModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                            <span x-text="editMode ? 'تعديل دورة إنتاج' : 'إضافة دورة إنتاج جديدة'"></span>
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">تاريخ البدء</label>
+                                <input 
+                                    type="datetime-local" 
+                                    x-model="formData.planned_start_date"
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">تاريخ الانتهاء المتوقع</label>
+                                <input 
+                                    type="datetime-local" 
+                                    x-model="formData.planned_end_date"
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                                <select 
+                                    x-model="formData.status"
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="Planned">مخطط</option>
+                                    <option value="In Progress">قيد التنفيذ</option>
+                                    <option value="Completed">مكتمل</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">المسؤول</label>
+                                <select 
+                                    x-model="formData.responsible_user_id"
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="">اختر المسؤول</option>
+                                    <template x-for="user in users" :key="user.id">
+                                        <option :value="user.id" x-text="user.username"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            
+                            <!-- Production Items Section -->
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <label class="block text-sm font-medium text-gray-700">المنتجات المخطط إنتاجها</label>
+                                    <button 
+                                        type="button"
+                                        @click="addProductionItem()"
+                                        class="text-sm text-blue-600 hover:text-blue-800">
+                                        <i class="fas fa-plus ml-1"></i>
+                                        إضافة منتج
+                                    </button>
+                                </div>
+                                
+                                <div class="space-y-3">
+                                    <template x-for="(item, index) in formData.details" :key="index">
+                                        <div class="flex items-center space-x-2 space-x-reverse">
+                                            <div class="flex-grow">
+                                                <select 
+                                                    x-model="item.item_id"
+                                                    @change="updateBomOptions(index)"
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                                    <option value="">اختر المنتج</option>
+                                                    <template x-for="product in products" :key="product.id">
+                                                        <option :value="product.id" x-text="product.name"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                            <div class="w-24">
+                                                <input 
+                                                    type="number" 
+                                                    x-model="item.quantity_planned"
+                                                    placeholder="الكمية"
+                                                    min="1"
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                            </div>
+                                            <div class="flex-grow">
+                                                <select 
+                                                    x-model="item.bom_id"
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                                    <option value="">اختر الوصفة</option>
+                                                    <template x-for="bom in item.availableBoms || []" :key="bom.id">
+                                                        <option :value="bom.id" x-text="bom.description || 'وصفة ' + bom.id"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                            <button 
+                                                type="button"
+                                                @click="removeProductionItem(index)"
+                                                class="text-red-600 hover:text-red-800">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button 
+                            type="button"
+                            @click="saveProductionRun()"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            <span x-text="editMode ? 'تحديث' : 'إضافة'">
+                            </span>
+                        </button>
+                        <button 
+                            type="button"
+                            @click="showModal = false"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Production Run Details Modal -->
+        <div x-show="showDetailsModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div 
+                    x-show="showDetailsModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0" 
+                    x-transition:enter-end="opacity-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100" 
+                    x-transition:leave-end="opacity-0"
+                    class="fixed inset-0 transition-opacity" 
+                    @click="showDetailsModal = false">
+                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+
+                <div 
+                    x-show="showDetailsModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                            تفاصيل دورة الإنتاج #<span x-text="selectedRun.id"></span>
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-sm text-gray-500">تاريخ البدء</p>
+                                    <p class="font-medium" x-text="formatDate(selectedRun.planned_start_date)"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">تاريخ الانتهاء</p>
+                                    <p class="font-medium" x-text="formatDate(selectedRun.planned_end_date)"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">الحالة</p>
+                                    <p class="font-medium" x-text="getStatusText(selectedRun.status)"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">المسؤول</p>
+                                    <p class="font-medium" x-text="selectedRun.responsible_user || '-'"></p>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-md font-medium text-gray-900 mb-2">المنتجات المخطط إنتاجها</h4>
+                                <div class="border rounded-md overflow-hidden">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المنتج</th>
+                                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الكمية</th>
+                                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الوصفة</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            <template x-if="detailsLoading">
+                                                <tr>
+                                                    <td colspan="3" class="px-4 py-2 text-center text-gray-500">
+                                                        <i class="fas fa-spinner fa-spin ml-2"></i>
+                                                        جاري التحميل...
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <template x-if="!detailsLoading && runDetails.length === 0">
+                                                <tr>
+                                                    <td colspan="3" class="px-4 py-2 text-center text-gray-500">
+                                                        لا توجد منتجات مخطط إنتاجها
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <template x-for="detail in runDetails" :key="detail.id">
+                                                <tr>
+                                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900" x-text="detail.item_name"></td>
+                                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900" x-text="detail.quantity_planned"></td>
+                                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900" x-text="detail.bom_name || '-'"></td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button 
+                            type="button"
+                            @click="showDetailsModal = false"
+                            class="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            إغلاق
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Production Run Modal -->
+        <div x-show="showStartModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div 
+                    x-show="showStartModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0" 
+                    x-transition:enter-end="opacity-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100" 
+                    x-transition:leave-end="opacity-0"
+                    class="fixed inset-0 transition-opacity" 
+                    @click="showStartModal = false">
+                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+
+                <div 
+                    x-show="showStartModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                            بدء دورة الإنتاج #<span x-text="selectedRun.id"></span>
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <p class="text-sm text-gray-600">
+                                هل أنت متأكد من بدء دورة الإنتاج هذه؟ سيتم استهلاك المواد الخام من المخزون وفقًا للوصفات المحددة.
+                            </p>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+                                <select 
+                                    x-model="startData.warehouse_id"
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="">اختر المستودع</option>
+                                    <template x-for="warehouse in warehouses" :key="warehouse.id">
+                                        <option :value="warehouse.id" x-text="warehouse.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button 
+                            type="button"
+                            @click="confirmStartRun()"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            بدء الإنتاج
+                        </button>
+                        <button 
+                            type="button"
+                            @click="showStartModal = false"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Complete Production Run Modal -->
+        <div x-show="showCompleteModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div 
+                    x-show="showCompleteModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0" 
+                    x-transition:enter-end="opacity-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100" 
+                    x-transition:leave-end="opacity-0"
+                    class="fixed inset-0 transition-opacity" 
+                    @click="showCompleteModal = false">
+                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                </div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+
+                <div 
+                    x-show="showCompleteModal" 
+                    x-transition:enter="ease-out duration-300" 
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave="ease-in duration-200" 
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                            إكمال دورة الإنتاج #<span x-text="selectedRun.id"></span>
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <p class="text-sm text-gray-600">
+                                هل أنت متأكد من إكمال دورة الإنتاج هذه؟ سيتم إضافة المنتجات النهائية إلى المخزون.
+                            </p>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+                                <select 
+                                    x-model="completeData.warehouse_id"
+                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="">اختر المستودع</option>
+                                    <template x-for="warehouse in warehouses" :key="warehouse.id">
+                                        <option :value="warehouse.id" x-text="warehouse.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center">
+                                    <input 
+                                        type="checkbox" 
+                                        x-model="completeData.create_batches"
+                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="mr-2 text-sm text-gray-700">إنشاء دفعات للمنتجات النهائية</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button 
+                            type="button"
+                            @click="confirmCompleteRun()"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            إكمال الإنتاج
+                        </button>
+                        <button 
+                            type="button"
+                            @click="showCompleteModal = false"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function productionScheduling() {
+        return {
+            loading: true,
+            productionRuns: [],
+            users: [],
+            products: [],
+            warehouses: [],
+            boms: [],
+            showModal: false,
+            showDetailsModal: false,
+            showStartModal: false,
+            showCompleteModal: false,
+            editMode: false,
+            detailsLoading: false,
+            runDetails: [],
+            selectedRun: {},
+            formData: {
+                planned_start_date: '',
+                planned_end_date: '',
+                status: 'Planned',
+                responsible_user_id: '',
+                details: []
+            },
+            startData: {
+                warehouse_id: ''
+            },
+            completeData: {
+                warehouse_id: '',
+                create_batches: true
+            },
+            
+            init() {
+                this.loadProductionRuns();
+                this.loadUsers();
+                this.loadProducts();
+                this.loadWarehouses();
+                this.loadBoms();
+            },
+            
+            loadProductionRuns() {
+                this.loading = true;
+                fetchAPI('/api/production-runs')
+                    .then(data => {
+                        this.productionRuns = data;
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('Error loading production runs:', error);
+                        this.loading = false;
+                    });
+            },
+            
+            loadUsers() {
+                fetchAPI('/api/admin/users')
+                    .then(data => {
+                        this.users = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading users:', error);
+                    });
+            },
+            
+            loadProducts() {
+                fetchAPI('/api/items')
+                    .then(data => {
+                        this.products = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading products:', error);
+                    });
+            },
+            
+            loadWarehouses() {
+                fetchAPI('/api/warehouses')
+                    .then(data => {
+                        this.warehouses = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading warehouses:', error);
+                    });
+            },
+            
+            loadBoms() {
+                fetchAPI('/api/cheese-recipes')
+                    .then(data => {
+                        this.boms = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading BOMs:', error);
+                    });
+            },
+            
+            openCreateModal() {
+                this.editMode = false;
+                this.formData = {
+                    planned_start_date: new Date().toISOString().slice(0, 16),
+                    planned_end_date: '',
+                    status: 'Planned',
+                    responsible_user_id: '',
+                    details: []
+                };
+                this.showModal = true;
+            },
+            
+            editRun(run) {
+                this.editMode = true;
+                this.formData = {
+                    id: run.id,
+                    planned_start_date: run.planned_start_date ? run.planned_start_date.slice(0, 16) : '',
+                    planned_end_date: run.planned_end_date ? run.planned_end_date.slice(0, 16) : '',
+                    status: run.status,
+                    responsible_user_id: run.responsible_user_id,
+                    details: []
+                };
+                
+                // Load run details
+                fetchAPI(`/api/production-runs/${run.id}/details`)
+                    .then(data => {
+                        this.formData.details = data.map(detail => {
+                            return {
+                                id: detail.id,
+                                item_id: detail.item_id,
+                                quantity_planned: detail.quantity_planned,
+                                bom_id: detail.bom_id,
+                                availableBoms: this.getBomsForItem(detail.item_id)
+                            };
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error loading run details:', error);
+                    });
+                
+                this.showModal = true;
+            },
+            
+            saveProductionRun() {
+                const url = this.editMode ? `/api/production-runs/${this.formData.id}` : '/api/production-runs';
+                const method = this.editMode ? 'PUT' : 'POST';
+                
+                fetchAPI(url, method, this.formData)
+                    .then(data => {
+                        showNotification(data.message, 'success');
+                        this.showModal = false;
+                        this.loadProductionRuns();
+                    })
+                    .catch(error => {
+                        console.error('Error saving production run:', error);
+                    });
+            },
+            
+            viewDetails(run) {
+                this.selectedRun = run;
+                this.detailsLoading = true;
+                this.runDetails = [];
+                
+                fetchAPI(`/api/production-runs/${run.id}/details`)
+                    .then(data => {
+                        this.runDetails = data;
+                        this.detailsLoading = false;
+                    })
+                    .catch(error => {
+                        console.error('Error loading run details:', error);
+                        this.detailsLoading = false;
+                    });
+                
+                this.showDetailsModal = true;
+            },
+            
+            startRun(run) {
+                this.selectedRun = run;
+                this.startData = {
+                    warehouse_id: ''
+                };
+                this.showStartModal = true;
+            },
+            
+            confirmStartRun() {
+                if (!this.startData.warehouse_id) {
+                    showNotification('يرجى اختيار المستودع', 'error');
+                    return;
+                }
+                
+                fetchAPI(`/api/production-runs/${this.selectedRun.id}/start`, 'POST', this.startData)
+                    .then(data => {
+                        showNotification(data.message, 'success');
+                        this.showStartModal = false;
+                        this.loadProductionRuns();
+                    })
+                    .catch(error => {
+                        console.error('Error starting production run:', error);
+                    });
+            },
+            
+            completeRun(run) {
+                this.selectedRun = run;
+                this.completeData = {
+                    warehouse_id: '',
+                    create_batches: true
+                };
+                this.showCompleteModal = true;
+            },
+            
+            confirmCompleteRun() {
+                if (!this.completeData.warehouse_id) {
+                    showNotification('يرجى اختيار المستودع', 'error');
+                    return;
+                }
+                
+                fetchAPI(`/api/production-runs/${this.selectedRun.id}/complete`, 'POST', this.completeData)
+                    .then(data => {
+                        showNotification(data.message, 'success');
+                        this.showCompleteModal = false;
+                        this.loadProductionRuns();
+                    })
+                    .catch(error => {
+                        console.error('Error completing production run:', error);
+                    });
+            },
+            
+            addProductionItem() {
+                this.formData.details.push({
+                    item_id: '',
+                    quantity_planned: 1,
+                    bom_id: '',
+                    availableBoms: []
+                });
+            },
+            
+            removeProductionItem(index) {
+                this.formData.details.splice(index, 1);
+            },
+            
+            updateBomOptions(index) {
+                const itemId = this.formData.details[index].item_id;
+                this.formData.details[index].bom_id = '';
+                this.formData.details[index].availableBoms = this.getBomsForItem(itemId);
+            },
+            
+            getBomsForItem(itemId) {
+                return this.boms.filter(bom => bom.final_product_id == itemId);
+            },
+            
+            formatDate(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                return date.toLocaleString('ar-EG');
+            },
+            
+            getStatusText(status) {
+                const statusMap = {
+                    'Planned': 'مخطط',
+                    'In Progress': 'قيد التنفيذ',
+                    'Completed': 'مكتمل'
+                };
+                return statusMap[status] || status;
+            }
+        };
+    }
+</script>
+{% endblock %}
+

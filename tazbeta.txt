@@ -12,9 +12,9 @@
 ✅# SUPPLIER MANAGEMENT
     ✅Supplier
     ✅SupplierItem
-# PURCHASE ORDERS (PO)
-    PurchaseOrder
-    PurchaseOrderDetail
+✅# PURCHASE ORDERS (PO)
+    ✅PurchaseOrder
+    ✅PurchaseOrderDetail
 # SALES ORDERS AND CUSTOMER MANAGEMENT
     Customer
     SalesOrder

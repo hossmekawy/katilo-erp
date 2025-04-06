@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+
+{% block title %}التقارير - نظام كاتيلو{% endblock %}
+
+{% block page_header %}التقارير{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">التقارير</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="reportsPage()">
+    <!-- Header with actions -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">التقارير</h1>
+            <p class="mt-1 text-sm text-gray-600">إنشاء وإدارة تقارير المخزون والمعاملات والموردين</p>
+        </div>
+        
+        <div class="mt-4 md:mt-0 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 sm:space-x-reverse">
+            <a href="/reports/request" class="btn btn-primary">
+                <i class="fas fa-plus ml-1"></i> طلب تقرير جديد
+            </a>
+            
+            <div class="relative" x-data="{ open: false }">
+                <button @click="open = !open" class="btn bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">
+                    <i class="fas fa-file-download ml-1"></i> تقارير سريعة
+                    <i class="fas fa-chevron-down mr-1 text-xs"></i>
+                </button>
+                <div x-show="open" 
+                     @click.away="open = false"
+                     class="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10"
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="transform opacity-0 scale-95"
+                     x-transition:enter-end="transform opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="transform opacity-100 scale-100"
+                     x-transition:leave-end="transform opacity-0 scale-95">
+                    <div class="py-1" role="menu" aria-orientation="vertical">
+                        <a href="/reports/generate/inventory?format=pdf" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                            <i class="fas fa-boxes ml-2 text-blue-500"></i> تقرير المخزون الحالي (PDF)
+                        </a>
+                        <a href="/reports/generate/inventory?format=excel" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                            <i class="fas fa-boxes ml-2 text-blue-500"></i> تقرير المخزون الحالي (Excel)
+                        </a>
+                        <a href="/reports/generate/transactions?format=pdf" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                            <i class="fas fa-exchange-alt ml-2 text-green-500"></i> تقرير المعاملات (PDF)
+                        </a>
+                        <a href="/reports/generate/transactions?format=excel" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                            <i class="fas fa-exchange-alt ml-2 text-green-500"></i> تقرير المعاملات (Excel)
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabs -->
+    <div class="mb-6 border-b border-gray-200">
+        <nav class="flex -mb-px">
+            <button @click="activeTab = 'all'" class="py-4 px-6 font-medium text-sm border-b-2 focus:outline-none"
+                    :class="activeTab === 'all' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                جميع التقارير
+            </button>
+            <button @click="activeTab = 'recent'" class="py-4 px-6 font-medium text-sm border-b-2 focus:outline-none"
+                    :class="activeTab === 'recent' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                التقارير الأخيرة
+            </button>
+            <button @click="activeTab = 'scheduled'" class="py-4 px-6 font-medium text-sm border-b-2 focus:outline-none"
+                    :class="activeTab === 'scheduled' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                التقارير المجدولة
+            </button>
+        </nav>
+    </div>
+    
+    <!-- Search and Filter -->
+    <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
+        <div class="w-full md:w-1/3 relative">
+            <input type="text" x-model="searchQuery" placeholder="البحث عن تقرير..."
+                   class="w-full pr-10 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <i class="fas fa-search text-gray-400"></i>
+            </div>
+        </div>
+        
+        <div class="mt-4 md:mt-0 flex flex-wrap gap-2">
+            <select x-model="filterType" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                <option value="">جميع أنواع التقارير</option>
+                <option value="Inventory">تقارير المخزون</option>
+                <option value="Transactions">تقارير المعاملات</option>
+                <option value="Suppliers">تقارير الموردين</option>
+                <option value="SupplierAccounts">تقارير حسابات الموردين</option>
+                <option value="PurchaseOrders">تقارير طلبات الشراء</option>
+                <option value="Production">تقارير الإنتاج</option>
+            </select>
+            
+            <select x-model="filterFormat" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                <option value="">جميع الصيغ</option>
+                <option value="PDF">PDF</option>
+                <option value="Excel">Excel</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Reports List -->
+    <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+        <!-- Table Header -->
+        <div class="hidden md:flex bg-gray-50 text-gray-600 text-sm font-medium border-b">
+            <div class="py-3 px-4 w-12 text-center">#</div>
+            <div class="py-3 px-4 flex-1">اسم التقرير</div>
+            <div class="py-3 px-4 w-32 text-center">النوع</div>
+            <div class="py-3 px-4 w-24 text-center">الصيغة</div>
+            <div class="py-3 px-4 w-40 text-center">تاريخ الإنشاء</div>
+            <div class="py-3 px-4 w-32 text-center">الحالة</div>
+            <div class="py-3 px-4 w-24 text-center">الإجراءات</div>
+        </div>
+        
+        <!-- Loading State -->
+        <div x-show="loading" class="py-12 text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-gray-500">جاري تحميل التقارير...</p>
+        </div>
+        
+        <!-- Empty State -->
+        <div x-show="!loading && filteredReports.length === 0" class="py-12 text-center">
+            <div class="inline-block p-3 rounded-full bg-gray-100">
+                <i class="fas fa-file-alt text-gray-400 text-2xl"></i>
+            </div>
+            <p class="mt-2 text-gray-500">لا توجد تقارير متاحة</p>
+            <a href="/reports/request" class="mt-3 inline-flex items-center text-sm text-blue-600 hover:text-blue-800">
+                <i class="fas fa-plus ml-1"></i> طلب تقرير جديد
+            </a>
+        </div>
+        
+        <!-- Reports List -->
+        <template x-for="(report, index) in filteredReports" :key="report.id">
+            <div class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-colors">
+                <!-- Mobile View -->
+                <div class="md:hidden p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-medium text-gray-900" x-text="report.name"></h3>
+                            <div class="mt-1 flex items-center text-sm text-gray-500">
+                                <span x-text="getReportTypeName(report.type)" class="ml-2"></span>
+                                <span class="mx-1">•</span>
+                                <span x-text="report.format"></span>
+                            </div>
+                            <div class="mt-1 text-xs text-gray-500" x-text="formatDate(report.created_at)"></div>
+                        </div>
+                        
+                        <div class="flex flex-col items-end">
+                            <span class="px-2 py-1 text-xs rounded-full" 
+                                  :class="getStatusClass(report.status)"
+                                  x-text="getStatusName(report.status)"></span>
+                            
+                            <div class="mt-2 flex space-x-2 space-x-reverse">
+                                <button @click="downloadReport(report.id)" class="text-blue-600 hover:text-blue-800" 
+                                        :disabled="report.status !== 'completed'">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button @click="deleteReport(report.id)" class="text-red-600 hover:text-red-800">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Desktop View -->
+                <div class="hidden md:flex items-center">
+                    <div class="py-4 px-4 w-12 text-center text-gray-500" x-text="index + 1"></div>
+                    <div class="py-4 px-4 flex-1">
+                        <div class="font-medium text-gray-900" x-text="report.name"></div>
+                        <div class="text-sm text-gray-500" x-text="report.description || '-'"></div>
+                    </div>
+                    <div class="py-4 px-4 w-32 text-center">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
+                              :class="getReportTypeClass(report.type)">
+                            <i class="fas mr-1" :class="getReportTypeIcon(report.type)"></i>
+                            <span x-text="getReportTypeName(report.type)"></span>
+                        </span>
+                    </div>
+                    <div class="py-4 px-4 w-24 text-center" x-text="report.format"></div>
+                    <div class="py-4 px-4 w-40 text-center text-sm text-gray-500" x-text="formatDate(report.created_at)"></div>
+                    <div class="py-4 px-4 w-32 text-center">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
+                              :class="getStatusClass(report.status)"
+                              x-text="getStatusName(report.status)"></span>
+                    </div>
+                    <div class="py-4 px-4 w-24 text-center">
+                        <div class="flex justify-center space-x-2 space-x-reverse">
+                            <button @click="downloadReport(report.id)" 
+                                    class="text-blue-600 hover:text-blue-800" 
+                                    :disabled="report.status !== 'completed'"
+                                    :class="report.status !== 'completed' ? 'opacity-50 cursor-not-allowed' : ''">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button @click="deleteReport(report.id)" class="text-red-600 hover:text-red-800">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+    
+    <!-- Pagination -->
+    <div class="mt-6 flex items-center justify-between">
+        <div class="text-sm text-gray-500">
+            عرض <span x-text="filteredReports.length"></span> من أصل <span x-text="reports.length"></span> تقرير
+        </div>
+        
+        <div class="flex space-x-2 space-x-reverse">
+            <button class="px-3 py-1 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                السابق
+            </button>
+            <button class="px-3 py-1 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                التالي
+            </button>
+        </div>
+    </div>
+    
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fas fa-exclamation-triangle text-red-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">حذف التقرير</h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500">
+                                    هل أنت متأكد من رغبتك في حذف هذا التقرير؟ لا يمكن التراجع عن هذا الإجراء.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="confirmDelete()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        حذف
+                    </button>
+                    <button @click="showDeleteModal = false; reportToDelete = null" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function reportsPage() {
+        return {
+            loading: true,
+            activeTab: 'all',
+            searchQuery: '',
+            filterType: '',
+            filterFormat: '',
+            reports: [],
+            showDeleteModal: false,
+            reportToDelete: null,
+            
+            init() {
+                this.fetchReports();
+            },
+            
+            async fetchReports() {
+                this.loading = true;
+                
+                try {
+                    // In a real application, this would be an API call
+                    // For demo purposes, we'll use mock data
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
+                    
+                    this.reports = [
+                        {
+                            id: 1,
+                            name: 'تقرير المخزون الشهري',
+                            description: 'تقرير شامل لحالة المخزون في نهاية الشهر',
+                            type: 'Inventory',
+                            format: 'PDF',
+                            created_at: '2023-06-15T10:30:00',
+                            status: 'completed'
+                        },
+                        {
+                            id: 2,
+                            name: 'تقرير معاملات الربع الثاني',
+                            description: 'تقرير معاملات المخزون للربع الثاني من العام',
+                            type: 'Transactions',
+                            format: 'Excel',
+                            created_at: '2023-06-10T14:45:00',
+                            status: 'completed'
+                        },
+                        {
+                            id: 3,
+                            name: 'تقرير الموردين',
+                            description: 'قائمة الموردين وتفاصيل الاتصال',
+                            type: 'Suppliers',
+                            format: 'PDF',
+                            created_at: '2023-06-05T09:15:00',
+                            status: 'completed'
+                        },
+                        {
+                            id: 4,
+                            name: 'تقرير حسابات الموردين',
+                            description: 'تقرير مالي لحسابات الموردين',
+                            type: 'SupplierAccounts',
+                            format: 'Excel',
+                            created_at: '2023-06-01T11:20:00',
+                            status: 'completed'
+                        },
+                        {
+                            id: 5,
+                            name: 'تقرير طلبات الشراء',
+                            description: 'تقرير طلبات الشراء للشهر الحالي',
+                            type: 'PurchaseOrders',
+                            format: 'PDF',
+                            created_at: '2023-05-28T16:10:00',
+                            status: 'completed'
+                        },
+                        {
+                            id: 6,
+                            name: 'تقرير الإنتاج الأسبوعي',
+                            description: 'تقرير الإنتاج للأسبوع الماضي',
+                            type: 'Production',
+                            format: 'PDF',
+                            created_at: '2023-05-25T13:40:00',
+                            status: 'completed'
+                        },
+                        {
+                            id: 7,
+                            name: 'تقرير المخزون منخفض المستوى',
+                            description: 'تقرير العناصر التي وصلت إلى مستوى إعادة الطلب',
+                            type: 'Inventory',
+                            format: 'Excel',
+                            created_at: '2023-06-16T08:30:00',
+                            status: 'processing'
+                        },
+                        {
+                            id: 8,
+                            name: 'تقرير معاملات اليوم',
+                            description: 'تقرير معاملات المخزون لليوم الحالي',
+                            type: 'Transactions',
+                            format: 'PDF',
+                            created_at: '2023-06-16T09:45:00',
+                            status: 'pending'
+                        }
+                    ];
+                } catch (error) {
+                    console.error('Error fetching reports:', error);
+                    showNotification('حدث خطأ أثناء تحميل التقارير', 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            get filteredReports() {
+                let filtered = [...this.reports];
+                
+                // Filter by tab
+                if (this.activeTab === 'recent') {
+                    // Get reports from the last 7 days
+                    const sevenDaysAgo = new Date();
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                    filtered = filtered.filter(report => new Date(report.created_at) >= sevenDaysAgo);
+                } else if (this.activeTab === 'scheduled') {
+                    // Get pending and processing reports
+                    filtered = filtered.filter(report => ['pending', 'processing'].includes(report.status));
+                }
+                
+                // Filter by search query
+                if (this.searchQuery.trim()) {
+                    const query = this.searchQuery.toLowerCase();
+                    filtered = filtered.filter(report => 
+                        report.name.toLowerCase().includes(query) || 
+                        (report.description && report.description.toLowerCase().includes(query))
+                    );
+                }
+                
+                // Filter by report type
+                if (this.filterType) {
+                    filtered = filtered.filter(report => report.type === this.filterType);
+                }
+                
+                // Filter by format
+                if (this.filterFormat) {
+                    filtered = filtered.filter(report => report.format === this.filterFormat);
+                }
+                
+                // Sort by created_at (newest first)
+                filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                
+                return filtered;
+            },
+            
+            formatDate(dateString) {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ar-EG', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            },
+            
+            getReportTypeName(type) {
+                const types = {
+                    'Inventory': 'المخزون',
+                    'Transactions': 'المعاملات',
+                    'Suppliers': 'الموردين',
+                    'SupplierAccounts': 'حسابات الموردين',
+                    'PurchaseOrders': 'طلبات الشراء',
+                    'Production': 'الإنتاج'
+                };
+                
+                return types[type] || type;
+            },
+            
+            getReportTypeIcon(type) {
+                const icons = {
+                    'Inventory': 'fa-boxes',
+                    'Transactions': 'fa-exchange-alt',
+                    'Suppliers': 'fa-truck',
+                    'SupplierAccounts': 'fa-file-invoice-dollar',
+                    'PurchaseOrders': 'fa-shopping-cart',
+                    'Production': 'fa-industry'
+                };
+                
+                return icons[type] || 'fa-file-alt';
+            },
+            
+            getReportTypeClass(type) {
+                const classes = {
+                    'Inventory': 'bg-blue-100 text-blue-800',
+                    'Transactions': 'bg-green-100 text-green-800',
+                    'Suppliers': 'bg-purple-100 text-purple-800',
+                    'SupplierAccounts': 'bg-yellow-100 text-yellow-800',
+                    'PurchaseOrders': 'bg-red-100 text-red-800',
+                    'Production': 'bg-indigo-100 text-indigo-800'
+                };
+                
+                return classes[type] || 'bg-gray-100 text-gray-800';
+            },
+            
+            getStatusName(status) {
+                const statuses = {
+                    'pending': 'قيد الانتظار',
+                    'processing': 'قيد المعالجة',
+                    'completed': 'مكتمل',
+                    'failed': 'فشل'
+                };
+                
+                return statuses[status] || status;
+            },
+            
+            getStatusClass(status) {
+                const classes = {
+                    'pending': 'bg-yellow-100 text-yellow-800',
+                    'processing': 'bg-blue-100 text-blue-800',
+                    'completed': 'bg-green-100 text-green-800',
+                    'failed': 'bg-red-100 text-red-800'
+                };
+                
+                return classes[status] || 'bg-gray-100 text-gray-800';
+            },
+            
+            downloadReport(reportId) {
+                const report = this.reports.find(r => r.id === reportId);
+                
+                if (!report || report.status !== 'completed') {
+                    showNotification('التقرير غير متاح للتنزيل', 'error');
+                    return;
+                }
+                
+                // In a real application, this would trigger a download
+                // For demo purposes, we'll just show a notification
+                showNotification(`جاري تنزيل تقرير "${report.name}"`, 'success');
+            },
+            
+            deleteReport(reportId) {
+                this.reportToDelete = reportId;
+                this.showDeleteModal = true;
+            },
+            
+            async confirmDelete() {
+                if (!this.reportToDelete) return;
+                
+                try {
+                    // In a real application, this would be an API call
+                    // For demo purposes, we'll just remove it from the array
+                    this.reports = this.reports.filter(report => report.id !== this.reportToDelete);
+                    showNotification('تم حذف التقرير بنجاح', 'success');
+                } catch (error) {
+                    console.error('Error deleting report:', error);
+                    showNotification('حدث خطأ أثناء حذف التقرير', 'error');
+                } finally {
+                    this.showDeleteModal = false;
+                    this.reportToDelete = null;
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}
