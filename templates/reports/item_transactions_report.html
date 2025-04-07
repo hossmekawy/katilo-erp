@@ -1,0 +1,105 @@
+{% extends "reports/report_base.html" %}
+
+{% block content %}
+<div class="filters-box">
+    <div class="filters-title">معايير التقرير:</div>
+    <div class="filter-item">العنصر: {{ report.item.name }}</div>
+    <div class="filter-item">الفترة الزمنية: {{ report.date_range }}</div>
+</div>
+
+<div class="section">
+    <h2>معلومات العنصر</h2>
+    <div class="summary-box">
+        <div class="summary-item">
+            <span>اسم العنصر:</span>
+            <span>{{ report.item.name }}</span>
+        </div>
+        <div class="summary-item">
+            <span>الرمز:</span>
+            <span>{{ report.item.sku }}</span>
+        </div>
+        <div class="summary-item">
+            <span>الفئة:</span>
+            <span>{{ report.item.category }}</span>
+        </div>
+        <div class="summary-item">
+            <span>وحدة القياس:</span>
+            <span>{{ report.item.unit_of_measure }}</span>
+        </div>
+        <div class="summary-item">
+            <span>حد إعادة الطلب:</span>
+            <span>{{ report.item.reorder_level }}</span>
+        </div>
+        <div class="summary-item">
+            <span>التكلفة:</span>
+            <span>{{ "%.2f"|format(report.item.cost) }}</span>
+        </div>
+        <div class="summary-item">
+            <span>السعر:</span>
+            <span>{{ "%.2f"|format(report.item.price) }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>المخزون الحالي</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>المستودع</th>
+                <th>الكمية</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for inv in report.current_inventory %}
+            <tr>
+                <td>{{ inv.warehouse_name }}</td>
+                <td>{{ inv.quantity }}</td>
+            </tr>
+            {% endfor %}
+            <tr style="font-weight: bold; background-color: #EFF6FF;">
+                <td>الإجمالي</td>
+                <td>{{ report.total_quantity }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>سجل المعاملات</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>رقم المعاملة</th>
+                <th>المستودع</th>
+                <th>نوع المعاملة</th>
+                <th>الكمية</th>
+                <th>تاريخ المعاملة</th>
+                <th>المرجع</th>
+                <th>الرصيد المتراكم</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for txn in report.transactions_data %}
+            <tr>
+                <td>{{ txn.transaction_id }}</td>
+                <td>{{ txn.warehouse_name }}</td>
+                <td>
+                    {% if txn.transaction_type == 'IN' %}
+                        <span style="color: #059669;">وارد</span>
+                    {% elif txn.transaction_type == 'OUT' %}
+                        <span style="color: #DC2626;">صادر</span>
+                    {% else %}
+                        <span>{{ txn.transaction_type }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ txn.quantity }}</td>
+                <td>{{ txn.transaction_date }}</td>
+                <td>{{ txn.reference }}</td>
+                <td>{{ txn.running_balance }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

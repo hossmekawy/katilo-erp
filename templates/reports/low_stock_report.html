@@ -1,0 +1,57 @@
+{% extends "reports/report_base.html" %}
+
+{% block content %}
+<div class="filters-box">
+    <div class="filters-title">معايير التقرير:</div>
+    <div class="filter-item">المستودع: {{ report.warehouse }}</div>
+    <div class="filter-item">الفئة: {{ report.category }}</div>
+</div>
+
+<div class="section">
+    <h2>ملخص العناصر منخفضة المخزون</h2>
+    <div class="summary-box">
+        <div class="summary-item">
+            <span>إجمالي العناصر منخفضة المخزون:</span>
+            <span>{{ report.total_items }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>تفاصيل العناصر منخفضة المخزون</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>العنصر</th>
+                <th>الرمز</th>
+                <th>الفئة</th>
+                <th>الكمية الحالية</th>
+                <th>حد إعادة الطلب</th>
+                <th>وحدة القياس</th>
+                <th>الموردين</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in report.low_stock_items %}
+            <tr>
+                <td>{{ item.item_name }}</td>
+                <td>{{ item.sku }}</td>
+                <td>{{ item.category_name }}</td>
+                <td class="status-low">{{ item.current_quantity }}</td>
+                <td>{{ item.reorder_level }}</td>
+                <td>{{ item.unit_of_measure }}</td>
+                <td>
+                    {% if item.suppliers %}
+                        {% for supplier in item.suppliers %}
+                            {{ supplier.supplier_name }} ({{ "%.2f"|format(supplier.cost) }})<br>
+                        {% endfor %}
+                    {% else %}
+                        لا يوجد موردين
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

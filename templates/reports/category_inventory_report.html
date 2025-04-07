@@ -1,0 +1,114 @@
+{% extends "reports/report_base.html" %}
+
+{% block content %}
+<div class="filters-box">
+    <div class="filters-title">معايير التقرير:</div>
+    <div class="filter-item">الفئة: {{ report.category.name }}</div>
+    <div class="filter-item">المستودع: {{ report.warehouse }}</div>
+    <div class="filter-item">تضمين العناصر بدون مخزون: {{ "نعم" if report.include_zero_stock else "لا" }}</div>
+</div>
+
+<div class="section">
+    <h2>معلومات الفئة</h2>
+    <div class="summary-box">
+        <div class="summary-item">
+            <span>اسم الفئة:</span>
+            <span>{{ report.category.name }}</span>
+        </div>
+        <div class="summary-item">
+            <span>الوصف:</span>
+            <span>{{ report.category.description or 'بدون وصف' }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>ملخص المخزون</h2>
+    <div class="summary-box">
+        <div class="summary-item">
+            <span>إجمالي العناصر:</span>
+            <span>{{ report.total_items }}</span>
+        </div>
+        <div class="summary-item">
+            <span>إجمالي الكمية:</span>
+            <span>{{ report.total_quantity }}</span>
+        </div>
+        <div class="summary-item">
+            <span>إجمالي القيمة:</span>
+            <span>{{ "%.2f"|format(report.total_value) }} ج.م</span>
+        </div>
+        <div class="summary-item">
+            <span>عناصر منخفضة المخزون:</span>
+            <span>{{ report.low_stock_count }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>ملخص المستودعات</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>المستودع</th>
+                <th>عدد العناصر</th>
+                <th>إجمالي الكمية</th>
+                <th>إجمالي القيمة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for warehouse in report.warehouse_summary %}
+            <tr>
+                <td>{{ warehouse.name }}</td>
+                <td>{{ warehouse.item_count }}</td>
+                <td>{{ warehouse.total_quantity }}</td>
+                <td>{{ "%.2f"|format(warehouse.total_value) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>تفاصيل المخزون</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>العنصر</th>
+                <th>الرمز</th>
+                <th>المستودع</th>
+                <th>الكمية</th>
+                <th>حد إعادة الطلب</th>
+                <th>وحدة القياس</th>
+                <th>التكلفة</th>
+                <th>إجمالي التكلفة</th>
+                <th>آخر تحديث</th>
+                <th>الحالة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in report.inventory_data %}
+            <tr>
+                <td>{{ item.item_name }}</td>
+                <td>{{ item.sku }}</td>
+                <td>{{ item.warehouse_name }}</td>
+                <td {% if item.status == 'Low Stock' %}class="status-low"{% endif %}>
+                    {{ item.quantity }}
+                </td>
+                <td>{{ item.reorder_level }}</td>
+                <td>{{ item.unit_of_measure }}</td>
+                <td>{{ "%.2f"|format(item.cost) }}</td>
+                <td>{{ "%.2f"|format(item.total_cost) }}</td>
+                <td>{{ item.last_updated }}</td>
+                <td>
+                    {% if item.status == 'Low Stock' %}
+                        <span class="status-low">منخفض المخزون</span>
+                    {% else %}
+                        <span class="status-ok">متوفر</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

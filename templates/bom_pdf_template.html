@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقرير قائمة المواد - {{ bom.final_product_name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            direction: rtl;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .header p {
+            color: #666;
+            margin: 5px 0;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #2563eb;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #e5e7eb;
+            padding: 10px;
+            text-align: right;
+        }
+        th {
+            background-color: #f9fafb;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        .summary-box {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .summary-item:last-child {
+            margin-bottom: 0;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+            font-weight: bold;
+        }
+        .cost-bar {
+            height: 20px;
+            background-color: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        .cost-segment {
+            height: 100%;
+            float: right;
+        }
+        .cost-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-left: 15px;
+        }
+        .color-box {
+            width: 15px;
+            height: 15px;
+            margin-left: 5px;
+            border-radius: 3px;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        .positive {
+            color: #10b981;
+        }
+        .negative {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>تقرير قائمة المواد (BOM)</h1>
+        <p>{{ bom.final_product_name }}</p>
+        <p>تاريخ التقرير: {{ bom.updated_at }}</p>
+    </div>
+    
+    <div class="section">
+        <h2>معلومات المنتج النهائي</h2>
+        <div class="summary-box">
+            <div class="summary-item">
+                <span>اسم المنتج:</span>
+                <span>{{ bom.final_product_name }}</span>
+            </div>
+            <div class="summary-item">
+                <span>الفئة:</span>
+                <span>{{ bom.final_product_category_name }}</span>
+            </div>
+            <div class="summary-item">
+                <span>النوع:</span>
+                <span>{{ bom.final_product_category_type }}</span>
+            </div>
+            <div class="summary-item">
+                <span>الوصف:</span>
+                <span>{{ bom.description or 'لا يوجد وصف' }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>مكونات قائمة المواد</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>المكون</th>
+                    <th>الفئة</th>
+                    <th>الكمية المطلوبة</th>
+                    <th>وحدة القياس</th>
+                    <th>تكلفة الوحدة</th>
+                    <th>التكلفة الإجمالية</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for detail in bom.details %}
+                <tr>
+                    <td>{{ detail.component_name }}</td>
+                    <td>{{ detail.component_category_name }}</td>
+                    <td>{{ detail.quantity_required }}</td>
+                    <td>{{ detail.unit_of_measure }}</td>
+                    <td>{{ "%.2f"|format(detail.component_cost) }} ج.م</td>
+                    <td>{{ "%.2f"|format(detail.total_component_cost) }} ج.م</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>ملخص التكاليف</h2>
+        <div class="summary-box">
+            <div class="summary-item">
+                <span>إجمالي التكلفة:</span>
+                <span>{{ "%.2f"|format(bom.total_cost) }} ج.م</span>
+            </div>
+            <div class="summary-item">
+                <span>سعر البيع:</span>
+                <span>{{ "%.2f"|format(bom.selling_price) }} ج.م</span>
+            </div>
+            <div class="summary-item">
+                <span>الربح:</span>
+                <span class="{{ 'positive' if bom.profit >= 0 else 'negative' }}">
+                    {{ "%.2f"|format(bom.profit) }} ج.م
+                </span>
+            </div>
+            <div class="summary-item">
+                <span>هامش الربح:</span>
+                <span class="{{ 'positive' if bom.profit_margin >= 0 else 'negative' }}">
+                    {{ "%.1f"|format(bom.profit_margin) }}%
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>توزيع التكاليف حسب المكونات</h2>
+        
+        <!-- Cost distribution bar -->
+        <div class="cost-bar">
+            {% set colors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#3B82F6', '#F97316', '#14B8A6', '#6366F1'] %}
+            {% for cost in bom.component_costs %}
+                <div class="cost-segment" style="width: {{ cost.percentage }}%; background-color: {{ colors[loop.index0 % colors|length] }};"></div>
+            {% endfor %}
+        </div>
+        
+        <!-- Legend -->
+        <div class="cost-legend">
+            {% for cost in bom.component_costs %}
+                <div class="legend-item">
+                    <div class="color-box" style="background-color: {{ colors[loop.index0 % colors|length] }};"></div>
+                    <span>{{ cost.component_name }} ({{ "%.1f"|format(cost.percentage) }}%)</span>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Cost breakdown table -->
+        <table>
+            <thead>
+                <tr>
+                    <th>المكون</th>
+                    <th>التكلفة</th>
+                    <th>النسبة</th>
+                </tr>
+            </thead>
+            <tbody>
+{% for cost in bom.component_costs %}
+                <tr>
+                    <td>{{ cost.component_name }}</td>
+                    <td>{{ "%.2f"|format(cost.cost) }} ج.م</td>
+                    <td>{{ "%.1f"|format(cost.percentage) }}%</td>
+                </tr>
+                {% endfor %}
+                <tr>
+                    <td><strong>الإجمالي</strong></td>
+                    <td><strong>{{ "%.2f"|format(bom.total_cost) }} ج.م</strong></td>
+                    <td><strong>100%</strong></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="footer">
+        <p>تم إنشاء هذا التقرير بواسطة نظام قاتيلو لإدارة المخزون</p>
+        <p>تاريخ الطباعة: {{ bom.updated_at }}</p>
+    </div>
+</body>
+</html>

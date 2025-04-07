@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}تقارير المخزون - كاتيلو{% endblock %}
+
+{% block content %}
+<div x-data="inventoryReportsManager()">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">تقارير المخزون</h1>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold mb-4">إنشاء تقرير جديد</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- نوع التقرير -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">نوع التقرير</label>
+                <select x-model="reportType" class="w-full border rounded-lg px-3 py-2">
+                    <option value="full_inventory">تقرير المخزون الكامل</option>
+                    <option value="low_stock">العناصر منخفضة المخزون</option>
+                    <option value="transactions">سجل المعاملات</option>
+                    <option value="item_transactions">سجل المعاملات لمنتج محدد</option>
+                    <option value="warehouse_inventory">مخزون مستودع محدد</option>
+                    <option value="category_inventory">مخزون فئة محددة</option>
+                </select>
+            </div>
+            
+            <!-- صيغة التقرير -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">صيغة التقرير</label>
+                <select x-model="reportFormat" class="w-full border rounded-lg px-3 py-2">
+                    <option value="pdf">PDF</option>
+                    <option value="excel">Excel</option>
+                    <option value="csv">CSV</option>
+                </select>
+            </div>
+            
+            <!-- الفترة الزمنية - تظهر فقط لتقارير المعاملات -->
+            <template x-if="reportType === 'transactions' || reportType === 'item_transactions'">
+                <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label>
+                        <input type="date" x-model="dateFrom" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label>
+                        <input type="date" x-model="dateTo" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                </div>
+            </template>
+            
+            <!-- المستودع -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+                <select x-model="warehouseId" class="w-full border rounded-lg px-3 py-2">
+                    <option value="">كل المستودعات</option>
+                    <template x-for="warehouse in warehouses" :key="warehouse.id">
+                        <option :value="warehouse.id" x-text="warehouse.name"></option>
+                    </template>
+                </select>
+            </div>
+            
+            <!-- الفئة - لا تظهر في تقارير المعاملات لمنتج محدد -->
+            <template x-if="reportType !== 'item_transactions'">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">الفئة</label>
+                    <select x-model="categoryId" class="w-full border rounded-lg px-3 py-2"
+                            :disabled="reportType === 'warehouse_inventory' || reportType === 'category_inventory'">
+                        <option value="">كل الفئات</option>
+                        <template x-for="category in categories" :key="category.id">
+                            <option :value="category.id" x-text="category.name"></option>
+                        </template>
+                    </select>
+                </div>
+            </template>
+            
+            <!-- العنصر - يظهر فقط في تقارير المخزون الكامل والمعاملات -->
+            <template x-if="reportType === 'full_inventory' || reportType === 'transactions' || reportType === 'item_transactions'">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">العنصر</label>
+                    <select x-model="itemId" class="w-full border rounded-lg px-3 py-2"
+                            :required="reportType === 'item_transactions'">
+                        <option value="" :disabled="reportType === 'item_transactions'">
+                            <span x-text="reportType === 'item_transactions' ? 'اختر عنصرًا' : 'كل العناصر'"></span>
+                        </option>
+                        <template x-for="item in filteredItems" :key="item.id">
+                            <option :value="item.id" x-text="item.name + ' (' + item.sku + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+            </template>
+            
+            <!-- خيارات إضافية -->
+            <template x-if="reportType === 'full_inventory' || reportType === 'warehouse_inventory' || reportType === 'category_inventory'">
+                <div class="md:col-span-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="includeZeroStock" x-model="includeZeroStock" class="h-4 w-4 text-blue-600">
+                        <label for="includeZeroStock" class="mr-2 text-sm text-gray-700">تضمين العناصر بدون مخزون</label>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+        <div class="mt-6">
+            <button @click="generateReport" 
+                    :disabled="isGenerating || (reportType === 'item_transactions' && !itemId)"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50">
+                <template x-if="isGenerating">
+                    <span>جاري إنشاء التقرير...</span>
+                </template>
+                <template x-if="!isGenerating">
+                    <span>إنشاء التقرير</span>
+                </template>
+            </button>
+        </div>
+    </div>
+    
+    <!-- قائمة التقارير السابقة - يمكن إضافتها لاحقًا -->
+</div>
+
+{% block scripts %}
+<script>
+function inventoryReportsManager() {
+    return {
+        // خيارات التقرير
+        reportType: 'full_inventory',
+        reportFormat: 'pdf',
+        dateFrom: '',
+        dateTo: '',
+        warehouseId: '',
+        categoryId: '',
+        itemId: '',
+        includeZeroStock: false,
+        
+        // البيانات
+        warehouses: [],
+        categories: [],
+        items: [],
+        
+        // حالة التقرير
+        isGenerating: false,
+        
+        // التهيئة
+        async init() {
+            try {
+                // تحميل البيانات بالتوازي
+                const [warehousesData, categoriesData, itemsData] = await Promise.all([
+                    fetchAPI('/api/warehouses'),
+                    fetchAPI('/api/categories'),
+                    fetchAPI('/api/items')
+                ]);
+                
+                this.warehouses = warehousesData;
+                this.categories = categoriesData;
+                this.items = itemsData;
+            } catch (error) {
+                console.error('خطأ في تحميل البيانات:', error);
+                showNotification('حدث خطأ أثناء تحميل البيانات', 'error');
+            }
+        },
+        
+        // تصفية العناصر حسب الفئة المحددة
+        get filteredItems() {
+            if (!this.categoryId) {
+                return this.items;
+            }
+            
+            return this.items.filter(item => item.category_id == this.categoryId);
+        },
+        
+        // إنشاء التقرير
+        async generateReport() {
+            // التحقق من صحة البيانات
+            if (this.reportType === 'item_transactions' && !this.itemId) {
+                showNotification('يرجى اختيار عنصر للتقرير', 'error');
+                return;
+            }
+            
+            if (this.reportType === 'warehouse_inventory' && !this.warehouseId) {
+                showNotification('يرجى اختيار مستودع للتقرير', 'error');
+                return;
+            }
+            
+            if (this.reportType === 'category_inventory' && !this.categoryId) {
+                showNotification('يرجى اختيار فئة للتقرير', 'error');
+                return;
+            }
+            
+            // إعداد بيانات التقرير
+            const reportData = {
+                report_type: this.reportType,
+                format: this.reportFormat,
+                include_zero_stock: this.includeZeroStock
+            };
+            
+            // إضافة المعلمات الاختيارية
+            if (this.warehouseId) reportData.warehouse_id = this.warehouseId;
+            if (this.categoryId) reportData.category_id = this.categoryId;
+            if (this.itemId) reportData.item_id = this.itemId;
+            if (this.dateFrom) reportData.date_from = this.dateFrom;
+            if (this.dateTo) reportData.date_to = this.dateTo;
+            
+            this.isGenerating = true;
+            
+            try {
+                // بناء URL للتقرير
+                let url = `/api/reports/inventory/${this.reportType}?`;
+                const params = new URLSearchParams();
+                
+                for (const [key, value] of Object.entries(reportData)) {
+                    params.append(key, value);
+                }
+                
+                url += params.toString();
+                
+                // فتح التقرير في نافذة جديدة
+                window.open(url, '_blank');
+            } catch (error) {
+                console.error('خطأ في إنشاء التقرير:', error);
+                showNotification('حدث خطأ أثناء إنشاء التقرير', 'error');
+            } finally {
+                this.isGenerating = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}
+{% endblock %}
+

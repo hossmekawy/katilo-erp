@@ -10,7 +10,7 @@ db = SQLAlchemy()
 ##############################################################################
 # ENUMERATIONS
 ##############################################################################
-
+category_type_enum = SAEnum('FinalProduct', 'Packaging', 'RawMaterial', 'IntermediateProduct', name='category_type_enum')
 transaction_type_enum = SAEnum('IN', 'OUT', 'TRANSFER', name='transaction_type_enum')
 purchase_order_status_enum = SAEnum('Pending', 'Approved', 'Received', 'Cancelled', name='purchase_order_status_enum')
 sales_order_status_enum = SAEnum('Pending', 'Shipped', 'Delivered', 'Cancelled', name='sales_order_status_enum')
@@ -46,7 +46,7 @@ recurring_frequency_enum = SAEnum('Daily', 'Weekly', 'Monthly', 'Yearly', name='
 return_status_enum = SAEnum('Pending', 'Approved', 'Denied', name='return_status_enum')
 return_reason_enum = SAEnum('Defective', 'WrongItem', 'Damaged', 'Other', name='return_reason_enum')
 interaction_type_enum = SAEnum('Call', 'Email', 'Visit', 'Other', name='interaction_type_enum')
-
+packaging_status_enum = SAEnum('Pending', 'Completed', 'Cancelled', name='packaging_status_enum')
 ##############################################################################
 # CORE ENTITIES AND RELATIONSHIPS
 ##############################################################################
@@ -56,7 +56,7 @@ class Category(db.Model):
     id = db.Column('CategoryID', db.Integer, primary_key=True)
     name = db.Column('CategoryName', db.String(50), nullable=False)
     description = db.Column('Description', db.String(255))
-    
+    category_type = db.Column(category_type_enum, default='RawMaterial')
     items = db.relationship('Item', backref='category', lazy=True)
     
     def __repr__(self):
@@ -397,8 +397,11 @@ class Batch(db.Model):
     production_date = db.Column('ProductionDate', db.DateTime)
     expiry_date = db.Column('ExpiryDate', db.DateTime)
     quantity = db.Column('Quantity', db.Integer, nullable=False)
+    production_run_id = db.Column('ProductionRunID', db.Integer, 
+                                 db.ForeignKey('production_runs.ProductionRunID', name='fk_batch_production_run'))
 
     item = db.relationship('Item', backref='batches', lazy=True)
+    production_run = db.relationship('ProductionRun', backref='batches', lazy=True)
     batch_slots = db.relationship('BatchSlot', backref='batch', lazy=True)
 
     __table_args__ = (
@@ -407,6 +410,7 @@ class Batch(db.Model):
 
     def __repr__(self):
         return f"<Batch {self.id} Item {self.item_id} Lot {self.lot_number}>"
+
 
 class BatchSlot(db.Model):
     __tablename__ = 'batch_slots'
@@ -720,6 +724,38 @@ class WorkerProductivity(db.Model):
     user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('productivity_records', lazy=True))
     production_run = db.relationship('ProductionRun', backref=db.backref('productivity_records', lazy=True))
     recorder = db.relationship('User', foreign_keys=[recorded_by])
+
+class ProductPackaging(db.Model):
+    __tablename__ = 'product_packaging'
+    id = db.Column(db.Integer, primary_key=True)
+    production_run_id = db.Column(db.Integer, db.ForeignKey('production_runs.ProductionRunID'), nullable=False)
+    batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)
+    packaging_date = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(packaging_status_enum, default='Pending')
+    packaged_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    notes = db.Column(db.Text)
+    
+    # Relationships
+    production_run = db.relationship('ProductionRun', backref='packaging_records', lazy=True)
+    batch = db.relationship('Batch', backref='packaging_records', lazy=True)
+    packager = db.relationship('User', backref='packaging_records', lazy=True)
+    packaging_materials = db.relationship('PackagingMaterial', backref='packaging', lazy=True, cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f"<ProductPackaging {self.id} for Batch {self.batch_id}>"
+
+class PackagingMaterial(db.Model):
+    __tablename__ = 'packaging_materials'
+    id = db.Column(db.Integer, primary_key=True)
+    packaging_id = db.Column(db.Integer, db.ForeignKey('product_packaging.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
+    quantity_used = db.Column(db.Integer, nullable=False)
+    
+    # Relationship
+    item = db.relationship('Item', backref='used_in_packaging', lazy=True)
+    
+    def __repr__(self):
+        return f"<PackagingMaterial {self.id} Item {self.item_id} Qty {self.quantity_used}>"
 
 
 ##############################################################################

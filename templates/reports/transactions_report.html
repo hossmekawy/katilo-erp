@@ -1,0 +1,60 @@
+{% extends "reports/report_base.html" %}
+
+{% block content %}
+<div class="filters-box">
+    <div class="filters-title">معايير التقرير:</div>
+    <div class="filter-item">المستودع: {{ report.warehouse }}</div>
+    <div class="filter-item">العنصر: {{ report.item }}</div>
+    <div class="filter-item">الفترة الزمنية: {{ report.date_range }}</div>
+</div>
+
+<div class="section">
+    <h2>ملخص المعاملات</h2>
+    <div class="summary-box">
+        <div class="summary-item">
+            <span>إجمالي المعاملات:</span>
+            <span>{{ report.total_transactions }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>تفاصيل المعاملات</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>رقم المعاملة</th>
+                <th>العنصر</th>
+                <th>الرمز</th>
+                <th>المستودع</th>
+                <th>نوع المعاملة</th>
+                <th>الكمية</th>
+                <th>تاريخ المعاملة</th>
+                <th>المرجع</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for txn in report.transactions_data %}
+            <tr>
+                <td>{{ txn.transaction_id }}</td>
+                <td>{{ txn.item_name }}</td>
+                <td>{{ txn.sku }}</td>
+                <td>{{ txn.warehouse_name }}</td>
+                <td>
+                    {% if txn.transaction_type == 'IN' %}
+                        <span style="color: #059669;">وارد</span>
+                    {% elif txn.transaction_type == 'OUT' %}
+                        <span style="color: #DC2626;">صادر</span>
+                    {% else %}
+                        <span>{{ txn.transaction_type }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ txn.quantity }}</td>
+                <td>{{ txn.transaction_date }}</td>
+                <td>{{ txn.reference }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

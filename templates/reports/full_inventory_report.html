@@ -1,0 +1,69 @@
+{% extends "reports/report_base.html" %}
+
+{% block content %}
+<div class="filters-box">
+    <div class="filters-title">معايير التقرير:</div>
+    <div class="filter-item">المستودع: {{ report.warehouse }}</div>
+    <div class="filter-item">الفئة: {{ report.category }}</div>
+    <div class="filter-item">العنصر: {{ report.item }}</div>
+    <div class="filter-item">تضمين العناصر بدون مخزون: {{ "نعم" if report.include_zero_stock else "لا" }}</div>
+</div>
+
+<div class="section">
+    <h2>ملخص المخزون</h2>
+    <div class="summary-box">
+        <div class="summary-item">
+            <span>إجمالي العناصر:</span>
+            <span>{{ report.total_items }}</span>
+        </div>
+        <div class="summary-item">
+            <span>إجمالي الكمية:</span>
+            <span>{{ report.total_quantity }}</span>
+        </div>
+        <div class="summary-item">
+            <span>إجمالي القيمة:</span>
+            <span>{{ "%.2f"|format(report.total_value) }} ج.م</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>تفاصيل المخزون</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>العنصر</th>
+                <th>الرمز</th>
+                <th>الفئة</th>
+                <th>المستودع</th>
+                <th>الكمية</th>
+                <th>حد إعادة الطلب</th>
+                <th>وحدة القياس</th>
+                <th>التكلفة</th>
+                <th>إجمالي التكلفة</th>
+                <th>آخر تحديث</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tbody>
+                {% for item in report.inventory_data %}
+                <tr>
+                    <td>{{ item.item_name }}</td>
+                    <td>{{ item.sku }}</td>
+                    <td>{{ item.category_name }}</td>
+                    <td>{{ item.warehouse_name }}</td>
+                    <td {% if item.quantity <= item.reorder_level %}class="status-low"{% endif %}>
+                        {{ item.quantity }}
+                    </td>
+                    <td>{{ item.reorder_level }}</td>
+                    <td>{{ item.unit_of_measure }}</td>
+                    <td>{{ "%.2f"|format(item.cost) }}</td>
+                    <td>{{ "%.2f"|format(item.total_cost) }}</td>
+                    <td>{{ item.last_updated }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endblock %}
+    

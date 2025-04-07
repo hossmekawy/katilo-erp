@@ -171,6 +171,13 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
                                 <i class="fas fa-warehouse"></i>
                                 <span>إدارة المستودعات</span>
                             </a>
+                            {% if current_user.role and current_user.role.name == 'admin' %}
+                            <a href="/inventory-reports" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/inventory-reports' %}active{% endif %}">
+                                <i class="fas fa-file-alt"></i>
+                                <span>التقارير</span>
+                            </a>
+                            {% endif %}
+                        
                         </div>
                     </div>
                     
@@ -201,7 +208,7 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
                     </div>
                     <!-- Add this inside the sidebar navigation, after the Products Management Section -->
 <!-- Production Management Section -->
-<div x-data="{ open: {{ 'true' if request.path in ['/production-management', '/production-scheduling', '/cheese-recipes', '/batch-tracking', '/aging-monitoring', '/worker-productivity', '/production-processes', '/bom-management'] else 'false' }} }">
+<div x-data="{ open: {{ 'true' if request.path in ['/production-management', '/production-scheduling', '/cheese-recipes', '/batch-tracking', '/aging-monitoring', '/worker-productivity', '/production-processes', '/bom-management', '/product-packaging'] else 'false' }} }">
     <button @click="open = !open" class="sidebar-item w-full text-left py-2.5 px-4 rounded-lg flex items-center justify-between">
         <div class="flex items-center">
             <i class="fas fa-industry"></i>
@@ -242,6 +249,11 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
         <a href="/worker-productivity" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/worker-productivity' %}active{% endif %}">
             <i class="fas fa-user-clock"></i>
             <span>إنتاجية العمال</span>
+        </a>
+
+        <a href="/packaging-management" class="sidebar-item block py-2 px-4 rounded-lg {% if request.path == '/packaging-management' %}active{% endif %}">
+            <i class="fas fa-box"></i>
+            <span>تعبئة المنتجات</span>
         </a>
     </div>
 </div>
@@ -354,11 +366,13 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
                 <div class="flex items-center justify-between px-4 py-3">
                     {% if current_user.is_authenticated %}
                     <!-- Hamburger Menu -->
-                    <button class="md:hidden text-gray-700 hover:text-blue-600 transition-colors"
+                    <button class="md:hidden text-gray-700 hover:text-blue-600 transition-colors hamburger-btn"
                             x-data="{ open: false }"
                             @click="open = !open; document.querySelector('.mobile-menu').classList.toggle('show')"
-                            aria-label="فتح القائمة">
-                        <i class="fas fa-bars text-xl"></i>
+                            :aria-expanded="open"
+                            aria-label="فتح/إغلاق القائمة">
+                        <i class="fas fa-bars text-xl" x-show="!open"></i>
+                        <i class="fas fa-times text-xl" x-show="open"></i>
                     </button>
                     
                     <!-- Page Title (visible on mobile) -->
@@ -676,6 +690,10 @@ aside nav.overflow-y-auto::-webkit-scrollbar,
     
                 </div>
             </div>
+            <div x-show="document.querySelector('.mobile-menu').classList.contains('show')"
+     @click="document.querySelector('.mobile-menu').classList.remove('show')"
+     class="fixed inset-0 bg-black/20 md:hidden z-40"
+     x-cloak></div>
             {% endif %}
 
             <!-- Page Content Container -->

@@ -1,7 +1,9 @@
-from flask import Blueprint, request, jsonify, render_template, abort, current_app
+from flask import Blueprint, request, jsonify, render_template, abort, current_app , send_file
 from flask_login import current_user, login_required
 from models import db, BOM, BOMDetail, Item, Inventory, InventoryTransaction, Warehouse, Category
-
+import os
+import tempfile
+import subprocess
 # Create a Blueprint for BOM routes
 bom_bp = Blueprint('bom', __name__)
 
@@ -22,6 +24,7 @@ def get_boms():
             'final_product_name': final_product.name if final_product else 'Unknown Product',
             'final_product_category_id': final_product.category_id if final_product else None,
             'final_product_category_name': final_product_category.name if final_product_category else 'Uncategorized',
+            'final_product_category_type': final_product_category.category_type if final_product_category else None,
             'description': bom.description,
             'created_at': bom.created_at.isoformat(),
             'updated_at': bom.updated_at.isoformat()
@@ -38,6 +41,10 @@ def get_bom(id):
     # Get all details for this BOM
     details = []
     total_cost = 0
+    
+    # Track costs by individual component
+    component_costs = []
+    
     for detail in bom.details:
         component = Item.query.get(detail.component_item_id)
         component_category = Category.query.get(component.category_id) if component and component.category_id else None
@@ -45,6 +52,14 @@ def get_bom(id):
         # Calculate component cost
         component_cost = component.cost * detail.quantity_required if component else 0
         total_cost += component_cost
+        
+        # Add to component costs list
+        component_costs.append({
+            'component_id': detail.component_item_id,
+            'component_name': component.name if component else 'Unknown Component',
+            'cost': component_cost,
+            'percentage': 0  # Will calculate after we have total
+        })
         
         details.append({
             'id': detail.id,
@@ -58,13 +73,20 @@ def get_bom(id):
             'total_component_cost': component_cost
         })
     
+    # Calculate percentages for component costs
+    if total_cost > 0:
+        for cost_item in component_costs:
+            cost_item['percentage'] = (cost_item['cost'] / total_cost * 100)
+    
+    # Sort component costs by percentage (descending)
+    component_costs.sort(key=lambda x: x['percentage'], reverse=True)
+    
     # Calculate selling price and profit
     selling_price = final_product.price if final_product else 0
     profit = selling_price - total_cost
     profit_margin = (profit / selling_price * 100) if selling_price > 0 else 0
     
     # Count how many times this BOM has been produced
-    # We'll count the number of "IN" transactions for the final product with reference "Production from BOM"
     production_count = 0
     if final_product:
         production_count = InventoryTransaction.query.filter_by(
@@ -87,7 +109,8 @@ def get_bom(id):
         'selling_price': selling_price,
         'profit': profit,
         'profit_margin': profit_margin,
-        'production_count': production_count
+        'production_count': production_count,
+        'component_costs': component_costs  # New field with component-based cost breakdown
     })
 
 
@@ -101,11 +124,15 @@ def get_item_categories():
     categorized_items = {}
     for item in items:
         category_name = item.category.name if item.category else "Uncategorized"
+        category_type = item.category.category_type if item.category else None
         
         if category_name not in categorized_items:
-            categorized_items[category_name] = []
+            categorized_items[category_name] = {
+                'items': [],
+                'category_type': category_type
+            }
             
-        categorized_items[category_name].append({
+        categorized_items[category_name]['items'].append({
             'id': item.id,
             'name': item.name,
             'sku': item.sku,
@@ -117,10 +144,107 @@ def get_item_categories():
     result = [
         {
             'category_name': category,
-            'items': items
+            'category_type': data['category_type'],
+            'items': data['items']
         }
-        for category, items in categorized_items.items()
+        for category, data in categorized_items.items()
     ]
+    
+    return jsonify(result)
+
+@bom_bp.route('/api/bom/final-products', methods=['GET'])
+@login_required
+def get_final_products():
+    """Get only items categorized as final products"""
+    # Join Item with Category and filter by category_type
+    items = Item.query.all()
+    
+    # Filter for final products based on category type
+    final_products = []
+    for item in items:
+        category = Category.query.get(item.category_id) if item.category_id else None
+        if category and hasattr(category, 'category_type') and category.category_type == 'FinalProduct':
+            final_products.append(item)
+    
+    # If no final products found, return all items as fallback
+    if not final_products:
+        final_products = items
+    
+    result = [{
+        'id': item.id,
+        'name': item.name,
+        'sku': item.sku,
+        'category_id': item.category_id,
+        'category_name': item.category.name if item.category else 'Uncategorized'
+    } for item in final_products]
+    
+    return jsonify(result)
+
+@bom_bp.route('/api/bom/raw-materials', methods=['GET'])
+@login_required
+def get_raw_materials():
+    """Get only items categorized as raw materials"""
+    # Join Item with Category and filter by category_type
+    raw_materials = Item.query.join(
+        Category, 
+        Item.category_id == Category.id
+    ).filter(
+        Category.category_type == 'RawMaterial'
+    ).all()
+    
+    result = [{
+        'id': item.id,
+        'name': item.name,
+        'sku': item.sku,
+        'category_id': item.category_id,
+        'category_name': item.category.name if item.category else 'Uncategorized'
+    } for item in raw_materials]
+    
+    return jsonify(result)
+
+@bom_bp.route('/api/bom/packaging-materials', methods=['GET'])
+@login_required
+def get_packaging_materials():
+    """Get only items categorized as packaging materials"""
+    # Join Item with Category and filter by category_type
+    packaging_materials = Item.query.join(
+        Category, 
+        Item.category_id == Category.id
+    ).filter(
+        Category.category_type == 'Packaging'
+    ).all()
+    
+    result = [{
+        'id': item.id,
+        'name': item.name,
+        'sku': item.sku,
+        'category_id': item.category_id,
+        'category_name': item.category.name if item.category else 'Uncategorized'
+    } for item in packaging_materials]
+    
+    return jsonify(result)
+
+@bom_bp.route('/api/bom/intermediate-products', methods=['GET'])
+@login_required
+def get_intermediate_products():
+    """Get only items categorized as intermediate products"""
+    # Join Item with Category and filter by category_type
+    items = Item.query.all()
+    
+    # Filter for intermediate products based on category type
+    intermediate_products = []
+    for item in items:
+        category = Category.query.get(item.category_id) if item.category_id else None
+        if category and hasattr(category, 'category_type') and category.category_type == 'IntermediateProduct':
+            intermediate_products.append(item)
+    
+    result = [{
+        'id': item.id,
+        'name': item.name,
+        'sku': item.sku,
+        'category_id': item.category_id,
+        'category_name': item.category.name if item.category else 'Uncategorized'
+    } for item in intermediate_products]
     
     return jsonify(result)
 
@@ -138,6 +262,11 @@ def create_bom():
     if not final_product:
         return jsonify({'message': 'Final product not found'}), 404
    
+    # Check if the item is categorized as a final product
+    if final_product.category and hasattr(final_product.category, 'category_type'):
+        if final_product.category.category_type != 'FinalProduct' and final_product.category.category_type != 'IntermediateProduct':
+            return jsonify({'message': 'Selected item must be categorized as a final product or intermediate product'}), 400
+   
     # Check if a BOM already exists for this product
     existing_bom = BOM.query.filter_by(final_product_id=data['final_product_id']).first()
     if existing_bom:
@@ -152,6 +281,10 @@ def create_bom():
     db.session.add(bom)
     db.session.commit()
     
+    # Initialize the cost calculation (will be 0 since no components yet)
+    update_item_cost_from_bom(bom.id)
+
+    
     # Get category information for response
     final_product_category = Category.query.get(final_product.category_id) if final_product.category_id else None
    
@@ -161,6 +294,7 @@ def create_bom():
         'final_product_name': final_product.name,
         'final_product_category_id': final_product.category_id,
         'final_product_category_name': final_product_category.name if final_product_category else 'Uncategorized',
+        'final_product_category_type': final_product_category.category_type if final_product_category else None,
         'description': bom.description,
         'created_at': bom.created_at.isoformat(),
         'updated_at': bom.updated_at.isoformat()
@@ -182,6 +316,11 @@ def update_bom(id):
         final_product = Item.query.get(data['final_product_id'])
         if not final_product:
             return jsonify({'message': 'Final product not found'}), 404
+        
+        # Check if the item is categorized as a final product
+        if final_product.category and hasattr(final_product.category, 'category_type'):
+            if final_product.category.category_type != 'FinalProduct' and final_product.category.category_type != 'IntermediateProduct':
+                return jsonify({'message': 'Selected item must be categorized as a final product or intermediate product'}), 400
        
         # Check if another BOM already uses this product
         existing_bom = BOM.query.filter_by(final_product_id=data['final_product_id']).first()
@@ -192,6 +331,8 @@ def update_bom(id):
    
     db.session.commit()
     
+    update_item_cost_from_bom(id)
+
     # Get updated product and category information
     final_product = Item.query.get(bom.final_product_id)
     final_product_category = Category.query.get(final_product.category_id) if final_product and final_product.category_id else None
@@ -202,6 +343,7 @@ def update_bom(id):
         'final_product_name': final_product.name if final_product else 'Unknown Product',
         'final_product_category_id': final_product.category_id if final_product else None,
         'final_product_category_name': final_product_category.name if final_product_category else 'Uncategorized',
+        'final_product_category_type': final_product_category.category_type if final_product_category else None,
         'description': bom.description,
         'updated_at': bom.updated_at.isoformat()
     })
@@ -241,6 +383,7 @@ def get_bom_details(bom_id):
             'component_name': component.name if component else 'Unknown Component',
             'component_category_id': component.category_id if component else None,
             'component_category_name': component_category.name if component_category else 'Uncategorized',
+            'component_category_type': component_category.category_type if component_category else None,
             'quantity_required': detail.quantity_required,
             'unit_of_measure': detail.unit_of_measure
         })
@@ -268,6 +411,14 @@ def add_bom_detail(bom_id):
     if component.id == bom.final_product_id:
         return jsonify({'message': 'Component cannot be the same as the final product'}), 400
    
+    # Check if component is a valid type (raw material, packaging, or intermediate product)
+    if component.category and hasattr(component.category, 'category_type'):
+        valid_component_types = ['RawMaterial', 'Packaging', 'IntermediateProduct']
+        if component.category.category_type not in valid_component_types:
+            return jsonify({
+                'message': f'Component must be categorized as one of: {", ".join(valid_component_types)}'
+            }), 400
+   
     # Check if component already exists in this BOM
     existing_detail = BOMDetail.query.filter_by(
         bom_id=bom_id,
@@ -288,9 +439,12 @@ def add_bom_detail(bom_id):
     db.session.add(detail)
     db.session.commit()
     
+    # Update the final product's cost based on the BOM
+    update_item_cost_from_bom(bom_id)
+    
     # Get category information for response
     component_category = Category.query.get(component.category_id) if component.category_id else None
-   
+       
     return jsonify({
         'id': detail.id,
         'bom_id': detail.bom_id,
@@ -298,6 +452,7 @@ def add_bom_detail(bom_id):
         'component_name': component.name,
         'component_category_id': component.category_id,
         'component_category_name': component_category.name if component_category else 'Uncategorized',
+        'component_category_type': component_category.category_type if component_category else None,
         'quantity_required': detail.quantity_required,
         'unit_of_measure': detail.unit_of_measure
     }), 201
@@ -328,6 +483,14 @@ def update_bom_detail(detail_id):
         if component.id == bom.final_product_id:
             return jsonify({'message': 'Component cannot be the same as the final product'}), 400
        
+        # Check if component is a valid type (raw material, packaging, or intermediate product)
+        if component.category and hasattr(component.category, 'category_type'):
+            valid_component_types = ['RawMaterial', 'Packaging', 'IntermediateProduct']
+            if component.category.category_type not in valid_component_types:
+                return jsonify({
+                    'message': f'Component must be categorized as one of: {", ".join(valid_component_types)}'
+                }), 400
+       
         # Check if component already exists in this BOM
         existing_detail = BOMDetail.query.filter_by(
             bom_id=detail.bom_id,
@@ -340,7 +503,7 @@ def update_bom_detail(detail_id):
         detail.component_item_id = data['component_item_id']
    
     db.session.commit()
-   
+    update_item_cost_from_bom(detail.bom_id)
     component = Item.query.get(detail.component_item_id)
     component_category = Category.query.get(component.category_id) if component and component.category_id else None
    
@@ -351,6 +514,7 @@ def update_bom_detail(detail_id):
         'component_name': component.name if component else 'Unknown Component',
         'component_category_id': component.category_id if component else None,
         'component_category_name': component_category.name if component_category else 'Uncategorized',
+        'component_category_type': component_category.category_type if component_category else None,
         'quantity_required': detail.quantity_required,
         'unit_of_measure': detail.unit_of_measure
     })
@@ -361,7 +525,8 @@ def delete_bom_detail(detail_id):
     detail = BOMDetail.query.get_or_404(detail_id)
     db.session.delete(detail)
     db.session.commit()
-   
+    update_item_cost_from_bom(detail.bom_id)
+    
     return '', 204
 
 # Production from BOM endpoint
@@ -374,7 +539,9 @@ def produce_from_bom(bom_id):
     # Validate required fields
     if 'quantity' not in data or not data.get('warehouse_id'):
         return jsonify({'message': 'Missing required fields: quantity or warehouse_id'}), 400
-   
+    
+    if not bom.details or len(bom.details) == 0:
+        return jsonify({'message': 'لا يمكن الإنتاج من قائمة مواد فارغة. لا توجد مكونات محددة.'}), 400
     quantity = int(data['quantity'])
     warehouse_id = data['warehouse_id']
    
@@ -389,6 +556,8 @@ def produce_from_bom(bom_id):
    
     # Get all components needed for production
     components_needed = []
+    total_cost = 0  # Track the total cost of components
+    
     for detail in bom.details:
         component = Item.query.get(detail.component_item_id)
         if not component:
@@ -396,6 +565,10 @@ def produce_from_bom(bom_id):
        
         # Calculate required quantity
         required_qty = detail.quantity_required * quantity
+        
+        # Calculate component cost
+        component_cost = component.cost * detail.quantity_required
+        total_cost += component_cost
        
         # Check if enough inventory is available
         inventory = Inventory.query.filter_by(
@@ -412,7 +585,8 @@ def produce_from_bom(bom_id):
                 'component': {
                     'id': component.id,
                     'name': component.name,
-                    'category': component_category.name if component_category else 'Uncategorized'
+                    'category': component_category.name if component_category else 'Uncategorized',
+                    'category_type': component_category.category_type if component_category else None
                 },
                 'required': required_qty,
                 'available': available_qty,
@@ -471,6 +645,12 @@ def produce_from_bom(bom_id):
             reference='Production from BOM'
         )
         db.session.add(transaction)
+        
+        # Update the final product's cost with the calculated total cost
+        final_product = Item.query.get(bom.final_product_id)
+        if final_product:
+            final_product.cost = total_cost
+            db.session.commit()
        
         db.session.commit()
         
@@ -485,13 +665,40 @@ def produce_from_bom(bom_id):
                 'item_id': bom.final_product_id,
                 'item_name': final_product.name if final_product else 'Unknown Product',
                 'category': final_product_category.name if final_product_category else 'Uncategorized',
-                'quantity_produced': quantity
+                'category_type': final_product_category.category_type if final_product_category else None,
+                'quantity_produced': quantity,
+                'updated_cost': total_cost  # Include the updated cost in the response
             }
         })
        
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Error during production: {str(e)}'}), 500
+
+
+def update_item_cost_from_bom(bom_id):
+    """Helper function to update an item's cost based on its BOM"""
+    bom = BOM.query.get(bom_id)
+    if not bom:
+        return False
+    
+    # Calculate total cost from BOM components
+    total_cost = 0
+    for detail in bom.details:
+        component = Item.query.get(detail.component_item_id)
+        if component:
+            component_cost = component.cost * detail.quantity_required
+            total_cost += component_cost
+    
+    # Update the final product's cost
+    final_product = Item.query.get(bom.final_product_id)
+    if final_product:
+        final_product.cost = total_cost
+        db.session.commit()
+        return True
+    
+    return False
+
 
 @bom_bp.route('/api/bom/<int:bom_id>/check-availability', methods=['POST'])
 @login_required
@@ -545,6 +752,7 @@ def check_bom_availability(bom_id):
             'component_id': detail.component_item_id,
             'component_name': component.name,
             'component_category': component_category.name if component_category else 'Uncategorized',
+            'component_category_type': component_category.category_type if component_category else None,
             'required_quantity': required_qty,
             'available_quantity': available_qty,
             'unit_of_measure': detail.unit_of_measure,
@@ -571,9 +779,6 @@ def calculate_bom_cost(bom_id):
     # Calculate component costs
     component_costs = []
     total_cost = 0
-    
-    # Group components by category for cost analysis
-    category_costs = {}
    
     for detail in bom.details:
         component = Item.query.get(detail.component_item_id)
@@ -586,11 +791,6 @@ def calculate_bom_cost(bom_id):
         component_cost = component.cost * detail.quantity_required
         total_cost += component_cost
         
-        # Add to category costs
-        if category_name not in category_costs:
-            category_costs[category_name] = 0
-        category_costs[category_name] += component_cost
-       
         component_costs.append({
             'component_id': detail.component_item_id,
             'component_name': component.name,
@@ -605,11 +805,19 @@ def calculate_bom_cost(bom_id):
     profit = selling_price - total_cost
     profit_margin = (profit / selling_price * 100) if selling_price > 0 else 0
     
-    # Format category costs for response
-    category_cost_breakdown = [
-        {'category': category, 'cost': cost, 'percentage': (cost / total_cost * 100) if total_cost > 0 else 0}
-        for category, cost in category_costs.items()
-    ]
+    # Calculate component cost percentages
+    component_cost_breakdown = []
+    for component in component_costs:
+        percentage = (component['total_cost'] / total_cost * 100) if total_cost > 0 else 0
+        component_cost_breakdown.append({
+            'component_id': component['component_id'],
+            'component_name': component['component_name'],
+            'cost': component['total_cost'],
+            'percentage': percentage
+        })
+    
+    # Sort by percentage (descending)
+    component_cost_breakdown.sort(key=lambda x: x['percentage'], reverse=True)
    
     return jsonify({
         'final_product': {
@@ -619,7 +827,7 @@ def calculate_bom_cost(bom_id):
             'selling_price': selling_price
         },
         'components': component_costs,
-        'category_breakdown': category_cost_breakdown,
+        'component_cost_breakdown': component_cost_breakdown,
         'total_cost': total_cost,
         'profit': profit,
         'profit_margin': profit_margin
@@ -633,17 +841,25 @@ def get_components_by_category():
     categories = Category.query.all()
     
     # Create a dictionary of categories
-    category_dict = {category.id: category.name for category in categories}
+    category_dict = {category.id: {
+        'name': category.name,
+        'type': category.category_type if hasattr(category, 'category_type') else None
+    } for category in categories}
     
     # Group items by category
     categorized_items = {}
     for item in items:
-        category_name = category_dict.get(item.category_id, 'Uncategorized')
+        category_info = category_dict.get(item.category_id, {'name': 'Uncategorized', 'type': None})
+        category_name = category_info['name']
+        category_type = category_info['type']
         
         if category_name not in categorized_items:
-            categorized_items[category_name] = []
+            categorized_items[category_name] = {
+                'items': [],
+                'category_type': category_type
+            }
             
-        categorized_items[category_name].append({
+        categorized_items[category_name]['items'].append({
             'id': item.id,
             'name': item.name,
             'sku': item.sku,
@@ -653,14 +869,61 @@ def get_components_by_category():
     
     # Convert to list format for the frontend
     result = []
-    for category_name, items in categorized_items.items():
+    for category_name, data in categorized_items.items():
         result.append({
             'category_name': category_name,
-            'items': sorted(items, key=lambda x: x['name'])
+            'category_type': data['category_type'],
+            'items': sorted(data['items'], key=lambda x: x['name'])
         })
     
     # Sort categories alphabetically
     result.sort(key=lambda x: x['category_name'])
+    
+    return jsonify(result)
+
+@bom_bp.route('/api/bom/components-by-type', methods=['GET'])
+@login_required
+def get_components_by_type():
+    """Get all potential components grouped by type"""
+    items = Item.query.all()
+    categories = Category.query.all()
+    
+    # Create a dictionary of categories with their types
+    category_dict = {}
+    for category in categories:
+        # Use category_type instead of type
+        category_type = category.category_type if hasattr(category, 'category_type') else 'Unknown'
+        category_dict[category.id] = {
+            'name': category.name,
+            'type': category_type
+        }
+    
+    # Group items by category type
+    categorized_items = {
+        'RawMaterial': {'category_type': 'RawMaterial', 'items': []},
+        'IntermediateProduct': {'category_type': 'IntermediateProduct', 'items': []},
+        'FinalProduct': {'category_type': 'FinalProduct', 'items': []},
+        'Packaging': {'category_type': 'Packaging', 'items': []},
+        'Unknown': {'category_type': 'Unknown', 'items': []}
+    }
+    
+    for item in items:
+        category_info = category_dict.get(item.category_id, {'name': 'Uncategorized', 'type': 'Unknown'})
+        category_type = category_info['type']
+        
+        if category_type not in categorized_items:
+            categorized_items[category_type] = {'category_type': category_type, 'items': []}
+            
+        categorized_items[category_type]['items'].append({
+            'id': item.id,
+            'name': item.name,
+            'sku': item.sku,
+            'unit_of_measure': item.unit_of_measure,
+            'cost': item.cost
+        })
+    
+    # Convert to list format for the frontend
+    result = [value for key, value in categorized_items.items() if value['items']]
     
     return jsonify(result)
 
@@ -670,3 +933,193 @@ def get_components_by_category():
 def bom_management_page():
     return render_template('bom_management.html')
 
+
+def generate_pdf(html_content, output_path=None):
+    """Generate a PDF from HTML content using wkhtmltopdf"""
+    # Path to wkhtmltopdf executable
+    wkhtmltopdf_path = 'pdftool\\wkhtmltopdf\\bin\\wkhtmltopdf.exe'
+    
+    # If no output path specified, create a temporary file
+    if not output_path:
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+        output_path = temp_file.name
+        temp_file.close()
+    
+    # Create a temporary HTML file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.html', mode='w', encoding='utf-8') as f:
+        f.write(html_content)
+        html_path = f.name
+    
+    try:
+        # Run wkhtmltopdf to generate PDF
+        subprocess.run([
+            wkhtmltopdf_path,
+            '--encoding', 'utf-8',
+            '--margin-top', '10mm',
+            '--margin-right', '10mm',
+            '--margin-bottom', '10mm',
+            '--margin-left', '10mm',
+            '--page-size', 'A4',
+            '--enable-local-file-access',
+            html_path,
+            output_path
+        ], check=True)
+        
+        # Remove temporary HTML file
+        os.unlink(html_path)
+        
+        return output_path
+    except Exception as e:
+        # Clean up temporary files in case of error
+        if os.path.exists(html_path):
+            os.unlink(html_path)
+        if os.path.exists(output_path):
+            os.unlink(output_path)
+        raise e
+
+@bom_bp.route('/api/bom/<int:bom_id>/pdf', methods=['GET'])
+@login_required
+def generate_bom_pdf(bom_id):
+    """Generate a PDF report for a BOM"""
+    bom = BOM.query.get_or_404(bom_id)
+    final_product = Item.query.get(bom.final_product_id)
+    final_product_category = Category.query.get(final_product.category_id) if final_product and final_product.category_id else None
+    
+    # Get all details for this BOM
+    details = []
+    total_cost = 0
+    
+    # Track costs by individual component
+    component_costs = []
+    
+    for detail in bom.details:
+        component = Item.query.get(detail.component_item_id)
+        component_category = Category.query.get(component.category_id) if component and component.category_id else None
+        
+        # Calculate component cost
+        component_cost = component.cost * detail.quantity_required if component else 0
+        total_cost += component_cost
+        
+        # Add to component costs list
+        component_costs.append({
+            'component_id': detail.component_item_id,
+            'component_name': component.name if component else 'Unknown Component',
+            'cost': component_cost,
+            'percentage': 0  # Will calculate after we have total
+        })
+        
+        details.append({
+            'id': detail.id,
+            'component_item_id': detail.component_item_id,
+            'component_name': component.name if component else 'Unknown Component',
+            'component_category_id': component.category_id if component else None,
+            'component_category_name': component_category.name if component_category else 'Uncategorized',
+            'component_category_type': getattr(component_category, 'category_type', 'Unknown') if component_category else 'Unknown',
+            'quantity_required': detail.quantity_required,
+            'unit_of_measure': detail.unit_of_measure,
+            'component_cost': component.cost if component else 0,
+            'total_component_cost': component_cost
+        })
+    
+    # Calculate percentages for component costs
+    if total_cost > 0:
+        for cost_item in component_costs:
+            cost_item['percentage'] = (cost_item['cost'] / total_cost * 100)
+    
+    # Sort component costs by percentage (descending)
+    component_costs.sort(key=lambda x: x['percentage'], reverse=True)
+    
+    # Calculate selling price and profit
+    selling_price = final_product.price if final_product else 0
+    profit = selling_price - total_cost
+    profit_margin = (profit / selling_price * 100) if selling_price > 0 else 0
+    
+    # Prepare data for the PDF template
+    bom_data = {
+        'id': bom.id,
+        'final_product_id': bom.final_product_id,
+        'final_product_name': final_product.name if final_product else 'Unknown Product',
+        'final_product_category_name': final_product_category.name if final_product_category else 'Uncategorized',
+        'final_product_category_type': getattr(final_product_category, 'category_type', 'Unknown') if final_product_category else 'Unknown',
+        'description': bom.description,
+        'created_at': bom.created_at.strftime('%Y-%m-%d'),
+        'updated_at': bom.updated_at.strftime('%Y-%m-%d'),
+        'details': details,
+        'total_cost': total_cost,
+        'selling_price': selling_price,
+        'profit': profit,
+        'profit_margin': profit_margin,
+        'component_costs': component_costs
+    }
+    
+    # Render the PDF template
+    html_content = render_template('bom_pdf_template.html', bom=bom_data)
+    
+    # Generate the PDF
+    try:
+        pdf_path = generate_pdf(html_content)
+        
+        # Send the PDF file
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=f'BOM-{bom.id}-{final_product.name if final_product else "report"}.pdf',
+            mimetype='application/pdf'
+        )
+    except Exception as e:
+        return jsonify({'message': f'Error generating PDF: {str(e)}'}), 500
+    
+@bom_bp.route('/api/bom/<int:bom_id>/simple-pdf', methods=['GET'])
+@login_required
+def generate_simple_bom_pdf(bom_id):
+    """Generate a simplified PDF report for a BOM (without cost summary)"""
+    bom = BOM.query.get_or_404(bom_id)
+    final_product = Item.query.get(bom.final_product_id)
+    final_product_category = Category.query.get(final_product.category_id) if final_product and final_product.category_id else None
+    
+    # Get all details for this BOM
+    details = []
+    
+    for detail in bom.details:
+        component = Item.query.get(detail.component_item_id)
+        component_category = Category.query.get(component.category_id) if component and component.category_id else None
+        
+        details.append({
+            'id': detail.id,
+            'component_item_id': detail.component_item_id,
+            'component_name': component.name if component else 'Unknown Component',
+            'component_category_name': component_category.name if component_category else 'Uncategorized',
+            'component_category_type': getattr(component_category, 'category_type', 'Unknown') if component_category else 'Unknown',
+            'quantity_required': detail.quantity_required,
+            'unit_of_measure': detail.unit_of_measure
+        })
+    
+    # Prepare data for the PDF template
+    bom_data = {
+        'id': bom.id,
+        'final_product_id': bom.final_product_id,
+        'final_product_name': final_product.name if final_product else 'Unknown Product',
+        'final_product_category_name': final_product_category.name if final_product_category else 'Uncategorized',
+        'final_product_category_type': getattr(final_product_category, 'category_type', 'Unknown') if final_product_category else 'Unknown',
+        'description': bom.description,
+        'created_at': bom.created_at.strftime('%Y-%m-%d'),
+        'updated_at': bom.updated_at.strftime('%Y-%m-%d'),
+        'details': details
+    }
+    
+    # Render the PDF template
+    html_content = render_template('bom_simple_pdf_template.html', bom=bom_data)
+    
+    # Generate the PDF
+    try:
+        pdf_path = generate_pdf(html_content)
+        
+        # Send the PDF file
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=f'BOM-Simple-{bom.id}-{final_product.name if final_product else "report"}.pdf',
+            mimetype='application/pdf'
+        )
+    except Exception as e:
+        return jsonify({'message': f'Error generating PDF: {str(e)}'}), 500

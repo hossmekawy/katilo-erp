@@ -19,13 +19,13 @@
     Customer
     SalesOrder
     SalesOrderDetail
-# LOT/BATCH TRACKING AND EXPIRY MANAGEMENT
-    Batch
-    BatchSlot
+# ✅LOT/BATCH TRACKING AND EXPIRY MANAGEMENT
+    ✅Batch
+    ✅BatchSlot
 # QUALITY CONTROL (QC) & INSPECTIONS
-    QualityCheck
-    QualityCheckResult
-    QCParameter
+    ✅QualityCheck
+    ✅QualityCheckResult
+    ✅QCParameter
 # EQUIPMENT & MAINTENANCE
     Equipment
     MaintenanceLog
@@ -35,8 +35,8 @@
      ✅Permission --->  ✅RolePermission
 # DOCUMENT MANAGEMENT
     Document 
-# PRODUCTION PLANNING & SCHEDULING
-    ProductionRun ---> ProductionRunDetail
+# ✅PRODUCTION PLANNING & SCHEDULING
+    ✅ProductionRun ---> ✅ProductionRunDetail
 
 # SYSTEM SETTINGS, ROLES, AND USER MANAGEMENT
     SystemSettings

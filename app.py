@@ -1,4 +1,7 @@
-from flask import Flask, request, jsonify, session, redirect, render_template
+from io import BytesIO
+from flask import Flask, request, jsonify, session, redirect, render_template,send_file
+from datetime import datetime
+import json
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from sqlalchemy import inspect
 from werkzeug.security import generate_password_hash
@@ -10,11 +13,13 @@ from routes.supplier_accounts import supplier_accounts_bp
 from routes.warehouse_routes import warehouse_bp
 from routes.profile_routes import profile_bp
 from routes.quality_control import quality_bp
-from routes.production_routes import production_bp
+# from routes.production_routes import production_bp
 from routes.chatbot_routes import chatbot_bp 
 from flask_migrate import Migrate
 from dotenv import load_dotenv
 import os 
+import tempfile
+import subprocess
 import socket
 import webbrowser
 import urllib.request
@@ -32,7 +37,7 @@ from models import (
     BOM, BOMDetail,
     
     # Supplier Management
-    Supplier, SupplierItem,SupplierLedgerEntry,SupplierPayment,
+    Supplier, SupplierItem, SupplierLedgerEntry, SupplierPayment,
     
     # Purchase Orders
     PurchaseOrder, PurchaseOrderDetail,
@@ -60,6 +65,9 @@ from models import (
     
     # Production Planning
     ProductionRun, ProductionRunDetail,
+    
+    # Packaging
+    ProductPackaging, PackagingMaterial,
     
     # Advanced Features
     DemandForecast,
@@ -102,7 +110,7 @@ app.register_blueprint(supplier_accounts_bp)
 app.register_blueprint(warehouse_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(quality_bp)
-app.register_blueprint(production_bp)
+# app.register_blueprint(production_bp)
 app.register_blueprint(chatbot_bp)
 # Create database tables
 
@@ -554,16 +562,30 @@ def remove_permission_from_role(role_id, permission_id):
 @login_required
 def get_categories():
     categories = Category.query.all()
-    return jsonify([{'id': c.id, 'name': c.name, 'description': c.description} for c in categories])
+    return jsonify([{
+        'id': c.id, 
+        'name': c.name, 
+        'description': c.description,
+        'category_type': c.category_type
+    } for c in categories])
 
 @app.route('/api/categories', methods=['POST'])
 @login_required
 def create_category():
     data = request.get_json()
-    category = Category(name=data['name'], description=data.get('description'))
+    category = Category(
+        name=data['name'], 
+        description=data.get('description'),
+        category_type=data.get('category_type', 'RawMaterial')  # Default to RawMaterial if not specified
+    )
     db.session.add(category)
     db.session.commit()
-    return jsonify({'id': category.id, 'name': category.name, 'description': category.description}), 201
+    return jsonify({
+        'id': category.id, 
+        'name': category.name, 
+        'description': category.description,
+        'category_type': category.category_type
+    }), 201
 
 @app.route('/api/categories/<int:id>', methods=['PUT'])
 @login_required
@@ -572,9 +594,15 @@ def update_category(id):
     data = request.get_json()
     category.name = data.get('name', category.name)
     category.description = data.get('description', category.description)
+    category.category_type = data.get('category_type', category.category_type)
     db.session.commit()
-    return jsonify({'id': category.id, 'name': category.name, 'description': category.description})
-
+    return jsonify({
+        'id': category.id, 
+        'name': category.name, 
+        'description': category.description,
+        'category_type': category.category_type
+    })
+    
 @app.route('/api/categories/<int:id>', methods=['DELETE'])
 @login_required
 def delete_category(id):
@@ -805,6 +833,975 @@ def get_recent_transactions():
     return jsonify(result)
 
 
+def generate_pdf(html_content, output_path=None):
+    """Generate a PDF from HTML content using wkhtmltopdf"""
+    # Path to wkhtmltopdf executable
+    wkhtmltopdf_path = 'pdftool\\wkhtmltopdf\\bin\\wkhtmltopdf.exe'
+    
+    # If no output path specified, create a temporary file
+    if not output_path:
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+        output_path = temp_file.name
+        temp_file.close()
+    
+    # Create a temporary HTML file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.html', mode='w', encoding='utf-8') as f:
+        f.write(html_content)
+        html_path = f.name
+    
+    try:
+        # Run wkhtmltopdf to generate PDF
+        subprocess.run([
+            wkhtmltopdf_path,
+            '--encoding', 'utf-8',
+            '--margin-top', '10mm',
+            '--margin-right', '10mm',
+            '--margin-bottom', '10mm',
+            '--margin-left', '10mm',
+            '--page-size', 'A4',
+            '--enable-local-file-access',
+            html_path,
+            output_path
+        ], check=True)
+        
+        # Remove temporary HTML file
+        os.unlink(html_path)
+        
+        return output_path
+    except Exception as e:
+        # Clean up temporary files in case of error
+        if os.path.exists(html_path):
+            os.unlink(html_path)
+        if os.path.exists(output_path):
+            os.unlink(output_path)
+        raise e
+    
+    
+@app.route('/inventory-reports')
+@login_required
+def inventory_reports_page():
+    # Check if user is admin
+    if not current_user.role or current_user.role.name != 'admin':
+        return redirect('/dashboard')
+    return render_template('inventory_reports.html')
+
+
+@app.route('/api/inventory/reports/generate', methods=['POST'])
+@login_required
+def generate_inventory_report():
+    data = request.get_json()
+    
+    # Extract report parameters
+    report_type = data.get('report_type', 'full_inventory')
+    date_from = data.get('date_from')
+    date_to = data.get('date_to')
+    warehouse_id = data.get('warehouse_id')
+    category_id = data.get('category_id')
+    item_id = data.get('item_id')
+    include_zero_stock = data.get('include_zero_stock', False)
+    format_type = data.get('format', 'pdf')  # pdf, excel, csv
+    
+    # Convert date strings to datetime objects if provided
+    from_date = None
+    to_date = None
+    
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'message': 'Invalid from date format. Use YYYY-MM-DD'}), 400
+    
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'message': 'Invalid to date format. Use YYYY-MM-DD'}), 400
+    
+    # Generate report based on type
+    if report_type == 'full_inventory':
+        return generate_full_inventory_report(warehouse_id, category_id, item_id, include_zero_stock, format_type)
+    elif report_type == 'low_stock':
+        return generate_low_stock_report(warehouse_id, category_id, format_type)
+    elif report_type == 'transactions':
+        return generate_transactions_report(from_date, to_date, warehouse_id, item_id, format_type)
+    elif report_type == 'item_transactions':
+        if not item_id:
+            return jsonify({'message': 'Item ID is required for item transactions report'}), 400
+        return generate_item_transactions_report(item_id, from_date, to_date, warehouse_id, format_type)
+    elif report_type == 'warehouse_inventory':
+        if not warehouse_id:
+            return jsonify({'message': 'Warehouse ID is required for warehouse inventory report'}), 400
+        return generate_warehouse_inventory_report(warehouse_id, category_id, include_zero_stock, format_type)
+    elif report_type == 'category_inventory':
+        if not category_id:
+            return jsonify({'message': 'Category ID is required for category inventory report'}), 400
+        return generate_category_inventory_report(category_id, warehouse_id, include_zero_stock, format_type)
+    else:
+        return jsonify({'message': 'Invalid report type'}), 400
+
+def generate_full_inventory_report(warehouse_id=None, category_id=None, item_id=None, include_zero_stock=False, format_type='pdf'):
+    """Generate a full inventory report with optional filtering"""
+    # Base query for inventory
+    query = db.session.query(
+        Inventory, Item, Warehouse, Category
+    ).join(
+        Item, Inventory.item_id == Item.id
+    ).join(
+        Warehouse, Inventory.warehouse_id == Warehouse.id
+    ).join(
+        Category, Item.category_id == Category.id
+    )
+    
+    # Apply filters
+    if warehouse_id:
+        query = query.filter(Inventory.warehouse_id == warehouse_id)
+    
+    if category_id:
+        query = query.filter(Item.category_id == category_id)
+    
+    if item_id:
+        query = query.filter(Inventory.item_id == item_id)
+    
+    if not include_zero_stock:
+        query = query.filter(Inventory.quantity > 0)
+    
+    # Execute query
+    results = query.all()
+    
+    # Prepare data for the report
+    inventory_data = []
+    for inv, item, warehouse, category in results:
+        inventory_data.append({
+            'inventory_id': inv.id,
+            'item_id': item.id,
+            'item_name': item.name,
+            'sku': item.sku,
+            'category_name': category.name,
+            'warehouse_id': warehouse.id,
+            'warehouse_name': warehouse.name,
+            'quantity': inv.quantity,
+            'reorder_level': item.reorder_level,
+            'unit_of_measure': item.unit_of_measure,
+            'cost': item.cost,
+            'total_cost': item.cost * inv.quantity,
+            'last_updated': inv.last_updated.strftime('%Y-%m-%d %H:%M') if inv.last_updated else 'N/A'
+        })
+    
+    # Calculate totals
+    total_items = len(inventory_data)
+    total_quantity = sum(item['quantity'] for item in inventory_data)
+    total_value = sum(item['total_cost'] for item in inventory_data)
+    
+    # Get filter names for the report title
+    warehouse_name = "All Warehouses"
+    category_name = "All Categories"
+    item_name = "All Items"
+    
+    if warehouse_id:
+        warehouse = Warehouse.query.get(warehouse_id)
+        if warehouse:
+            warehouse_name = warehouse.name
+    
+    if category_id:
+        category = Category.query.get(category_id)
+        if category:
+            category_name = category.name
+    
+    if item_id:
+        item = Item.query.get(item_id)
+        if item:
+            item_name = item.name
+    
+    # Prepare report context
+    report_context = {
+        'title': 'تقرير المخزون الكامل',
+        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'warehouse': warehouse_name,
+        'category': category_name,
+        'item': item_name,
+        'include_zero_stock': include_zero_stock,
+        'inventory_data': inventory_data,
+        'total_items': total_items,
+        'total_quantity': total_quantity,
+        'total_value': total_value
+    }
+    
+    # Generate report based on format
+    if format_type == 'pdf':
+        return generate_inventory_pdf(report_context, 'full_inventory')
+    elif format_type == 'excel':
+        return generate_inventory_excel(report_context, 'full_inventory')
+    elif format_type == 'csv':
+        return generate_inventory_csv(report_context, 'full_inventory')
+    else:
+        return jsonify({'message': 'Invalid format type'}), 400
+
+def generate_low_stock_report(warehouse_id=None, category_id=None, format_type='pdf'):
+    """Generate a report of items with stock below reorder level"""
+    # Get all items
+    query = db.session.query(
+        Item, Category
+    ).join(
+        Category, Item.category_id == Category.id
+    )
+    
+    # Apply category filter if provided
+    if category_id:
+        query = query.filter(Item.category_id == category_id)
+    
+    items = query.all()
+    
+    # Prepare low stock data
+    low_stock_items = []
+    
+    for item, category in items:
+        # Calculate total quantity across all warehouses or specific warehouse
+        if warehouse_id:
+            total_quantity = db.session.query(db.func.sum(Inventory.quantity))\
+                .filter(Inventory.item_id == item.id, Inventory.warehouse_id == warehouse_id).scalar() or 0
+        else:
+            total_quantity = db.session.query(db.func.sum(Inventory.quantity))\
+                .filter(Inventory.item_id == item.id).scalar() or 0
+        
+        # Check if below reorder level
+        if total_quantity <= item.reorder_level:
+            # Get supplier information
+            suppliers = db.session.query(Supplier, SupplierItem)\
+                .join(SupplierItem, Supplier.id == SupplierItem.supplier_id)\
+                .filter(SupplierItem.item_id == item.id)\
+                .all()
+            
+            supplier_info = []
+            for supplier, supplier_item in suppliers:
+                supplier_info.append({
+                    'supplier_id': supplier.id,
+                    'supplier_name': supplier.supplier_name,
+                    'cost': supplier_item.cost
+                })
+            
+            low_stock_items.append({
+                'item_id': item.id,
+                'item_name': item.name,
+                'sku': item.sku,
+                'category_name': category.name,
+                'current_quantity': total_quantity,
+                'reorder_level': item.reorder_level,
+                'unit_of_measure': item.unit_of_measure,
+                'suppliers': supplier_info
+            })
+    
+    # Get filter names
+    warehouse_name = "All Warehouses"
+    category_name = "All Categories"
+    
+    if warehouse_id:
+        warehouse = Warehouse.query.get(warehouse_id)
+        if warehouse:
+            warehouse_name = warehouse.name
+    
+    if category_id:
+        category = Category.query.get(category_id)
+        if category:
+            category_name = category.name
+    
+    # Prepare report context
+    report_context = {
+        'title': 'تقرير العناصر منخفضة المخزون',
+        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'warehouse': warehouse_name,
+        'category': category_name,
+        'low_stock_items': low_stock_items,
+        'total_items': len(low_stock_items)
+    }
+    
+    # Generate report based on format
+    if format_type == 'pdf':
+        return generate_inventory_pdf(report_context, 'low_stock')
+    elif format_type == 'excel':
+        return generate_inventory_excel(report_context, 'low_stock')
+    elif format_type == 'csv':
+        return generate_inventory_csv(report_context, 'low_stock')
+    else:
+        return jsonify({'message': 'Invalid format type'}), 400
+
+def generate_transactions_report(from_date=None, to_date=None, warehouse_id=None, item_id=None, format_type='pdf'):
+    """Generate a report of inventory transactions with optional filtering"""
+    # Base query for transactions
+    query = db.session.query(
+        InventoryTransaction, Item, Warehouse
+    ).join(
+        Item, InventoryTransaction.item_id == Item.id
+    ).join(
+        Warehouse, InventoryTransaction.warehouse_id == Warehouse.id
+    )
+    
+    # Apply filters
+    if from_date:
+        query = query.filter(InventoryTransaction.transaction_date >= from_date)
+    
+    if to_date:
+        # Add one day to include the end date fully
+        to_date = to_date.replace(hour=23, minute=59, second=59)
+        query = query.filter(InventoryTransaction.transaction_date <= to_date)
+    
+    if warehouse_id:
+        query = query.filter(InventoryTransaction.warehouse_id == warehouse_id)
+    
+    if item_id:
+        query = query.filter(InventoryTransaction.item_id == item_id)
+    
+    # Order by date (newest first)
+    query = query.order_by(InventoryTransaction.transaction_date.desc())
+    
+    # Execute query
+    results = query.all()
+    
+    # Prepare data for the report
+    transactions_data = []
+    for txn, item, warehouse in results:
+        transactions_data.append({
+            'transaction_id': txn.id,
+            'item_id': item.id,
+            'item_name': item.name,
+            'sku': item.sku,
+            'warehouse_id': warehouse.id,
+            'warehouse_name': warehouse.name,
+            'transaction_type': txn.transaction_type,
+            'quantity': txn.quantity,
+            'transaction_date': txn.transaction_date.strftime('%Y-%m-%d %H:%M'),
+            'reference': txn.reference or 'N/A'
+        })
+    
+    # Get filter names
+    warehouse_name = "All Warehouses"
+    item_name = "All Items"
+    
+    if warehouse_id:
+        warehouse = Warehouse.query.get(warehouse_id)
+        if warehouse:
+            warehouse_name = warehouse.name
+    
+    if item_id:
+        item = Item.query.get(item_id)
+        if item:
+            item_name = item.name
+    
+    # Format date range for display
+    date_range = "All Time"
+    if from_date and to_date:
+        date_range = f"{from_date.strftime('%Y-%m-%d')} to {to_date.strftime('%Y-%m-%d')}"
+    elif from_date:
+        date_range = f"From {from_date.strftime('%Y-%m-%d')}"
+    elif to_date:
+        date_range = f"Until {to_date.strftime('%Y-%m-%d')}"
+    
+    # Prepare report context
+    report_context = {
+                'title': 'تقرير حركات المخزون',
+        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'warehouse': warehouse_name,
+        'item': item_name,
+        'date_range': date_range,
+        'transactions_data': transactions_data,
+        'total_transactions': len(transactions_data)
+    }
+    
+    # Generate report based on format
+    if format_type == 'pdf':
+        return generate_inventory_pdf(report_context, 'transactions')
+    elif format_type == 'excel':
+        return generate_inventory_excel(report_context, 'transactions')
+    elif format_type == 'csv':
+        return generate_inventory_csv(report_context, 'transactions')
+    else:
+        return jsonify({'message': 'Invalid format type'}), 400
+
+def generate_item_transactions_report(item_id, from_date=None, to_date=None, warehouse_id=None, format_type='pdf'):
+    """Generate a detailed transaction history report for a specific item"""
+    # Get the item
+    item = Item.query.get_or_404(item_id)
+    
+    # Base query for transactions
+    query = db.session.query(
+        InventoryTransaction, Warehouse
+    ).join(
+        Warehouse, InventoryTransaction.warehouse_id == Warehouse.id
+    ).filter(
+        InventoryTransaction.item_id == item_id
+    )
+    
+    # Apply filters
+    if from_date:
+        query = query.filter(InventoryTransaction.transaction_date >= from_date)
+    
+    if to_date:
+        # Add one day to include the end date fully
+        to_date = to_date.replace(hour=23, minute=59, second=59)
+        query = query.filter(InventoryTransaction.transaction_date <= to_date)
+    
+    if warehouse_id:
+        query = query.filter(InventoryTransaction.warehouse_id == warehouse_id)
+    
+    # Order by date (oldest first to show the progression)
+    query = query.order_by(InventoryTransaction.transaction_date.asc())
+    
+    # Execute query
+    results = query.all()
+    
+    # Prepare data for the report
+    transactions_data = []
+    running_balance = 0
+    
+    for txn, warehouse in results:
+        # Update running balance
+        if txn.transaction_type == 'IN':
+            running_balance += txn.quantity
+        elif txn.transaction_type == 'OUT':
+            running_balance -= txn.quantity
+        
+        transactions_data.append({
+            'transaction_id': txn.id,
+            'warehouse_name': warehouse.name,
+            'transaction_type': txn.transaction_type,
+            'quantity': txn.quantity,
+            'transaction_date': txn.transaction_date.strftime('%Y-%m-%d %H:%M'),
+            'reference': txn.reference or 'N/A',
+            'running_balance': running_balance
+        })
+    
+    # Get current inventory levels across all warehouses
+    current_inventory = db.session.query(
+        Warehouse.name, Inventory.quantity
+    ).join(
+        Inventory, Warehouse.id == Inventory.warehouse_id
+    ).filter(
+        Inventory.item_id == item_id
+    ).all()
+    
+    inventory_by_warehouse = [
+        {'warehouse_name': name, 'quantity': qty}
+        for name, qty in current_inventory
+    ]
+    
+    # Get category information
+    category = Category.query.get(item.category_id) if item.category_id else None
+    
+    # Format date range for display
+    date_range = "All Time"
+    if from_date and to_date:
+        date_range = f"{from_date.strftime('%Y-%m-%d')} to {to_date.strftime('%Y-%m-%d')}"
+    elif from_date:
+        date_range = f"From {from_date.strftime('%Y-%m-%d')}"
+    elif to_date:
+        date_range = f"Until {to_date.strftime('%Y-%m-%d')}"
+    
+    # Prepare report context
+    report_context = {
+        'title': f'تقرير حركات المخزون للعنصر: {item.name}',
+        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'item': {
+            'id': item.id,
+            'name': item.name,
+            'sku': item.sku,
+            'category': category.name if category else 'Uncategorized',
+            'unit_of_measure': item.unit_of_measure,
+            'reorder_level': item.reorder_level,
+            'cost': item.cost,
+            'price': item.price
+        },
+        'date_range': date_range,
+        'transactions_data': transactions_data,
+        'total_transactions': len(transactions_data),
+        'current_inventory': inventory_by_warehouse,
+        'total_quantity': sum(inv['quantity'] for inv in inventory_by_warehouse)
+    }
+    
+    # Generate report based on format
+    if format_type == 'pdf':
+        return generate_inventory_pdf(report_context, 'item_transactions')
+    elif format_type == 'excel':
+        return generate_inventory_excel(report_context, 'item_transactions')
+    elif format_type == 'csv':
+        return generate_inventory_csv(report_context, 'item_transactions')
+    else:
+        return jsonify({'message': 'Invalid format type'}), 400
+
+def generate_warehouse_inventory_report(warehouse_id, category_id=None, include_zero_stock=False, format_type='pdf'):
+    """Generate a detailed inventory report for a specific warehouse"""
+    # Get the warehouse
+    warehouse = Warehouse.query.get_or_404(warehouse_id)
+    
+    # Base query for inventory in this warehouse
+    query = db.session.query(
+        Inventory, Item, Category
+    ).join(
+        Item, Inventory.item_id == Item.id
+    ).join(
+        Category, Item.category_id == Category.id
+    ).filter(
+        Inventory.warehouse_id == warehouse_id
+    )
+    
+    # Apply category filter if provided
+    if category_id:
+        query = query.filter(Item.category_id == category_id)
+    
+    # Filter out zero stock items if requested
+    if not include_zero_stock:
+        query = query.filter(Inventory.quantity > 0)
+    
+    # Execute query
+    results = query.all()
+    
+    # Prepare data for the report
+    inventory_data = []
+    for inv, item, category in results:
+        inventory_data.append({
+            'item_id': item.id,
+            'item_name': item.name,
+            'sku': item.sku,
+            'category_name': category.name,
+            'quantity': inv.quantity,
+            'reorder_level': item.reorder_level,
+            'unit_of_measure': item.unit_of_measure,
+            'cost': item.cost,
+            'total_cost': item.cost * inv.quantity,
+            'last_updated': inv.last_updated.strftime('%Y-%m-%d %H:%M') if inv.last_updated else 'N/A',
+            'status': 'Low Stock' if inv.quantity <= item.reorder_level else 'In Stock'
+        })
+    
+    # Group by category for summary
+    categories = {}
+    for item in inventory_data:
+        category = item['category_name']
+        if category not in categories:
+            categories[category] = {
+                'name': category,
+                'item_count': 0,
+                'total_quantity': 0,
+                'total_value': 0
+            }
+        
+        categories[category]['item_count'] += 1
+        categories[category]['total_quantity'] += item['quantity']
+        categories[category]['total_value'] += item['total_cost']
+    
+    category_summary = list(categories.values())
+    
+    # Calculate totals
+    total_items = len(inventory_data)
+    total_quantity = sum(item['quantity'] for item in inventory_data)
+    total_value = sum(item['total_cost'] for item in inventory_data)
+    low_stock_count = sum(1 for item in inventory_data if item['status'] == 'Low Stock')
+    
+    # Get category name if filter applied
+    category_name = "All Categories"
+    if category_id:
+        category = Category.query.get(category_id)
+        if category:
+            category_name = category.name
+    
+    # Prepare report context
+    report_context = {
+        'title': f'تقرير مخزون المستودع: {warehouse.name}',
+        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'warehouse': {
+            'id': warehouse.id,
+            'name': warehouse.name,
+            'location': warehouse.location,
+            'capacity': warehouse.capacity,
+            'contact_info': warehouse.contact_info
+        },
+        'category': category_name,
+        'include_zero_stock': include_zero_stock,
+        'inventory_data': inventory_data,
+        'category_summary': category_summary,
+        'total_items': total_items,
+        'total_quantity': total_quantity,
+        'total_value': total_value,
+        'low_stock_count': low_stock_count
+    }
+    
+    # Generate report based on format
+    if format_type == 'pdf':
+        return generate_inventory_pdf(report_context, 'warehouse_inventory')
+    elif format_type == 'excel':
+        return generate_inventory_excel(report_context, 'warehouse_inventory')
+    elif format_type == 'csv':
+        return generate_inventory_csv(report_context, 'warehouse_inventory')
+    else:
+        return jsonify({'message': 'Invalid format type'}), 400
+
+def generate_category_inventory_report(category_id, warehouse_id=None, include_zero_stock=False, format_type='pdf'):
+    """Generate a detailed inventory report for a specific category"""
+    # Get the category
+    category = Category.query.get_or_404(category_id)
+    
+    # Base query for inventory in this category
+    query = db.session.query(
+        Inventory, Item, Warehouse
+    ).join(
+        Item, Inventory.item_id == Item.id
+    ).join(
+        Warehouse, Inventory.warehouse_id == Warehouse.id
+    ).filter(
+        Item.category_id == category_id
+    )
+    
+    # Apply warehouse filter if provided
+    if warehouse_id:
+        query = query.filter(Inventory.warehouse_id == warehouse_id)
+    
+    # Filter out zero stock items if requested
+    if not include_zero_stock:
+        query = query.filter(Inventory.quantity > 0)
+    
+    # Execute query
+    results = query.all()
+    
+    # Prepare data for the report
+    inventory_data = []
+    for inv, item, warehouse in results:
+        inventory_data.append({
+            'item_id': item.id,
+            'item_name': item.name,
+            'sku': item.sku,
+            'warehouse_name': warehouse.name,
+            'quantity': inv.quantity,
+            'reorder_level': item.reorder_level,
+            'unit_of_measure': item.unit_of_measure,
+            'cost': item.cost,
+            'total_cost': item.cost * inv.quantity,
+            'last_updated': inv.last_updated.strftime('%Y-%m-%d %H:%M') if inv.last_updated else 'N/A',
+            'status': 'Low Stock' if inv.quantity <= item.reorder_level else 'In Stock'
+        })
+    
+    # Group by warehouse for summary
+    warehouses = {}
+    for item in inventory_data:
+        wh_name = item['warehouse_name']
+        if wh_name not in warehouses:
+            warehouses[wh_name] = {
+                'name': wh_name,
+                'item_count': 0,
+                'total_quantity': 0,
+                'total_value': 0
+            }
+        
+        warehouses[wh_name]['item_count'] += 1
+        warehouses[wh_name]['total_quantity'] += item['quantity']
+        warehouses[wh_name]['total_value'] += item['total_cost']
+    
+    warehouse_summary = list(warehouses.values())
+    
+    # Calculate totals
+    total_items = len(inventory_data)
+    total_quantity = sum(item['quantity'] for item in inventory_data)
+    total_value = sum(item['total_cost'] for item in inventory_data)
+    low_stock_count = sum(1 for item in inventory_data if item['status'] == 'Low Stock')
+    
+    # Get warehouse name if filter applied
+    warehouse_name = "All Warehouses"
+    if warehouse_id:
+        warehouse = Warehouse.query.get(warehouse_id)
+        if warehouse:
+            warehouse_name = warehouse.name
+    
+    # Prepare report context
+    report_context = {
+        'title': f'تقرير مخزون الفئة: {category.name}',
+        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'category': {
+            'id': category.id,
+            'name': category.name,
+            'description': category.description
+        },
+        'warehouse': warehouse_name,
+        'include_zero_stock': include_zero_stock,
+        'inventory_data': inventory_data,
+        'warehouse_summary': warehouse_summary,
+        'total_items': total_items,
+        'total_quantity': total_quantity,
+        'total_value': total_value,
+        'low_stock_count': low_stock_count
+    }
+    
+    # Generate report based on format
+    if format_type == 'pdf':
+        return generate_inventory_pdf(report_context, 'category_inventory')
+    elif format_type == 'excel':
+        return generate_inventory_excel(report_context, 'category_inventory')
+    elif format_type == 'csv':
+        return generate_inventory_csv(report_context, 'category_inventory')
+    else:
+        return jsonify({'message': 'Invalid format type'}), 400
+
+def generate_inventory_pdf(report_context, report_type):
+    """Generate a PDF report for inventory data"""
+    # Select the appropriate template based on report type
+    template_name = f'reports/{report_type}_report.html'
+    
+    # Render the HTML template with the report context
+    html_content = render_template(template_name, report=report_context)
+    
+    # Generate the PDF
+    try:
+        pdf_path = generate_pdf(html_content)
+        
+        # Generate a meaningful filename
+        filename = f"{report_type}_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        
+        # Send the PDF file
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+    except Exception as e:
+        return jsonify({'message': f'Error generating PDF: {str(e)}'}), 500
+
+def generate_inventory_excel(report_context, report_type):
+    """Generate an Excel report for inventory data"""
+    import pandas as pd
+    from io import BytesIO
+    
+    # Create a BytesIO object to store the Excel file
+    output = BytesIO()
+    
+    # Create Excel writer
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        # Create different sheets based on report type
+        if report_type == 'full_inventory':
+            # Main inventory data
+            df = pd.DataFrame(report_context['inventory_data'])
+            df.to_excel(writer, sheet_name='Inventory', index=False)
+            
+            # Add summary sheet
+            summary_data = {
+                'Metric': ['Total Items', 'Total Quantity', 'Total Value'],
+                'Value': [
+                    report_context['total_items'],
+                    report_context['total_quantity'],
+                    report_context['total_value']
+                ]
+            }
+            summary_df = pd.DataFrame(summary_data)
+            summary_df.to_excel(writer, sheet_name='Summary', index=False)
+            
+        elif report_type == 'low_stock':
+            # Low stock items
+            df = pd.DataFrame(report_context['low_stock_items'])
+            df.to_excel(writer, sheet_name='Low Stock Items', index=False)
+            
+            # Format the suppliers column if it exists
+            if 'suppliers' in df.columns:
+                # Create a new sheet for supplier details
+                supplier_data = []
+                for item in report_context['low_stock_items']:
+                    for supplier in item.get('suppliers', []):
+                        supplier_data.append({
+                            'item_id': item['item_id'],
+                            'item_name': item['item_name'],
+                            'supplier_id': supplier['supplier_id'],
+                            'supplier_name': supplier['supplier_name'],
+                            'cost': supplier['cost']
+                        })
+                
+                if supplier_data:
+                    supplier_df = pd.DataFrame(supplier_data)
+                    supplier_df.to_excel(writer, sheet_name='Supplier Details', index=False)
+            
+        elif report_type == 'transactions':
+            # Transaction data
+            df = pd.DataFrame(report_context['transactions_data'])
+            df.to_excel(writer, sheet_name='Transactions', index=False)
+            
+        elif report_type == 'item_transactions':
+            # Item details
+            item_data = {
+                'Property': [
+                    'Item ID', 'Name', 'SKU', 'Category', 
+                    'Unit of Measure', 'Reorder Level', 'Cost', 'Price'
+                ],
+                'Value': [
+                    report_context['item']['id'],
+                    report_context['item']['name'],
+                    report_context['item']['sku'],
+                    report_context['item']['category'],
+                    report_context['item']['unit_of_measure'],
+                    report_context['item']['reorder_level'],
+                    report_context['item']['cost'],
+                    report_context['item']['price']
+                ]
+            }
+            item_df = pd.DataFrame(item_data)
+            item_df.to_excel(writer, sheet_name='Item Details', index=False)
+            
+            # Transaction history
+            transactions_df = pd.DataFrame(report_context['transactions_data'])
+            transactions_df.to_excel(writer, sheet_name='Transaction History', index=False)
+            
+            # Current inventory
+            inventory_df = pd.DataFrame(report_context['current_inventory'])
+            inventory_df.to_excel(writer, sheet_name='Current Inventory', index=False)
+            
+        elif report_type == 'warehouse_inventory':
+            # Warehouse details
+            warehouse_data = {
+                'Property': ['Warehouse ID', 'Name', 'Location', 'Capacity', 'Contact Info'],
+                'Value': [
+                    report_context['warehouse']['id'],
+                    report_context['warehouse']['name'],
+                    report_context['warehouse']['location'],
+                    report_context['warehouse']['capacity'],
+                    report_context['warehouse']['contact_info']
+                ]
+            }
+            warehouse_df = pd.DataFrame(warehouse_data)
+            warehouse_df.to_excel(writer, sheet_name='Warehouse Details', index=False)
+            
+            # Inventory data
+            inventory_df = pd.DataFrame(report_context['inventory_data'])
+            inventory_df.to_excel(writer, sheet_name='Inventory', index=False)
+            
+            # Category summary
+            category_df = pd.DataFrame(report_context['category_summary'])
+            category_df.to_excel(writer, sheet_name='Category Summary', index=False)
+            
+        elif report_type == 'category_inventory':
+            # Category details
+            category_data = {
+                'Property': ['Category ID', 'Name', 'Description'],
+                'Value': [
+                    report_context['category']['id'],
+                    report_context['category']['name'],
+                    report_context['category']['description']
+                ]
+            }
+            category_df = pd.DataFrame(category_data)
+            category_df.to_excel(writer, sheet_name='Category Details', index=False)
+            
+            # Inventory data
+            inventory_df = pd.DataFrame(report_context['inventory_data'])
+            inventory_df.to_excel(writer, sheet_name='Inventory', index=False)
+            
+            # Warehouse summary
+            warehouse_df = pd.DataFrame(report_context['warehouse_summary'])
+            warehouse_df.to_excel(writer, sheet_name='Warehouse Summary', index=False)
+        
+        # Add report metadata
+        metadata = {
+            'Property': ['Report Type', 'Generated At', 'Total Items'],
+            'Value': [
+                report_context['title'],
+                report_context['generated_at'],
+                report_context.get('total_items', 0)
+            ]
+        }
+        metadata_df = pd.DataFrame(metadata)
+        metadata_df.to_excel(writer, sheet_name='Metadata', index=False)
+        
+        # Format the workbook
+        workbook = writer.book
+        
+        # Add a format for headers
+        header_format = workbook.add_format({
+            'bold': True,
+            'text_wrap': True,
+            'valign': 'top',
+            'fg_color': '#D7E4BC',
+            'border': 1
+        })
+        
+        # Apply the header format to all sheets
+        for sheet_name in writer.sheets:
+            worksheet = writer.sheets[sheet_name]
+            # Get the column headers from the dataframe
+            for col_num, value in enumerate(pd.DataFrame(metadata_df if sheet_name == 'Metadata' else 
+                                           df if sheet_name == 'Inventory' or sheet_name == 'Low Stock Items' or sheet_name == 'Transactions' else 
+                                           summary_df if sheet_name == 'Summary' else 
+                                           item_df if sheet_name == 'Item Details' else 
+                                           transactions_df if sheet_name == 'Transaction History' else 
+                                           inventory_df if sheet_name == 'Current Inventory' else 
+                                           warehouse_df if sheet_name == 'Warehouse Details' else 
+                                           category_df if sheet_name == 'Category Details' else 
+                                           supplier_df if sheet_name == 'Supplier Details' else pd.DataFrame()).columns):
+                worksheet.write(0, col_num, value, header_format)
+                worksheet.set_column(col_num, col_num, 15)  # Set column width
+    
+    # Seek to the beginning of the BytesIO object
+    output.seek(0)
+    
+    # Generate a meaningful filename
+    filename = f"{report_type}_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    # Send the Excel file
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+def generate_inventory_csv(report_context, report_type):
+    """Generate a CSV report for inventory data"""
+    import pandas as pd
+    from io import StringIO
+    
+    # Create a StringIO object to store the CSV data
+    output = StringIO()
+    
+    # Create different CSV content based on report type
+    if report_type == 'full_inventory':
+        df = pd.DataFrame(report_context['inventory_data'])
+        df.to_csv(output, index=False)
+        
+    elif report_type == 'low_stock':
+        # For low stock, we need to flatten the suppliers data
+        data = []
+        for item in report_context['low_stock_items']:
+            item_data = item.copy()
+            # Remove the suppliers list and add a supplier count
+            suppliers = item_data.pop('suppliers', [])
+            item_data['supplier_count'] = len(suppliers)
+            data.append(item_data)
+        
+        df = pd.DataFrame(data)
+        df.to_csv(output, index=False)
+        
+    elif report_type == 'transactions':
+        df = pd.DataFrame(report_context['transactions_data'])
+        df.to_csv(output, index=False)
+        
+    elif report_type == 'item_transactions':
+        # For item transactions, we'll just export the transaction history
+        df = pd.DataFrame(report_context['transactions_data'])
+        df.to_csv(output, index=False)
+        
+    elif report_type == 'warehouse_inventory':
+        df = pd.DataFrame(report_context['inventory_data'])
+        df.to_csv(output, index=False)
+        
+    elif report_type == 'category_inventory':
+        df = pd.DataFrame(report_context['inventory_data'])
+        df.to_csv(output, index=False)
+    
+    # Seek to the beginning of the StringIO object
+    output.seek(0)
+    
+    # Generate a meaningful filename
+    filename = f"{report_type}_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    # Create a response with the CSV data
+    return send_file(
+        BytesIO(output.getvalue().encode('utf-8')),
+        as_attachment=True,
+        download_name=filename,
+        mimetype='text/csv'
+    )
+
+
 
 
 # # # # # # # # # # # # # # # # # # # # # # 
@@ -896,6 +1893,12 @@ def admin_roles_page():
     return render_template('admin_roles.html')
 
 
+# @app.route('/check-schema')
+# def check_schema():
+#     from sqlalchemy import inspect
+#     inspector = inspect(db.engine)
+#     columns = inspector.get_columns('categories')
+#     return jsonify([col['name'] for col in columns])
 
 
 def check_internet():
@@ -906,6 +1909,118 @@ def check_internet():
     except:
         return False
 
+
+
+@app.route('/api/reports/inventory/full_inventory')
+@login_required
+def api_full_inventory_report():
+    warehouse_id = request.args.get('warehouse_id', type=int)
+    category_id = request.args.get('category_id', type=int)
+    item_id = request.args.get('item_id', type=int)
+    include_zero_stock = request.args.get('include_zero_stock', 'false').lower() == 'true'
+    format_type = request.args.get('format', 'pdf')
+    
+    return generate_full_inventory_report(
+        warehouse_id=warehouse_id,
+        category_id=category_id,
+        item_id=item_id,
+        include_zero_stock=include_zero_stock,
+        format_type=format_type
+    )
+
+@app.route('/api/reports/inventory/low_stock')
+@login_required
+def api_low_stock_report():
+    warehouse_id = request.args.get('warehouse_id', type=int)
+    category_id = request.args.get('category_id', type=int)
+    format_type = request.args.get('format', 'pdf')
+    
+    return generate_low_stock_report(
+        warehouse_id=warehouse_id,
+        category_id=category_id,
+        format_type=format_type
+    )
+
+@app.route('/api/reports/inventory/transactions')
+@login_required
+def api_transactions_report():
+    warehouse_id = request.args.get('warehouse_id', type=int)
+    item_id = request.args.get('item_id', type=int)
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    format_type = request.args.get('format', 'pdf')
+    
+    # Convert date strings to datetime objects
+    from_date = datetime.strptime(date_from, '%Y-%m-%d') if date_from else None
+    to_date = datetime.strptime(date_to, '%Y-%m-%d') if date_to else None
+    
+    return generate_transactions_report(
+        warehouse_id=warehouse_id,
+        item_id=item_id,
+        from_date=from_date,
+        to_date=to_date,
+        format_type=format_type
+    )
+
+@app.route('/api/reports/inventory/item_transactions')
+@login_required
+def api_item_transactions_report():
+    item_id = request.args.get('item_id', type=int)
+    warehouse_id = request.args.get('warehouse_id', type=int)
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    format_type = request.args.get('format', 'pdf')
+    
+    if not item_id:
+        return jsonify({'message': 'Item ID is required'}), 400
+    
+    # Convert date strings to datetime objects
+    from_date = datetime.strptime(date_from, '%Y-%m-%d') if date_from else None
+    to_date = datetime.strptime(date_to, '%Y-%m-%d') if date_to else None
+    
+    return generate_item_transactions_report(
+        item_id=item_id,
+        warehouse_id=warehouse_id,
+        from_date=from_date,
+        to_date=to_date,
+        format_type=format_type
+    )
+
+@app.route('/api/reports/inventory/warehouse_inventory')
+@login_required
+def api_warehouse_inventory_report():
+    warehouse_id = request.args.get('warehouse_id', type=int)
+    category_id = request.args.get('category_id', type=int)
+    include_zero_stock = request.args.get('include_zero_stock', 'false').lower() == 'true'
+    format_type = request.args.get('format', 'pdf')
+    
+    if not warehouse_id:
+        return jsonify({'message': 'Warehouse ID is required'}), 400
+    
+    return generate_warehouse_inventory_report(
+        warehouse_id=warehouse_id,
+        category_id=category_id,
+        include_zero_stock=include_zero_stock,
+        format_type=format_type
+    )
+
+@app.route('/api/reports/inventory/category_inventory')
+@login_required
+def api_category_inventory_report():
+    category_id = request.args.get('category_id', type=int)
+    warehouse_id = request.args.get('warehouse_id', type=int)
+    include_zero_stock = request.args.get('include_zero_stock', 'false').lower() == 'true'
+    format_type = request.args.get('format', 'pdf')
+    
+    if not category_id:
+        return jsonify({'message': 'Category ID is required'}), 400
+    
+    return generate_category_inventory_report(
+        category_id=category_id,
+        warehouse_id=warehouse_id,
+        include_zero_stock=include_zero_stock,
+        format_type=format_type
+    )
 
 if __name__ == '__main__':
     # --- Check for Gemini API Key before starting ---

@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 
 {% block title %}إدارة قوائم المواد - نظام كاتيلو{% endblock %}
@@ -78,7 +79,11 @@
                                     <div class="flex justify-between items-center">
                                         <div>
                                             <h3 class="font-medium text-gray-800" x-text="bom.final_product_name"></h3>
-                                            <p class="text-sm text-gray-500" x-text="bom.description || 'بدون وصف'"></p>
+                                            <div class="flex items-center mt-1">
+                                                <span class="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800" 
+                                                      x-text="getCategoryTypeLabel(bom.final_product_category_type)"></span>
+                                                <span class="text-xs text-gray-500 mr-2" x-text="bom.description || 'بدون وصف'"></span>
+                                            </div>
                                         </div>
                                         <div class="flex space-x-2 space-x-reverse">
                                             <button @click.stop="editBom(bom)" class="text-blue-600 hover:text-blue-800">
@@ -97,7 +102,15 @@
             </div>
         </div>
                 <!-- BOM Details -->
+                
         <div class="lg:col-span-2">
+            <button 
+    @click="updateItemCost()" 
+    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+    x-show="selectedBom && selectedBom.details && selectedBom.details.length > 0">
+    <i class="fas fa-sync-alt mr-2"></i> تحديث تكلفة المنتج
+</button>
+
             <template x-if="!selectedBomId">
                 <div class="card h-full flex items-center justify-center">
                     <div class="text-center p-8">
@@ -113,17 +126,56 @@
                     <div class="p-4 border-b border-gray-100 flex justify-between items-center">
                         <div>
                             <h2 class="text-lg font-semibold text-gray-800" x-text="selectedBom?.final_product_name || 'تفاصيل قائمة المواد'"></h2>
-                            <p class="text-sm text-gray-500" x-text="selectedBom?.description || ''"></p>
+                            <div class="flex items-center mt-1">
+                                <span class="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800" 
+                                      x-text="getCategoryTypeLabel(selectedBom?.final_product_category_type)"></span>
+                                <span class="text-xs text-gray-500 mr-2" x-text="selectedBom?.description || ''"></span>
+                            </div>
                         </div>
                         <div class="flex space-x-2 space-x-reverse">
-                            <button @click="showAddComponentModal = true" class="btn btn-primary text-sm">
-                                <i class="fas fa-plus ml-1"></i> إضافة مكون
-                            </button>
-                            <button @click="showProduceModal = true" class="btn bg-green-600 hover:bg-green-700 text-white text-sm">
-                                <i class="fas fa-industry ml-1"></i> إنتاج
-                            </button>
+                            
+                            <button @click="showProduceModal = true" class="btn bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 flex items-center">
+                                <i class="fas fa-industry mr-2"></i> إنتاج
+                            </button>                            
+                            <!-- Add this dropdown button in the BOM details section, near other action buttons -->
+<div class="relative" x-data="{ showPdfOptions: false }">
+    <button @click="showPdfOptions = !showPdfOptions" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center">
+        <i class="fas fa-file-pdf mr-2"></i> تصدير PDF <i class="fas fa-chevron-down ml-2"></i>
+    </button>
+    <div x-show="showPdfOptions" @click.away="showPdfOptions = false"
+          class="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-100"
+         x-transition:enter="transition ease-out duration-100"
+         x-transition:enter-start="opacity-0 transform scale-95"
+         x-transition:enter-end="opacity-100 transform scale-100"
+         x-transition:leave="transition ease-in duration-75"
+         x-transition:leave-start="opacity-100 transform scale-100"
+         x-transition:leave-end="opacity-0 transform scale-95"
+         x-cloak>
+        <div class="py-1">
+            <a href="#" @click.prevent="exportBomToPdf()" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                <i class="fas fa-file-invoice-dollar ml-2"></i> تقرير كامل مع التكاليف
+            </a>
+            <a href="#" @click.prevent="exportSimpleBomToPdf()" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                <i class="fas fa-file-alt ml-2"></i> قائمة المكونات فقط
+            </a>
+        </div>
+    </div>
+</div>
+<!-- Add this button to the BOM details section -->
+<button 
+    @click="printBomDetails()" 
+    class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center"
+    x-show="selectedBom">
+    <i class="fas fa-print mr-2"></i> طباعة مباشرة
+</button>
+
+
+    <button @click="showAddComponentModal = true" class="btn btn-primary text-sm">
+        <i class="fas fa-plus ml-1"></i> إضافة مكون
+    </button>
                             <div class="relative" x-data="{ showDetailActions: false }">
-                                <button @click="showDetailActions = !showDetailActions" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm">
+
+                                <button @click="showDetailActions = !showDetailActions" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-3 py-2 rounded-lg transition duration-200 ease-in-out">
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                                 <div x-show="showDetailActions" @click.away="showDetailActions = false"
@@ -147,1130 +199,1194 @@
                             </div>
                         </div>
                     </div>
-                                          <div class="p-4">
-                                              <template x-if="loadingDetails">
-                                                  <div class="flex justify-center items-center py-8">
-                                                      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                                  </div>
-                                              </template>
+                    <div class="p-4">
+                        <template x-if="loadingDetails">
+                            <div class="flex justify-center items-center py-8">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                        </template>
                         
-                                              <template x-if="!loadingDetails && (!selectedBom?.details || selectedBom.details.length === 0)">
-                                                  <div class="text-center py-8 text-gray-500">
-                                                      <i class="fas fa-boxes text-4xl mb-2"></i>
-                                                      <p>لا توجد مكونات في هذه القائمة</p>
-                                                      <button @click="showAddComponentModal = true" class="mt-4 btn btn-primary text-sm">
-                                                          <i class="fas fa-plus ml-1"></i> إضافة مكون
-                                                      </button>
-                                                  </div>
-                                              </template>
+                        <template x-if="!loadingDetails && (!selectedBom?.details || selectedBom.details.length === 0)">
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-boxes text-4xl mb-2"></i>
+                                <p>لا توجد مكونات في هذه القائمة</p>
+                                <button @click="showAddComponentModal = true" class="mt-4 btn btn-primary text-sm">
+                                    <i class="fas fa-plus ml-1"></i> إضافة مكون
+                                </button>
+                            </div>
+                        </template>
                         
-                                              <template x-if="!loadingDetails && selectedBom?.details && selectedBom.details.length > 0">
-                                                  <div>
-                                                      <div class="overflow-x-auto">
-                                                          <table class="min-w-full divide-y divide-gray-200">
-                                                              <thead class="bg-gray-50">
-                                                                  <tr>
-                                                                      <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                          المكون
-                                                                      </th>
-                                                                      <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                          الكمية المطلوبة
-                                                                      </th>
-                                                                      <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                          وحدة القياس
-                                                                      </th>
-                                                                      <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                          الإجراءات
-                                                                      </th>
-                                                                  </tr>
-                                                              </thead>
-                                                              <tbody class="bg-white divide-y divide-gray-200">
-                                                                  <template x-for="detail in selectedBom.details" :key="detail.id">
-                                                                      <tr>
-                                                                          <td class="px-6 py-4 whitespace-nowrap">
-                                                                              <div class="text-sm font-medium text-gray-900" x-text="detail.component_name"></div>
-                                                                          </td>
-                                                                          <td class="px-6 py-4 whitespace-nowrap">
-                                                                              <div class="text-sm text-gray-900" x-text="detail.quantity_required"></div>
-                                                                          </td>
-                                                                          <td class="px-6 py-4 whitespace-nowrap">
-                                                                              <div class="text-sm text-gray-900" x-text="detail.unit_of_measure"></div>
-                                                                          </td>
-                                                                          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                                              <button @click="editComponent(detail)" class="text-blue-600 hover:text-blue-900 ml-3">
-                                                                                  <i class="fas fa-edit"></i>
-                                                                              </button>
-                                                                              <button @click="confirmDeleteComponent(detail.id)" class="text-red-600 hover:text-red-900">
-                                                                                  <i class="fas fa-trash-alt"></i>
-                                                                              </button>
-                                                                          </td>
-                                                                      </tr>
-                                                                  </template>
-                                                              </tbody>
-                                                          </table>
-                                                      </div>
-                                                  </div>
-                                              </template>
-
-                                              <!-- Add this after the components table in the BOM details section -->
-                                              <template x-if="!loadingDetails && selectedBom?.details && selectedBom.details.length > 0">
-                                                  <div class="mt-6 bg-gray-50 rounded-lg p-4">
-                                                      <h3 class="text-lg font-semibold text-gray-800 mb-3">ملخص قائمة المواد</h3>
-                                
-                                                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                          <!-- Cost and Price Information -->
-                                                          <div class="bg-white p-4 rounded-lg shadow-sm">
-                                                              <h4 class="font-medium text-gray-700 mb-3">معلومات التكلفة والسعر</h4>
-                                        
-                                                              <div class="space-y-2">
-                                                                  <div class="flex justify-between">
-                                                                      <span class="text-gray-600">إجمالي تكلفة المكونات:</span>
-                                                                      <span class="font-medium" x-text="selectedBom.total_cost.toFixed(2) + ' جنيه'"></span>
-                                                                  </div>
-                                            
-                                                                  <div class="flex justify-between">
-                                                                      <span class="text-gray-600">سعر البيع:</span>
-                                                                      <span class="font-medium" x-text="selectedBom.selling_price.toFixed(2) + ' جنيه'"></span>
-                                                                  </div>
-                                            
-                                                                  <div class="flex justify-between">
-                                                                      <span class="text-gray-600">الربح:</span>
-                                                                      <span class="font-medium"
-                                                                          :class="selectedBom.profit >= 0 ? 'text-green-600' : 'text-red-600'"
-                                                                          x-text="selectedBom.profit.toFixed(2) + ' جنيه'"></span>
-                                                                  </div>
-                                            
-                                                                  <div class="flex justify-between">
-                                                                      <span class="text-gray-600">هامش الربح:</span>
-                                                                      <span class="font-medium"
-                                                                          :class="selectedBom.profit_margin >= 0 ? 'text-green-600' : 'text-red-600'"
-                                                                          x-text="selectedBom.profit_margin.toFixed(2) + '%'"></span>
-                                                                  </div>
-                                                              </div>
-                                                          </div>
-                                    
-                                                          <!-- Production Information -->
-                                                          <div class="bg-white p-4 rounded-lg shadow-sm">
-                                                              <h4 class="font-medium text-gray-700 mb-3">معلومات الإنتاج</h4>
-                                        
-                                                              <div class="space-y-2">
-                                                                  <div class="flex justify-between">
-                                                                      <span class="text-gray-600">عدد مرات الإنتاج:</span>
-                                                                      <span class="font-medium" x-text="selectedBom.production_count + ' مرة'"></span>
-                                                                  </div>
-                                            
-                                                                  <div class="flex justify-between">
-                                                                      <span class="text-gray-600">تاريخ إنشاء القائمة:</span>
-                                                                      <span class="font-medium" x-text="new Date(selectedBom.created_at).toLocaleDateString('ar-EG')"></span>
-                                                                  </div>
-                                            
-                                                                  <div class="flex justify-between">
-                                                                      <span class="text-gray-600">آخر تحديث:</span>
-                                                                      <span class="font-medium" x-text="new Date(selectedBom.updated_at).toLocaleDateString('ar-EG')"></span>
-                                                                  </div>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                
-                                                      <!-- Component Cost Breakdown -->
-                                                      <div class="mt-4 bg-white p-4 rounded-lg shadow-sm">
-                                                          <h4 class="font-medium text-gray-700 mb-3">تفاصيل تكلفة المكونات</h4>
-                                    
-                                                          <div class="overflow-x-auto">
-                                                              <table class="min-w-full divide-y divide-gray-200">
-                                                                  <thead class="bg-gray-50">
-                                                                      <tr>
-                                                                          <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                              المكون
-                                                                          </th>
-                                                                          <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                              الكمية
-                                                                          </th>
-                                                                          <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                              تكلفة الوحدة
-                                                                          </th>
-                                                                          <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                              التكلفة الإجمالية
-                                                                          </th>
-                                                                          <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                              النسبة من التكلفة
-                                                                          </th>
-                                                                      </tr>
-                                                                  </thead>
-                                                                  <tbody class="bg-white divide-y divide-gray-200">
-                                                                      <template x-for="detail in selectedBom.details" :key="detail.id">
-                                                                          <tr>
-                                                                              <td class="px-6 py-4 whitespace-nowrap">
-                                                                                  <div class="text-sm font-medium text-gray-900" x-text="detail.component_name"></div>
-                                                                              </td>
-                                                                              <td class="px-6 py-4 whitespace-nowrap">
-                                                                                  <div class="text-sm text-gray-900" x-text="detail.quantity_required + ' ' + detail.unit_of_measure"></div>
-                                                                              </td>
-                                                                              <td class="px-6 py-4 whitespace-nowrap">
-                                                                                  <div class="text-sm text-gray-900" x-text="detail.component_cost.toFixed(2) + ' جنيه'"></div>
-                                                                              </td>
-                                                                              <td class="px-6 py-4 whitespace-nowrap">
-                                                                                  <div class="text-sm text-gray-900" x-text="detail.total_component_cost.toFixed(2) + ' جنيه'"></div>
-                                                                              </td>
-                                                                              <td class="px-6 py-4 whitespace-nowrap">
-                                                                                  <div class="text-sm text-gray-900" x-text="((detail.total_component_cost / selectedBom.total_cost) * 100).toFixed(2) + '%'"></div>
-                                                                              </td>
-                                                                          </tr>
-                                                                      </template>
-                                                                  </tbody>
-                                                              </table>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-                                              </template>
-                                          </div>
-                                      </div>
-                                  </template>
-                              </div>
-                          </div>
-    <!-- Add BOM Modal -->
-    <div x-show="showAddBomModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
-        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            <div @click.away="showAddBomModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <div class="sm:flex sm:items-start">
-                        <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
-                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                                إضافة قائمة مواد جديدة
-                            </h3>
-                            <div class="mt-2 space-y-4">
-                                <div>
-                                    <label for="final_product_id" class="block text-sm font-medium text-gray-700 mb-1">المنتج النهائي</label>
-                                    <select id="final_product_id" x-model="newBom.final_product_id" 
-                                            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                        <option value="">اختر المنتج النهائي</option>
-                                        <template x-for="category in categorizedItems" :key="category.category_name">
-                                            <optgroup :label="category.category_name">
-                                                <template x-for="item in category.items" :key="item.id">
-                                                    <option :value="item.id" x-text="item.name"></option>
-                                                </template>
-                                            </optgroup>
-                                        </template>
-                                    </select>
-                                </div>
-                                <div class="mt-2 flex justify-end">
-                                    <a @click="goToItemsPage()" class="text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
-                                        <i class="fas fa-plus-circle ml-1"></i> إضافة عنصر جديد
-                                    </a>
-                                </div>
-                                <div>
-                                    <label for="description" class="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
-                                    <textarea id="description" x-model="newBom.description" rows="3" 
-                                              class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button @click="addBom()" type="button" 
-                            :disabled="!newBom.final_product_id"
-                            :class="{'opacity-50 cursor-not-allowed': !newBom.final_product_id}"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
-                        إضافة
-                    </button>
-                    <button @click="showAddBomModal = false" type="button" 
-                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                        إلغاء
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Edit BOM Modal -->
-    <div x-show="showEditBomModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
-        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-
-            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-
-            <div @click.away="showEditBomModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <div class="sm:flex sm:items-start">
-                        <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
-                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                                تعديل قائمة المواد
-                            </h3>
-                            <div class="mt-2 space-y-4">
-                                <div>
-                                    <label for="edit_final_product_id" class="block text-sm font-medium text-gray-700 mb-1">المنتج النهائي</label>
-                                    <select id="edit_final_product_id" x-model="editingBom.final_product_id" 
-                                            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                        <option value="">اختر المنتج النهائي</option>
-                                        <template x-for="category in categorizedItems" :key="category.category_name">
-                                            <optgroup :label="category.category_name">
-                                                <template x-for="item in category.items" :key="item.id">
-                                                    <option :value="item.id" x-text="item.name"></option>
-                                                </template>
-                                            </optgroup>
-                                        </template>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label for="edit_description" class="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
-                                    <textarea id="edit_description" x-model="editingBom.description" rows="3" 
-                                              class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button @click="updateBom()" type="button" 
-                            :disabled="!editingBom.final_product_id"
-                            :class="{'opacity-50 cursor-not-allowed': !editingBom.final_product_id}"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
-                        حفظ التغييرات
-                    </button>
-                    <button @click="showEditBomModal = false" type="button" 
-                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                        إلغاء
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-<!-- Add Component Modal -->
-<div x-show="showAddComponentModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
-    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-        </div>
-        <div @click.away="showAddComponentModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                    <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                            إضافة مكون جديد
-                        </h3>
-                        <div class="mt-2 space-y-4">
+                        <template x-if="!loadingDetails && selectedBom?.details && selectedBom.details.length > 0">
                             <div>
-                                <label for="component_item_id" class="block text-sm font-medium text-gray-700 mb-1">المكون</label>
-                                <select id="component_item_id" x-model="newComponent.component_item_id" 
-                                        @change="handleComponentSelection()"
-                                        class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                    <option value="">اختر المكون</option>
-                                    <template x-for="category in componentsByCategory" :key="category.category_name">
-                                        <optgroup :label="category.category_name">
-                                            <template x-for="item in category.items" :key="item.id">
-                                                <option :value="item.id" x-text="item.name"></option>
-                                            </template>
-                                        </optgroup>
-                                    </template>
-                                </select>
-                                <div class="mt-2 flex justify-end">
-                                    <a @click="goToItemsPage()" class="text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
-                                        <i class="fas fa-plus-circle ml-1"></i> إضافة عنصر جديد
-                                    </a>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label for="quantity_required" class="block text-sm font-medium text-gray-700 mb-1">الكمية المطلوبة</label>
-                                <input type="number" id="quantity_required" x-model="newComponent.quantity_required" min="0.01" step="0.01"
-                                       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                       onkeydown="if(event.key === '.' && this.value.includes('.')) event.preventDefault();">
-                            </div>
-                            <div>
-                                <label for="unit_of_measure" class="block text-sm font-medium text-gray-700 mb-1">وحدة القياس</label>
-                                <input type="text" id="unit_of_measure" x-model="newComponent.unit_of_measure" 
-                                       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button @click="addComponent()" type="button" 
-                        :disabled="!newComponent.component_item_id || !newComponent.quantity_required"
-                        :class="{'opacity-50 cursor-not-allowed': !newComponent.component_item_id || !newComponent.quantity_required}"
-                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
-                    إضافة
-                </button>
-                <button @click="showAddComponentModal = false" type="button" 
-                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                    إلغاء
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-    
-    <!-- Edit Component Modal -->
-<div x-show="showEditComponentModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
-    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-        </div>
-        <div @click.away="showEditComponentModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                    <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                            تعديل المكون
-                        </h3>
-                        <div class="mt-2 space-y-4">
-                            <div>
-                                <label for="edit_component_item_id" class="block text-sm font-medium text-gray-700 mb-1">المكون</label>
-                                <select id="edit_component_item_id" x-model="editingComponent.component_item_id" 
-                                        @change="handleEditComponentSelection()"
-                                        class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                    <option value="">اختر المكون</option>
-                                    <template x-for="category in componentsByCategory" :key="category.category_name">
-                                        <optgroup :label="category.category_name">
-                                            <template x-for="item in category.items" :key="item.id">
-                                                <option :value="item.id" x-text="item.name"></option>
-                                            </template>
-                                        </optgroup>
-                                    </template>
-                                </select>
-                                <div class="mt-2 flex justify-end">
-                                    <a @click="goToItemsPage()" class="text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
-                                        <i class="fas fa-plus-circle ml-1"></i> إضافة عنصر جديد
-                                    </a>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="edit_quantity_required" class="block text-sm font-medium text-gray-700 mb-1">الكمية المطلوبة</label>
-                                <input type="number" id="edit_quantity_required" x-model="editingComponent.quantity_required" min="0.01" step="any"
-                                       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                            </div>
-                            <div>
-                                <label for="edit_unit_of_measure" class="block text-sm font-medium text-gray-700 mb-1">وحدة القياس</label>
-                                <input type="text" id="edit_unit_of_measure" x-model="editingComponent.unit_of_measure" 
-                                       class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button @click="updateComponent()" type="button" 
-                        :disabled="!editingComponent.component_item_id || !editingComponent.quantity_required"
-                        :class="{'opacity-50 cursor-not-allowed': !editingComponent.component_item_id || !editingComponent.quantity_required}"
-                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
-                    حفظ التغييرات
-                </button>
-                <button @click="showEditComponentModal = false" type="button" 
-                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                    إلغاء
-                </button>
-            </div>
-        </div>
-    </div>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    المكون
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    النوع
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    الكمية المطلوبة
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    وحدة القياس
+                                                </th>
+                                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    الإجراءات
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            <template x-for="detail in selectedBom.details" :key="detail.id">
+                                                <tr>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <div class="text-sm font-medium text-gray-900" x-text="detail.component_name"></div>
+                                                        <div class="text-xs text-gray-500" x-text="detail.component_category_name"></div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <span class="text-xs px-2 py-1 rounded-full" 
+                                                              :class="getCategoryTypeClass(detail.component_category_type)"
+                                                              x-text="getCategoryTypeLabel(detail.component_category_type)"></span>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <div class="text-sm text-gray-900" x-text="detail.quantity_required"></div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <div class="text-sm text-gray-900" x-text="detail.unit_of_measure"></div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                        <button @click="editComponent(detail)" class="text-blue-600 hover:text-blue-900 ml-3">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+<button @click="confirmDeleteComponent(detail.id)" class="text-red-600 hover:text-red-900">
+    <i class="fas fa-trash-alt"></i>
+</button>
+</td>
+</tr>
+</template>
+</tbody>
+</table>
 </div>
 
-    
-    <!-- Production Modal -->
-    <div x-show="showProduceModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
-        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-
+<!-- Cost Summary -->
+<div class="mt-6 bg-gray-50 rounded-lg p-4">
+<h3 class="text-lg font-medium text-gray-800 mb-3">ملخص التكاليف</h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="bg-white p-3 rounded-lg border border-gray-200">
+<div class="text-sm text-gray-500">إجمالي التكلفة</div>
+<div class="text-xl font-bold text-gray-800" x-text="formatCurrency(selectedBom.total_cost)"></div>
 </div>
-<div @click.away="showProduceModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-        <div class="sm:flex sm:items-start">
-            <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                    إنتاج <span x-text="selectedBom?.final_product_name"></span>
-                </h3>
-                <div class="mt-2 space-y-4">
-                    <div>
-                        <label for="production_quantity" class="block text-sm font-medium text-gray-700 mb-1">كمية الإنتاج</label>
-                        <input type="number" id="production_quantity" x-model="production.quantity" min="1" step="1"
-                               class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="production_warehouse_id" class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
-                        <select id="production_warehouse_id" x-model="production.warehouse_id" 
-                                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                            <option value="">اختر المستودع</option>
-                            <template x-for="warehouse in warehouses" :key="warehouse.id">
-                                <option :value="warehouse.id" x-text="warehouse.name"></option>
-                            </template>
-                        </select>
-                    </div>
+<div class="bg-white p-3 rounded-lg border border-gray-200">
+<div class="text-sm text-gray-500">سعر البيع</div>
+<div class="text-xl font-bold text-gray-800" x-text="formatCurrency(selectedBom.selling_price)"></div>
+</div>
+<div class="bg-white p-3 rounded-lg border border-gray-200">
+<div class="text-sm text-gray-500">هامش الربح</div>
+<div class="text-xl font-bold" 
+:class="selectedBom.profit_margin >= 0 ? 'text-green-600' : 'text-red-600'"
+x-text="formatPercentage(selectedBom.profit_margin)"></div>
+</div>
+</div>
+
+<!-- Category Type Breakdown -->
+<div class="mt-6">
+     <h3 class="text-lg font-semibold mb-2">توزيع التكاليف حسب المكونات</h3>
+    
+     <div class="bg-white rounded-lg shadow p-4">
+         <div class="grid grid-cols-1 gap-4">
+             <!-- Component cost breakdown -->
+             <template x-if="selectedBom && selectedBom.component_costs && selectedBom.component_costs.length > 0">
+                 <div>
+                     <div class="mb-2 flex justify-between text-sm text-gray-600">
+                         <span>المكون</span>
+                         <span>النسبة</span>
+                         <span>التكلفة</span>
+                     </div>
                     
-                    <div x-show="selectedBom?.details && selectedBom.details.length > 0" class="mt-4">
-                        <h4 class="font-medium text-gray-700 mb-2">المكونات المطلوبة:</h4>
-                        <ul class="space-y-2 bg-gray-50 p-3 rounded-lg">
-                            <template x-for="detail in selectedBom.details" :key="detail.id">
-                                <li class="flex justify-between">
-                                    <span x-text="detail.component_name"></span>
-                                    <span class="font-medium" x-text="(detail.quantity_required * production.quantity) + ' ' + detail.unit_of_measure"></span>
-                                </li>
-                            </template>
-                        </ul>
-                    </div>
+                     <template x-for="(cost, index) in selectedBom.component_costs" :key="index">
+                         <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                             <span class="text-sm font-medium" x-text="cost.component_name"></span>
+                             <span class="text-sm" x-text="cost.percentage.toFixed(1) + '%'"></span>
+                             <span class="text-sm" x-text="formatCurrency(cost.cost)"></span>
+                         </div>
+                     </template>
                     
-                    <div x-show="availabilityResults.length > 0" class="mt-4">
-                        <h4 class="font-medium text-gray-700 mb-2">توفر المكونات:</h4>
-                        <ul class="space-y-2 bg-gray-50 p-3 rounded-lg">
-                            <template x-for="result in availabilityResults" :key="result.component_id">
-                                <li class="flex justify-between items-center">
-                                    <span x-text="result.component_name"></span>
-                                    <div class="flex items-center">
-                                        <span class="text-sm" x-text="result.available_quantity + '/' + result.required_quantity + ' ' + result.unit_of_measure"></span>
-                                        <span x-show="result.is_available" class="ml-2 text-green-500">
-                                            <i class="fas fa-check-circle"></i>
-                                        </span>
-                                        <span x-show="!result.is_available" class="ml-2 text-red-500">
-                                            <i class="fas fa-times-circle"></i>
-                                        </span>
-                                    </div>
-                                </li>
-                            </template>
-                        </ul>
-                        <div x-show="!allComponentsAvailable" class="mt-2 text-red-500 text-sm">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                            بعض المكونات غير متوفرة بالكمية المطلوبة
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-        <button @click="produceFromBom()" type="button" 
-                :disabled="!production.quantity || !production.warehouse_id || production.quantity < 1 || !allComponentsAvailable"
-                :class="{'opacity-50 cursor-not-allowed': !production.quantity || !production.warehouse_id || production.quantity < 1 || !allComponentsAvailable}"
-                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm">
-            بدء الإنتاج
-        </button>
-        <button @click="checkAvailability()" type="button" 
-                :disabled="!production.quantity || !production.warehouse_id || production.quantity < 1"
-                :class="{'opacity-50 cursor-not-allowed': !production.quantity || !production.warehouse_id || production.quantity < 1}"
-                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
-            التحقق من التوفر
-        </button>
-        <button @click="showProduceModal = false" type="button" 
-                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-            إلغاء
-        </button>
-    </div>
-</div>
-</div>
+                     <div class="flex justify-between items-center py-2 mt-2 font-semibold">
+                         <span>الإجمالي</span>
+                         <span>100%</span>
+                         <span x-text="formatCurrency(selectedBom.total_cost)"></span>
+                     </div>
+                 </div>
+             </template>
+            
+             <template x-if="!selectedBom || !selectedBom.component_costs || selectedBom.component_costs.length === 0">
+                 <div class="text-center text-gray-500 py-4">
+                     لا توجد بيانات تكلفة متاحة
+                 </div>
+             </template>
+         </div>
+     </div>
 </div>
 
-<!-- Confirmation Modal -->
-<div x-show="showConfirmModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+<!-- Add a visualization of the cost distribution -->
+<div class="mt-6" x-show="selectedBom && selectedBom.component_costs && selectedBom.component_costs.length > 0">
+     <h3 class="text-lg font-semibold mb-2">رسم بياني لتوزيع التكاليف</h3>
+    
+     <div class="bg-white rounded-lg shadow p-4">
+         <div class="h-8 w-full rounded-lg overflow-hidden flex">
+             <template x-for="(cost, index) in selectedBom.component_costs" :key="index">
+                 <div
+                     :style="`width: ${cost.percentage}%; background-color: ${getColorForIndex(index)};`"
+                     class="h-full transition-all duration-500"
+                     :title="`${cost.component_name}: ${cost.percentage.toFixed(1)}%`">
+                 </div>
+             </template>
+         </div>
+        
+         <div class="mt-2 flex flex-wrap gap-2">
+             <template x-for="(cost, index) in selectedBom.component_costs" :key="index">
+                 <div class="flex items-center text-xs">
+                     <div :style="`background-color: ${getColorForIndex(index)};`" class="w-3 h-3 mr-1 rounded-sm"></div>
+                     <span x-text="cost.component_name"></span>
+                 </div>
+             </template>
+         </div>
+     </div>
+</div>
+</div>
+</div>
+</template>
+</div>
+</div>
+</template>
+</div>
+</div>
+<!-- Add BOM Modal -->
+<div x-show="showAddBomModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
 <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
 <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+<div class="absolute inset-0 bg-gray-500 opacity-75"></div>
 </div>
-<div @click.away="showConfirmModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-        <div class="sm:flex sm:items-start">
-            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                <i class="fas fa-exclamation-triangle text-red-600"></i>
-            </div>
-            <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
-                <h3 class="text-lg leading-6 font-medium text-gray-900" x-text="confirmTitle"></h3>
-                <div class="mt-2">
-                    <p class="text-sm text-gray-500" x-text="confirmMessage"></p>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-        <button @click="confirmAction()" type="button" 
-                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
-            تأكيد
-        </button>
-        <button @click="showConfirmModal = false" type="button" 
-                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-            إلغاء
-        </button>
-    </div>
+<span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+<div @click.away="showAddBomModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+<div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+<div class="sm:flex sm:items-start">
+<div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
+<h3 class="text-lg leading-6 font-medium text-gray-900" x-text="editingBom ? 'تعديل قائمة المواد' : 'إضافة قائمة مواد جديدة'"></h3>
+<div class="mt-4">
+<form @submit.prevent="saveBom">
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-1">المنتج النهائي</label>
+<select x-model="bomForm.final_product_id" required
+class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+<option value="">اختر المنتج النهائي</option>
+<optgroup label="المنتجات النهائية">
+<template x-for="product in finalProducts" :key="product.id">
+<option :value="product.id" x-text="product.name"></option>
+</template>
+</optgroup>
+<optgroup label="المنتجات الوسيطة">
+<template x-for="product in intermediateProducts" :key="product.id">
+<option :value="product.id" x-text="product.name"></option>
+</template>
+</optgroup>
+</select>
+</div>
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
+<textarea x-model="bomForm.description" rows="3"
+class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="وصف اختياري لقائمة المواد"></textarea>
+</div>
+<div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+<button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+حفظ
+</button>
+<button type="button" @click="showAddBomModal = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm">
+إلغاء
+</button>
+</div>
+</form>
 </div>
 </div>
 </div>
 </div>
-<!-- Tips and Tutorial Section -->
-<div class="mt-8 bg-white rounded-lg shadow-md overflow-hidden">
-<div class="bg-blue-50 p-4 border-b border-blue-100">
-<h2 class="text-xl font-bold text-blue-800">
-<i class="fas fa-lightbulb mr-2"></i>نصائح وإرشادات لإدارة قوائم المواد
-</h2>
 </div>
-
-<div class="p-6">
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-<!-- Tips Column -->
-<div>
-    <h3 class="text-lg font-semibold text-gray-800 mb-4">نصائح مفيدة</h3>
-    
-    <ul class="space-y-3 text-gray-700">
-        <li class="flex">
-            <i class="fas fa-check-circle text-green-500 mt-1 ml-2"></i>
-            <span>قم بتسمية قوائم المواد بشكل واضح ومميز لسهولة العثور عليها لاحقاً.</span>
-        </li>
-        <li class="flex">
-            <i class="fas fa-check-circle text-green-500 mt-1 ml-2"></i>
-            <span>تأكد من تحديث كميات المكونات بشكل دوري للحصول على تقديرات دقيقة للإنتاج.</span>
-        </li>
-        <li class="flex">
-            <i class="fas fa-check-circle text-green-500 mt-1 ml-2"></i>
-            <span>استخدم وحدات قياس موحدة لجميع المكونات المتشابهة لتجنب الأخطاء.</span>
-        </li>
-        <li class="flex">
-            <i class="fas fa-check-circle text-green-500 mt-1 ml-2"></i>
-            <span>قم بمراجعة مخزون المكونات قبل بدء عملية الإنتاج للتأكد من توفر جميع المواد المطلوبة.</span>
-        </li>
-    </ul>
-</div>
-
-<!-- Tutorial Column -->
-<div>
-    <h3 class="text-lg font-semibold text-gray-800 mb-4">كيفية استخدام نظام قوائم المواد</h3>
-    
-    <div class="space-y-4">
-        <div class="bg-gray-50 p-3 rounded-lg">
-            <h4 class="font-medium text-blue-700 mb-2">1. إنشاء قائمة مواد جديدة</h4>
-            <p class="text-gray-700">انقر على زر "إضافة قائمة" واختر المنتج النهائي من القائمة المنسدلة، ثم أضف وصفاً مناسباً للقائمة.</p>
-        </div>
-        
-        <div class="bg-gray-50 p-3 rounded-lg">
-            <h4 class="font-medium text-blue-700 mb-2">2. إضافة المكونات</h4>
-            <p class="text-gray-700">بعد إنشاء القائمة، انقر على "إضافة مكون" لإضافة المواد الخام أو المكونات المطلوبة لإنتاج المنتج النهائي.</p>
-        </div>
-        
-        <div class="bg-gray-50 p-3 rounded-lg">
-            <h4 class="font-medium text-blue-700 mb-2">3. بدء عملية الإنتاج</h4>
-            <p class="text-gray-700">عند الحاجة للإنتاج، انقر على زر "إنتاج" وحدد الكمية المطلوبة والمستودع المناسب. سيقوم النظام تلقائياً بخصم المكونات المستخدمة وإضافة المنتج النهائي للمخزون.</p>
-        </div>
-    </div>
 </div>
 </div>
 
-<!-- Common Questions -->
-<div class="mt-6">
-<h3 class="text-lg font-semibold text-gray-800 mb-4">أسئلة شائعة</h3>
-
-
-            
-            <div class="space-y-3">
-                <div x-data="{ open: false }" class="border border-gray-200 rounded-lg overflow-hidden">
-                    <button @click="open = !open" class="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
-                        <span class="font-medium">كيف يمكنني تعديل مكونات قائمة المواد بعد إنشائها؟</span>
-                        <i :class="open ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas text-gray-500"></i>
-                    </button>
-                    <div x-show="open" class="p-4 bg-white">
-                        <p class="text-gray-700">يمكنك تعديل المكونات بالنقر على أيقونة التعديل (القلم) بجانب المكون المراد تعديله. يمكنك تغيير المكون نفسه أو الكمية المطلوبة أو وحدة القياس.</p>
-                    </div>
-                </div>
-                
-                <div x-data="{ open: false }" class="border border-gray-200 rounded-lg overflow-hidden">
-                    <button @click="open = !open" class="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
-                        <span class="font-medium">ماذا يحدث عند نفاد المكونات أثناء عملية الإنتاج؟</span>
-                        <i :class="open ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas text-gray-500"></i>
-                    </button>
-                    <div x-show="open" class="p-4 bg-white">
-                        <p class="text-gray-700">سيقوم النظام بالتحقق من توفر جميع المكونات قبل بدء عملية الإنتاج. إذا كانت الكمية المتوفرة غير كافية، سيظهر تنبيه يوضح المكونات الناقصة ولن تتم عملية الإنتاج حتى يتم توفير الكميات المطلوبة.</p>
-                    </div>
-                </div>
-                
-                <div x-data="{ open: false }" class="border border-gray-200 rounded-lg overflow-hidden">
-                    <button @click="open = !open" class="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
-                        <span class="font-medium">هل يمكن استخدام منتج نهائي كمكون في قائمة مواد أخرى؟</span>
-                        <i :class="open ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas text-gray-500"></i>
-                    </button>
-                    <div x-show="open" class="p-4 bg-white">
-                        <p class="text-gray-700">نعم، يمكنك استخدام أي منتج كمكون في قائمة مواد أخرى. هذا مفيد للمنتجات المركبة التي تتكون من منتجات وسيطة. النظام يدعم قوائم المواد متعددة المستويات.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<!-- Add Component Modal -->
+<div x-show="showAddComponentModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+<div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+<div class="fixed inset-0 transition-opacity" aria-hidden="true">
+<div class="absolute inset-0 bg-gray-500 opacity-75"></div>
 </div>
+<span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+<div @click.away="showAddComponentModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+<div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+<div class="sm:flex sm:items-start">
+<div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
+<h3 class="text-lg leading-6 font-medium text-gray-900" x-text="editingComponent ? 'تعديل مكون' : 'إضافة مكون جديد'"></h3>
+<div class="mt-4">
+<form @submit.prevent="saveComponent">
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-1">نوع المكون</label>
+<div class="flex space-x-4 space-x-reverse mb-2">
+<button type="button" @click="componentTypeFilter = 'RawMaterial'" 
+:class="componentTypeFilter === 'RawMaterial' ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-gray-100 text-gray-700 border-gray-200'"
+class="px-3 py-1 rounded-full text-sm border">
+مواد خام
+</button>
+<button type="button" @click="componentTypeFilter = 'Packaging'" 
+:class="componentTypeFilter === 'Packaging' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-gray-100 text-gray-700 border-gray-200'"
+class="px-3 py-1 rounded-full text-sm border">
+مواد تغليف
+</button>
+<button type="button" @click="componentTypeFilter = 'IntermediateProduct'" 
+:class="componentTypeFilter === 'IntermediateProduct' ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-gray-100 text-gray-700 border-gray-200'"
+class="px-3 py-1 rounded-full text-sm border">
+منتجات وسيطة
+</button>
+<button type="button" @click="componentTypeFilter = 'all'" 
+:class="componentTypeFilter === 'all' ? 'bg-gray-700 text-white border-gray-600' : 'bg-gray-100 text-gray-700 border-gray-200'"
+class="px-3 py-1 rounded-full text-sm border">
+الكل
+</button>
+</div>
+<select x-model="componentForm.component_item_id" required
+        @change="const item = getItemById(componentForm.component_item_id); if (item) componentForm.unit_of_measure = item.unit_of_measure"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <option value="">اختر المكون</option>
+    <template x-for="category in filteredComponentsByType" :key="category.category_name || category.category_type">
+        <optgroup :label="category.category_name || getCategoryTypeLabel(category.category_type)">
+            <template x-for="item in category.items" :key="item.id">
+                <option :value="item.id" x-text="item.name"></option>
+            </template>
+        </optgroup>
+    </template>
+</select>
+
+</div>
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-1">الكمية المطلوبة</label>
+<input type="number" x-model="componentForm.quantity_required" required min="0.01" step="0.01"
+class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+</div>
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-1">وحدة القياس</label>
+<input type="text" x-model="componentForm.unit_of_measure"
+class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="كجم، لتر، قطعة، ...">
+</div>
+<div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+<button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+حفظ
+</button>
+<button type="button" @click="showAddComponentModal = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm">
+    إلغاء
+</button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Production Modal -->
+<div x-show="showProduceModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+<div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+<div class="fixed inset-0 transition-opacity" aria-hidden="true">
+<div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+</div>
+<span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+<div @click.away="showProduceModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+<div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+<div class="sm:flex sm:items-start">
+<div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
+<h3 class="text-lg leading-6 font-medium text-gray-900">إنتاج من قائمة المواد</h3>
+<div class="mt-4">
+<form @submit.prevent="produceFromBom">
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-1">المنتج</label>
+<div class="p-3 bg-gray-50 rounded-lg">
+    <div class="font-medium text-gray-800" x-text="selectedBom?.final_product_name"></div>
+    <div class="text-sm text-gray-500" x-text="selectedBom?.description || ''"></div>
+</div>
+</div>
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+<select x-model="produceForm.warehouse_id" required
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <option value="">اختر المستودع</option>
+    <template x-for="warehouse in warehouses" :key="warehouse.id">
+        <option :value="warehouse.id" x-text="warehouse.name"></option>
+    </template>
+</select>
+</div>
+<div class="mb-4">
+<label class="block text-sm font-medium text-gray-700 mb-1">الكمية</label>
+<input type="number" x-model="produceForm.quantity" required min="1" step="1"
+       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+</div>
+
+<div x-show="availabilityCheck !== null" class="mb-4">
+<h4 class="font-medium text-gray-700 mb-2">توفر المكونات:</h4>
+<div x-show="availabilityCheck && availabilityCheck.all_available" class="p-3 bg-green-50 text-green-800 rounded-lg">
+    <i class="fas fa-check-circle ml-1"></i> جميع المكونات متوفرة
+</div>
+<div x-show="availabilityCheck && !availabilityCheck.all_available" class="p-3 bg-red-50 text-red-800 rounded-lg mb-2">
+    <i class="fas fa-exclamation-circle ml-1"></i> بعض المكونات غير متوفرة بالكمية المطلوبة
+</div>
+<div x-show="availabilityCheck && availabilityCheck.components" class="mt-2 max-h-40 overflow-y-auto">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المكون</th>
+                <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المطلوب</th>
+                <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المتوفر</th>
+                <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            <template x-for="(component, index) in availabilityCheck.components" :key="index">
+                <tr>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900" x-text="component.component_name"></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900" x-text="`${component.required_quantity} ${component.unit_of_measure}`"></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900" x-text="`${component.available_quantity} ${component.unit_of_measure}`"></td>
+                    <td class="px-3 py-2 whitespace-nowrap">
+                        <span x-show="component.is_available" class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">متوفر</span>
+                        <span x-show="!component.is_available" class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-800">غير متوفر</span>
+                    </td>
+                </tr>
+            </template>
+        </tbody>
+    </table>
+</div>
+</div>
+
+<div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+<button type="submit" :disabled="availabilityCheck && !availabilityCheck.all_available"
+        :class="(availabilityCheck && !availabilityCheck.all_available) ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'"
+        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm">
+    إنتاج
+</button>
+<button type="button" @click="checkAvailability()" class="mt-3 w-full inline-flex justify-center rounded-md border border-blue-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-blue-700 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+    التحقق من التوفر
+</button>
+<button type="button" @click="showProduceModal = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm">
+    إلغاء
+</button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div x-show="showDeleteModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+<div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+<div class="fixed inset-0 transition-opacity" aria-hidden="true">
+<div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+</div>
+<span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+<div @click.away="showDeleteModal = false" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+<div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+<div class="sm:flex sm:items-start">
+<div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+<i class="fas fa-exclamation-triangle text-red-600"></i>
+</div>
+<div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-right">
+<h3 class="text-lg leading-6 font-medium text-gray-900" x-text="deleteType === 'bom' ? 'حذف قائمة المواد' : 'حذف المكون'"></h3>
+<div class="mt-2">
+<p class="text-sm text-gray-500" x-text="deleteType === 'bom' ? 'هل أنت متأكد من حذف قائمة المواد هذه؟ لا يمكن التراجع عن هذا الإجراء.' : 'هل أنت متأكد من حذف هذا المكون من قائمة المواد؟'"></p>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+<button type="button" @click="confirmDelete()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+حذف
+</button>
+<button type="button" @click="showDeleteModal = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+إلغاء
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+{% endblock %}
 
 {% block scripts %}
 <script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('bomManagement', () => ({
-            boms: [],
-            categorizedItems: [],
-            componentsByCategory: [],
-            warehouses: [],
-            selectedBomId: null,
-            selectedBom: null,
-            searchTerm: '',
-            loading: true,
-            loadingDetails: false,
-            
-            // Availability check results
-            availabilityResults: [],
-            allComponentsAvailable: true,
-            
-            // Modals
-            showAddBomModal: false,
-            showEditBomModal: false,
-            showAddComponentModal: false,
-            showEditComponentModal: false,
-            showProduceModal: false,
-            showConfirmModal: false,
-            
-            // Form data
-            newBom: {
-                final_product_id: '',
-                description: ''
-            },
-            editingBom: {
-                id: null,
-                final_product_id: '',
-                description: ''
-            },
-            newComponent: {
-                component_item_id: '',
-                quantity_required: '',
-                unit_of_measure: ''
-            },
-            editingComponent: {
-                id: null,
-                component_item_id: '',
-                quantity_required: '',
-                unit_of_measure: ''
-            },
-            production: {
-                quantity: 1,
-                warehouse_id: ''
-            },
-            
-            // Confirmation modal
-            confirmTitle: '',
-            confirmMessage: '',
-            confirmCallback: null,
-            
-            init() {
-                this.fetchBoms();
-                this.fetchCategorizedItems();
-                this.fetchComponentsByCategory();
-                this.fetchWarehouses();
-            },
-            
-            get filteredBoms() {
-                if (!this.searchTerm) return this.boms;
-                
-                const term = this.searchTerm.toLowerCase();
-                return this.boms.filter(bom => 
-                    bom.final_product_name.toLowerCase().includes(term) || 
-                    (bom.description && bom.description.toLowerCase().includes(term))
-                );
-            },
-            
-            async fetchBoms() {
-                this.loading = true;
-                try {
-                    const response = await fetch('/api/bom');
-                    if (!response.ok) throw new Error('Failed to fetch BOMs');
-                    
-                    this.boms = await response.json();
-                } catch (error) {
-                    console.error('Error fetching BOMs:', error);
-                    this.showToast('حدث خطأ أثناء جلب قوائم المواد', 'error');
-                } finally {
-                    this.loading = false;
-                }
-            },
-            
-            async fetchCategorizedItems() {
-                try {
-                    const response = await fetch('/api/bom/categories');
-                    if (!response.ok) throw new Error('Failed to fetch categorized items');
-                    
-                    this.categorizedItems = await response.json();
-                } catch (error) {
-                    console.error('Error fetching categorized items:', error);
-                    this.showToast('حدث خطأ أثناء جلب العناصر المصنفة', 'error');
-                }
-            },
-            
-            async fetchComponentsByCategory() {
-                try {
-                    const response = await fetch('/api/bom/components-by-category');
-                    if (!response.ok) throw new Error('Failed to fetch components by category');
-                    
-                    this.componentsByCategory = await response.json();
-                } catch (error) {
-                    console.error('Error fetching components by category:', error);
-                    this.showToast('حدث خطأ أثناء جلب المكونات حسب الفئة', 'error');
-                }
-            },
-            
-            async fetchWarehouses() {
-                try {
-                    const response = await fetch('/api/warehouses');
-                    if (!response.ok) throw new Error('Failed to fetch warehouses');
-                    
-                    this.warehouses = await response.json();
-                } catch (error) {
-                    console.error('Error fetching warehouses:', error);
-                    this.showToast('حدث خطأ أثناء جلب المستودعات', 'error');
-                }
-            },
-            
-            async selectBom(id) {
-                if (this.selectedBomId === id) return;
-                
-                this.selectedBomId = id;
-                this.loadingDetails = true;
-                
-                try {
-                    const response = await fetch(`/api/bom/${id}`);
-                    if (!response.ok) throw new Error('Failed to fetch BOM details');
-                    
-                    this.selectedBom = await response.json();
-                } catch (error) {
-                    console.error('Error fetching BOM details:', error);
-                    this.showToast('حدث خطأ أثناء جلب تفاصيل قائمة المواد', 'error');
-                } finally {
-                    this.loadingDetails = false;
-                }
-            },
-            
-            async addBom() {
-                try {
-                    const response = await fetch('/api/bom', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(this.newBom)
-                    });
-                    
-                    if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(error.message || 'Failed to create BOM');
-                    }
-                    
-                    const newBom = await response.json();
-                    this.boms.push(newBom);
-                    
-                    this.showAddBomModal = false;
-                    this.newBom = { final_product_id: '', description: '' };
-                    this.showToast('تم إنشاء قائمة المواد بنجاح', 'success');
-                    
-                    // Select the newly created BOM
-                    this.selectBom(newBom.id);
-                } catch (error) {
-                    console.error('Error creating BOM:', error);
-                    this.showToast(error.message || 'حدث خطأ أثناء إنشاء قائمة المواد', 'error');
-                }
-            },
-            
-            editBom(bom) {
-                this.editingBom = {
-                    id: bom.id,
-                    final_product_id: bom.final_product_id,
-                    description: bom.description || ''
-                };
-                this.showEditBomModal = true;
-            },
-            
-            async updateBom() {
-                try {
-                    const response = await fetch(`/api/bom/${this.editingBom.id}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            final_product_id: this.editingBom.final_product_id,
-                            description: this.editingBom.description
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(error.message || 'Failed to update BOM');
-                    }
-                    
-                    const updatedBom = await response.json();
-                    
-                    // Update the BOM in the list
-                    const index = this.boms.findIndex(b => b.id === this.editingBom.id);
-                    if (index !== -1) {
-                        this.boms[index] = updatedBom;
-                    }
-                    
-                    // If this is the selected BOM, update it
-                    if (this.selectedBomId === this.editingBom.id) {
-                        // Refresh the selected BOM to get updated details
-                        this.selectBom(this.editingBom.id);
-                    }
-                    
-                    this.showEditBomModal = false;
-                    this.showToast('تم تحديث قائمة المواد بنجاح', 'success');
-                } catch (error) {
-                    console.error('Error updating BOM:', error);
-                    this.showToast(error.message || 'حدث خطأ أثناء تحديث قائمة المواد', 'error');
-                }
-            },
-            
-            confirmDeleteBom(id) {
-                this.confirmTitle = 'حذف قائمة المواد';
-                this.confirmMessage = 'هل أنت متأكد من رغبتك في حذف قائمة المواد هذه؟ سيتم حذف جميع المكونات المرتبطة بها أيضًا.';
-                this.confirmCallback = () => this.deleteBom(id);
-                this.showConfirmModal = true;
-            },
-            
-            async deleteBom(id) {
-                try {
-                    const response = await fetch(`/api/bom/${id}`, {
-                        method: 'DELETE'
-                    });
-                    
-                    if (!response.ok) throw new Error('Failed to delete BOM');
-                    
-                    // Remove from the list
-                    this.boms = this.boms.filter(b => b.id !== id);
-                    
-                    // If this was the selected BOM, clear the selection
-                    if (this.selectedBomId === id) {
-                        this.selectedBomId = null;
-                        this.selectedBom = null;
-                    }
-                    
-                    this.showConfirmModal = false;
-                    this.showToast('تم حذف قائمة المواد بنجاح', 'success');
-                } catch (error) {
-                    console.error('Error deleting BOM:', error);
-                    this.showToast('حدث خطأ أثناء حذف قائمة المواد', 'error');
-                }
-            },
-            
-            async addComponent() {
-                if (!this.selectedBomId) return;
-                
-                try {
-                    const response = await fetch(`/api/bom/${this.selectedBomId}/details`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(this.newComponent)
-                    });
-                    
-                    if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(error.message || 'Failed to add component');
-                    }
-                    
-                    const newComponent = await response.json();
-                    
-                    // Add to the selected BOM's details
-                    if (!this.selectedBom.details) this.selectedBom.details = [];
-                    this.selectedBom.details.push(newComponent);
-                    
-                    this.showAddComponentModal = false;
-                    this.newComponent = { component_item_id: '', quantity_required: '', unit_of_measure: '' };
-                    this.showToast('تم إضافة المكون بنجاح', 'success');
-                } catch (error) {
-                    console.error('Error adding component:', error);
-                    this.showToast(error.message || 'حدث خطأ أثناء إضافة المكون', 'error');
-                }
-            },
-            
-            editComponent(component) {
-                this.editingComponent = {
-                    id: component.id,
-                    component_item_id: component.component_item_id,
-                    quantity_required: component.quantity_required,
-                    unit_of_measure: component.unit_of_measure
-                };
-                this.showEditComponentModal = true;
-            },
+function bomManagement() {
+return {
+// Data
+boms: [],
+selectedBomId: null,
+selectedBom: null,
+finalProducts: [],
+intermediateProducts: [],
+rawMaterials: [],
+packagingMaterials: [],
+componentsByCategory: [],
+componentsByType: [],
+warehouses: [],
+searchTerm: '',
+loading: true,
+loadingDetails: false,
 
-            async updateComponent() {
-                try {
-                    const response = await fetch(`/api/bom/details/${this.editingComponent.id}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            component_item_id: this.editingComponent.component_item_id,
-                            quantity_required: this.editingComponent.quantity_required,
-                            unit_of_measure: this.editingComponent.unit_of_measure
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(error.message || 'Failed to update component');
-                    }
-                    
-                    const updatedComponent = await response.json();
-                    
-                    // Update the component in the selected BOM's details
-                    const index = this.selectedBom.details.findIndex(d => d.id === this.editingComponent.id);
-                    if (index !== -1) {
-                        this.selectedBom.details[index] = updatedComponent;
-                    }
-                    
-                    this.showEditComponentModal = false;
-                    this.showToast('تم تحديث المكون بنجاح', 'success');
-                } catch (error) {
-                    console.error('Error updating component:', error);
-                    this.showToast(error.message || 'حدث خطأ أثناء تحديث المكون', 'error');
-                }
-            },
+// Modals
+showAddBomModal: false,
+showAddComponentModal: false,
+showProduceModal: false,
+showDeleteModal: false,
 
-            confirmDeleteComponent(id) {
-                this.confirmTitle = 'حذف المكون';
-                this.confirmMessage = 'هل أنت متأكد من رغبتك في حذف هذا المكون من قائمة المواد؟';
-                this.confirmCallback = () => this.deleteComponent(id);
-                this.showConfirmModal = true;
-            },
+// Forms
+bomForm: {
+id: null,
+final_product_id: '',
+description: ''
+},
+componentForm: {
+id: null,
+component_item_id: '',
+quantity_required: '',
+unit_of_measure: ''
+},
+produceForm: {
+warehouse_id: '',
+quantity: 1
+},
 
-            async deleteComponent(id) {
-                try {
-                    const response = await fetch(`/api/bom/details/${id}`, {
-                        method: 'DELETE'
-                    });
-                    
-                    if (!response.ok) throw new Error('Failed to delete component');
-                    
-                    // Remove from the selected BOM's details
-                    this.selectedBom.details = this.selectedBom.details.filter(d => d.id !== id);
-                    
-                    this.showConfirmModal = false;
-                    this.showToast('تم حذف المكون بنجاح', 'success');
-                } catch (error) {
-                    console.error('Error deleting component:', error);
-                    this.showToast('حدث خطأ أثناء حذف المكون', 'error');
-                }
-            },
+// Editing state
+editingBom: false,
+editingComponent: false,
 
-            async checkAvailability() {
-                if (!this.selectedBomId || !this.production.warehouse_id || !this.production.quantity) return;
+// Delete state
+deleteType: null, // 'bom' or 'component'
+deleteId: null,
+
+// Component filtering
+componentTypeFilter: 'all',
+
+// Production
+availabilityCheck: null,
+
+// Initialize
+async init() {
+await this.loadBoms();
+await this.loadFinalProducts();
+await this.loadIntermediateProducts();
+await this.loadRawMaterials();
+await this.loadPackagingMaterials();
+await this.loadComponentsByCategory();
+await this.loadComponentsByType();
+await this.loadWarehouses();
+this.loading = false;
+},
+
+
+// Computed properties
+get filteredBoms() {
+    if (!this.searchTerm) return this.boms;
+    
+    const term = this.searchTerm.toLowerCase();
+    return this.boms.filter(bom => 
+        bom.final_product_name.toLowerCase().includes(term) || 
+        (bom.description && bom.description.toLowerCase().includes(term)) ||
+        (bom.final_product_category_name && bom.final_product_category_name.toLowerCase().includes(term))
+    );
+},
+getItemById(itemId) {
+    // Search in all component categories
+    for (const category of this.componentsByCategory) {
+        const item = category.items.find(item => item.id === parseInt(itemId));
+        if (item) return item;
+    }
+    return null;
+},
+
+get filteredComponentsByType() {
+    if (this.componentTypeFilter === 'all') {
+        return this.componentsByCategory;
+    }
+    
+    // Filter components by the selected type
+    return this.componentsByType.filter(category => 
+        category.category_type === this.componentTypeFilter
+    );
+},
+
+// Methods
+async loadBoms() {
+    try {
+        const response = await fetch('/api/bom');
+        if (!response.ok) throw new Error('Failed to load BOMs');
+        this.boms = await response.json();
+    } catch (error) {
+        console.error('Error loading BOMs:', error);
+        showNotification('حدث خطأ أثناء تحميل قوائم المواد', 'error');
+    }
+},
+
+// Replace the loadFinalProducts and loadIntermediateProducts methods in the bomManagement() function
+async loadFinalProducts() {
+    try {
+        // First try to get categorized final products
+        let response = await fetch('/api/bom/final-products');
+        if (!response.ok) {
+            // If that fails, fall back to all items
+            console.warn('Failed to load categorized final products, falling back to all items');
+            response = await fetch('/api/items');
+        }
+        this.finalProducts = await response.json();
+        console.log('Loaded final products:', this.finalProducts);
+    } catch (error) {
+        console.error('Error loading final products:', error);
+        // Fall back to all items
+        try {
+            const response = await fetch('/api/items');
+            this.finalProducts = await response.json();
+            console.log('Loaded all items as final products:', this.finalProducts);
+        } catch (fallbackError) {
+            console.error('Error loading fallback items:', fallbackError);
+            showNotification('حدث خطأ أثناء تحميل المنتجات', 'error');
+        }
+    }
+},
+
+async loadIntermediateProducts() {
+    try {
+        // First try to get categorized intermediate products
+        let response = await fetch('/api/bom/intermediate-products');
+        if (!response.ok) {
+            // If that fails, fall back to all items
+            console.warn('Failed to load categorized intermediate products, falling back to all items');
+            response = await fetch('/api/items');
+        }
+        this.intermediateProducts = await response.json();
+        console.log('Loaded intermediate products:', this.intermediateProducts);
+    } catch (error) {
+        console.error('Error loading intermediate products:', error);
+        // Fall back to all items
+        try {
+            const response = await fetch('/api/items');
+            this.intermediateProducts = await response.json();
+            console.log('Loaded all items as intermediate products:', this.intermediateProducts);
+        } catch (fallbackError) {
+            console.error('Error loading fallback items:', fallbackError);
+            showNotification('حدث خطأ أثناء تحميل المنتجات', 'error');
+        }
+    }
+},
+
+
+async loadRawMaterials() {
+    try {
+        const response = await fetch('/api/items');
+        if (!response.ok) throw new Error('Failed to load items');
+        const items = await response.json();
+        
+        // Filter for raw materials
+        this.rawMaterials = items.filter(item => {
+            const category = item.category_id ? this.getCategoryById(item.category_id) : null;
+            return category && category.category_type === 'RawMaterial';
+        });
+    } catch (error) {
+        console.error('Error loading raw materials:', error);
+    }
+},
+
+async loadPackagingMaterials() {
+    try {
+        const response = await fetch('/api/items');
+        if (!response.ok) throw new Error('Failed to load items');
+        const items = await response.json();
+        
+        // Filter for packaging materials
+        this.packagingMaterials = items.filter(item => {
+            const category = item.category_id ? this.getCategoryById(item.category_id) : null;
+            return category && category.category_type === 'Packaging';
+        });
+    } catch (error) {
+        console.error('Error loading packaging materials:', error);
+    }
+},
+
+async loadComponentsByCategory() {
+    try {
+        const response = await fetch('/api/bom/components-by-category');
+        if (!response.ok) throw new Error('Failed to load components by category');
+        this.componentsByCategory = await response.json();
+    } catch (error) {
+        console.error('Error loading components by category:', error);
+    }
+},
+
+async loadComponentsByType() {
+    try {
+        const response = await fetch('/api/bom/components-by-type');
+        if (!response.ok) throw new Error('Failed to load components by type');
+        this.componentsByType = await response.json();
+    } catch (error) {
+        console.error('Error loading components by type:', error);
+    }
+},
+
+async loadWarehouses() {
+    try {
+        const response = await fetch('/api/warehouses');
+        if (!response.ok) throw new Error('Failed to load warehouses');
+        this.warehouses = await response.json();
+    } catch (error) {
+        console.error('Error loading warehouses:', error);
+    }
+},
+
+async selectBom(bomId) {
+    this.selectedBomId = bomId;
+    this.loadingDetails = true;
+    
+    try {
+        const response = await fetch(`/api/bom/${bomId}`);
+        if (!response.ok) throw new Error('Failed to load BOM details');
+        this.selectedBom = await response.json();
+    } catch (error) {
+        console.error('Error loading BOM details:', error);
+        showNotification('حدث خطأ أثناء تحميل تفاصيل قائمة المواد', 'error');
+    } finally {
+        this.loadingDetails = false;
+    }
+},
+
+resetBomForm() {
+    this.bomForm = {
+        id: null,
+        final_product_id: '',
+        description: ''
+    };
+    this.editingBom = false;
+},
+
+resetComponentForm() {
+    this.componentForm = {
+        id: null,
+        component_item_id: '',
+        quantity_required: '',
+        unit_of_measure: ''
+    };
+    this.editingComponent = false;
+},
+
+editBom(bom) {
+    this.bomForm = {
+        id: bom.id,
+        final_product_id: bom.final_product_id,
+        description: bom.description || ''
+    };
+    this.editingBom = true;
+    this.showAddBomModal = true;
+},
+
+editComponent(component) {
+    this.componentForm = {
+        id: component.id,
+        component_item_id: component.component_item_id,
+        quantity_required: component.quantity_required,
+        unit_of_measure: component.unit_of_measure
+    };
+    this.editingComponent = true;
+    this.showAddComponentModal = true;
+},
+
+async saveBom() {
+    try {
+        let response;
+        
+        if (this.editingBom) {
+            // Update existing BOM
+            response = await fetch(`/api/bom/${this.bomForm.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    final_product_id: this.bomForm.final_product_id,
+                    description: this.bomForm.description
+                })
+            });
+        } else {
+            // Create new BOM
+            response = await fetch('/api/bom', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    final_product_id: this.bomForm.final_product_id,
+                    description: this.bomForm.description
+                })
+            });
+        }
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to save BOM');
+        }
+        
+        const savedBom = await response.json();
+        
+        // Refresh BOM list
+        await this.loadBoms();
+        
+        // Select the saved BOM
+        this.selectBom(savedBom.id);
+        
+        // Close modal and reset form
+        this.showAddBomModal = false;
+        this.resetBomForm();
+        
+        showNotification(this.editingBom ? 'تم تحديث قائمة المواد بنجاح' : 'تم إنشاء قائمة المواد بنجاح', 'success');
+    } catch (error) {
+        console.error('Error saving BOM:', error);
+        showNotification(error.message || 'حدث خطأ أثناء حفظ قائمة المواد', 'error');
+    }
+},
+
+async saveComponent() {
+    try {
+        let response;
+        
+        if (this.editingComponent) {
+            // Update existing component
+            response = await fetch(`/api/bom/details/${this.componentForm.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    component_item_id: this.componentForm.component_item_id,
+                    quantity_required: this.componentForm.quantity_required,
+                    unit_of_measure: this.componentForm.unit_of_measure
+                })
+            });
+        } else {
+            // Add new component
+            response = await fetch(`/api/bom/${this.selectedBomId}/details`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    component_item_id: this.componentForm.component_item_id,
+                    quantity_required: this.componentForm.quantity_required,
+                    unit_of_measure: this.componentForm.unit_of_measure
+                })
+            });
+        }
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to save component');
+        }
+        
+        // Refresh BOM details
+        await this.selectBom(this.selectedBomId);
+        
+        // Close modal and reset form
+        this.showAddComponentModal = false;
+        this.resetComponentForm();
+        
+        showNotification(this.editingComponent ? 'تم تحديث المكون بنجاح' : 'تم إضافة المكون بنجاح', 'success');
+    } catch (error) {
+        console.error('Error saving component:', error);
+        showNotification(error.message || 'حدث خطأ أثناء حفظ المكون', 'error');
+    }
+},
+
+confirmDeleteBom(bomId) {
+    this.deleteType = 'bom';
+    this.deleteId = bomId;
+    this.showDeleteModal = true;
+},
+
+confirmDeleteComponent(componentId) {
+    this.deleteType = 'component';
+    this.deleteId = componentId;
+    this.showDeleteModal = true;
+},
+
+async confirmDelete() {
+    try {
+        let response;
+        
+        if (this.deleteType === 'bom') {
+            response = await fetch(`/api/bom/${this.deleteId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                // Refresh BOM list
+                await this.loadBoms();
                 
-                try {
-                    const response = await fetch(`/api/bom/${this.selectedBomId}/check-availability`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            quantity: this.production.quantity,
-                            warehouse_id: this.production.warehouse_id
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(error.message || 'Failed to check availability');
-                    }
-                    const result = await response.json();
-                    this.availabilityResults = result.components;
-                    this.allComponentsAvailable = result.all_available;
-                    
-                    if (!result.all_available) {
-                        this.showToast('بعض المكونات غير متوفرة بالكمية المطلوبة', 'warning');
-                    } else {
-                        this.showToast('جميع المكونات متوفرة بالكمية المطلوبة', 'success');
-                    }
-                } catch (error) {
-                    console.error('Error checking availability:', error);
-                    this.showToast(error.message || 'حدث خطأ أثناء التحقق من توفر المكونات', 'error');
+                // Clear selection if the deleted BOM was selected
+                if (this.selectedBomId === this.deleteId) {
+                    this.selectedBomId = null;
+                    this.selectedBom = null;
                 }
-            },
-            handleComponentSelection() {
-                if (this.newComponent.component_item_id) {
-                    // Find the selected component in the componentsByCategory array
-                    for (const category of this.componentsByCategory) {
-                        const selectedComponent = category.items.find(item => 
-                            item.id == this.newComponent.component_item_id
-                        );
-                        
-                        if (selectedComponent) {
-                            // Auto-fill the unit of measure
-                            this.newComponent.unit_of_measure = selectedComponent.unit_of_measure;
-                            break;
-                        }
-                    }
-                }
-            },
-            handleEditComponentSelection() {
-                if (this.editingComponent.component_item_id) {
-                    // Find the selected component in the componentsByCategory array
-                    for (const category of this.componentsByCategory) {
-                        const selectedComponent = category.items.find(item => 
-                            item.id == this.editingComponent.component_item_id
-                        );
-                        
-                        if (selectedComponent) {
-                            // Auto-fill the unit of measure
-                            this.editingComponent.unit_of_measure = selectedComponent.unit_of_measure;
-                            break;
-                        }
-                    }
-                }
-            },
-            async produceFromBom() {
-                if (!this.selectedBomId) return;
                 
-                try {
-                    const response = await fetch(`/api/bom/${this.selectedBomId}/produce`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(this.production)
-                    });
-                    
-                    if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(error.message || 'Failed to produce from BOM');
-                    }
-                    
-                    const result = await response.json();
-                    
-                    this.showProduceModal = false;
-                    this.production = { quantity: 1, warehouse_id: '' };
-                    this.availabilityResults = [];
-                    this.showToast(`تم إنتاج ${result.final_product.quantity_produced} وحدة بنجاح`, 'success');
-                } catch (error) {
-                    console.error('Error producing from BOM:', error);
-                    this.showToast(error.message || 'حدث خطأ أثناء الإنتاج', 'error');
-                }
-            },
-
-            confirmAction() {
-                if (typeof this.confirmCallback === 'function') {
-                    this.confirmCallback();
-                }
-            },
-            
-            // New method to use the toast notification system from base.html
-            showToast(message, type = 'info') {
-                window.dispatchEvent(new CustomEvent('notify', {
-                    detail: { message, type }
-                }));
-            },
-            
-            // Methods for quick actions
-            goToItemsPage() {
-                window.location.href = '/items-management';
-            },
-            
-            goToCategoriesPage() {
-                window.location.href = '/categories-management';
+                showNotification('تم حذف قائمة المواد بنجاح', 'success');
             }
-        }));
-    });
+        } else if (this.deleteType === 'component') {
+            response = await fetch(`/api/bom/details/${this.deleteId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                // Refresh BOM details
+                await this.selectBom(this.selectedBomId);
+                
+                showNotification('تم حذف المكون بنجاح', 'success');
+            }
+        }
+        
+        if (!response.ok) {
+            throw new Error('Failed to delete');
+        }
+    } catch (error) {
+        console.error('Error deleting:', error);
+        showNotification('حدث خطأ أثناء الحذف', 'error');
+    } finally {
+        this.showDeleteModal = false;
+        this.deleteType = null;
+        this.deleteId = null;
+    }
+},
+
+
+async checkAvailability() {
+    if (!this.produceForm.warehouse_id || !this.produceForm.quantity) {
+        showNotification('يرجى تحديد المستودع والكمية', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/bom/${this.selectedBomId}/check-availability`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                warehouse_id: this.produceForm.warehouse_id,
+                quantity: this.produceForm.quantity
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to check availability');
+        }
+        
+        this.availabilityCheck = await response.json();
+    } catch (error) {
+        console.error('Error checking availability:', error);
+        showNotification(error.message || 'حدث خطأ أثناء التحقق من التوفر', 'error');
+    }
+},
+
+async produceFromBom() {
+    if (!this.produceForm.warehouse_id || !this.produceForm.quantity) {
+        showNotification('يرجى تحديد المستودع والكمية', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/bom/${this.selectedBomId}/produce`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                warehouse_id: this.produceForm.warehouse_id,
+                quantity: this.produceForm.quantity
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to produce from BOM');
+        }
+        
+        const result = await response.json();
+        
+        // Refresh BOM details
+        await this.selectBom(this.selectedBomId);
+        
+        // Close modal and reset form
+        this.showProduceModal = false;
+        this.produceForm = {
+            warehouse_id: '',
+            quantity: 1
+        };
+        this.availabilityCheck = null;
+        
+        showNotification(result.message || 'تم الإنتاج بنجاح', 'success');
+    } catch (error) {
+        console.error('Error producing from BOM:', error);
+
+showNotification(error.message || 'حدث خطأ أثناء الإنتاج', 'error');
+}
+},
+
+// Helper methods
+getCategoryById(categoryId) {
+// This would need to be implemented if we have a categories list
+// For now, we'll return a placeholder
+return { name: 'Unknown', category_type: 'Unknown' };
+},
+
+// Add this function to the bomManagement() object
+getColorForIndex(index) {
+    // Array of colors for the chart
+    const colors = [
+        '#4F46E5', '#10B981', '#F59E0B', '#EF4444', 
+        '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16',
+        '#3B82F6', '#F97316', '#14B8A6', '#6366F1'
+    ];
+    
+    // Return color based on index, cycling through the array if needed
+    return colors[index % colors.length];
+},
+
+getCategoryTypeLabel(type) {
+const labels = {
+    'RawMaterial': 'مواد خام',
+    'IntermediateProduct': 'منتج وسيط',
+    'FinalProduct': 'منتج نهائي',
+    'Packaging': 'مواد تغليف',
+    'Unknown': 'غير مصنف'
+};
+
+return labels[type] || 'غير مصنف';
+},
+// Add this method to the bomManagement() object
+async updateItemCost() {
+    if (!this.selectedBom) return;
+    
+    try {
+        // Call the calculate-cost endpoint to get the current cost
+        const response = await fetch(`/api/bom/${this.selectedBom.id}/calculate-cost`);
+        if (!response.ok) throw new Error('Failed to calculate cost');
+        
+        const costData = await response.json();
+        
+        // Now update the item with the calculated cost
+        const itemResponse = await fetch(`/api/items/${this.selectedBom.final_product_id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                cost: costData.total_cost
+            })
+        });
+        
+        if (!itemResponse.ok) throw new Error('Failed to update item cost');
+        
+        showNotification('تم تحديث تكلفة المنتج بنجاح', 'success');
+        
+        // Refresh the BOM details to show the updated cost
+        await this.selectBom(this.selectedBom.id);
+        
+    } catch (error) {
+        console.error('Error updating item cost:', error);
+        showNotification('حدث خطأ أثناء تحديث تكلفة المنتج', 'error');
+    }
+},
+
+
+getCategoryTypeClass(type) {
+const classes = {
+    'RawMaterial': 'bg-blue-100 text-blue-800',
+    'IntermediateProduct': 'bg-purple-100 text-purple-800',
+    'FinalProduct': 'bg-green-100 text-green-800',
+    'Packaging': 'bg-yellow-100 text-yellow-800',
+    'Unknown': 'bg-gray-100 text-gray-800'
+};
+
+return classes[type] || 'bg-gray-100 text-gray-800';
+},
+
+getCategoryTypeProgressClass(type) {
+const classes = {
+    'RawMaterial': 'bg-blue-500',
+    'IntermediateProduct': 'bg-purple-500',
+    'FinalProduct': 'bg-green-500',
+    'Packaging': 'bg-yellow-500',
+    'Unknown': 'bg-gray-500'
+};
+
+return classes[type] || 'bg-gray-500';
+},
+exportSimpleBomToPdf() {
+    if (!this.selectedBom) return;
+    
+    // Show loading notification
+    showNotification('جاري إنشاء ملف PDF المبسط...', 'info');
+    
+    // Create a URL to the simplified PDF endpoint
+    const pdfUrl = `/api/bom/${this.selectedBom.id}/simple-pdf`;
+    
+    // Open the PDF in a new tab/window
+    window.open(pdfUrl, '_blank');
+},
+exportBomToPdf() {
+    if (!this.selectedBom) return;
+    
+    // Show loading notification
+    showNotification('جاري إنشاء ملف PDF...', 'info');
+    
+    // Create a URL to the PDF endpoint
+    const pdfUrl = `/api/bom/${this.selectedBom.id}/pdf`;
+    
+    // Open the PDF in a new tab/window
+    window.open(pdfUrl, '_blank');
+},
+
+formatCurrency(value) {
+if (value === undefined || value === null) return '0.00 ج.م';
+return parseFloat(value).toFixed(2) + ' ج.م';
+},
+// Add this method to the bomManagement() object
+printBomDetails() {
+    if (!this.selectedBom) return;
+    
+    // Create a printable version of the BOM details
+    const printContent = this.createPrintableContent();
+    
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    
+    // Wait for resources to load then print
+    printWindow.onload = function() {
+        printWindow.print();
+        // printWindow.close(); // Uncomment to auto-close after print dialog
+    };
+},
+
+createPrintableContent() {
+    const bom = this.selectedBom;
+    if (!bom) return '';
+    
+    // Create the HTML content for printing
+    return `
+        <!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head>
+            <meta charset="UTF-8">
+            <title>قائمة المواد - ${bom.final_product_name}</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 0;
+                    padding: 20px;
+                    direction: rtl;
+                }
+                .header {
+                    text-align: center;
+                    margin-bottom: 30px;
+                }
+                .header h1 {
+                    margin-bottom: 5px;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 20px;
+                }
+                th, td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    text-align: right;
+                }
+                th {
+                    background-color: #f2f2f2;
+                }
+                .footer {
+                    margin-top: 30px;
+                    text-align: center;
+                    font-size: 12px;
+                    color: #666;
+                }
+                @media print {
+                    @page {
+                        size: A4;
+                        margin: 1cm;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>قائمة المواد (BOM)</h1>
+                <p>${bom.final_product_name}</p>
+                <p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
+            </div>
+            
+            <h2>معلومات المنتج النهائي</h2>
+            <table>
+                <tr>
+                    <th>اسم المنتج</th>
+                    <td>${bom.final_product_name}</td>
+                </tr>
+                <tr>
+                    <th>الفئة</th>
+                    <td>${bom.final_product_category_name || 'غير مصنف'}</td>
+                </tr>
+                <tr>
+                    <th>الوصف</th>
+                    <td>${bom.description || 'لا يوجد وصف'}</td>
+                </tr>
+            </table>
+            
+            <h2>مكونات قائمة المواد</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>المكون</th>
+                        <th>الفئة</th>
+                        <th>الكمية المطلوبة</th>
+                        <th>وحدة القياس</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${bom.details.map(detail => `
+                        <tr>
+                            <td>${detail.component_name}</td>
+                            <td>${detail.component_category_name}</td>
+                            <td>${detail.quantity_required}</td>
+                            <td>${detail.unit_of_measure}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            
+            <div class="footer">
+                <p>تم إنشاء هذا التقرير بواسطة نظام كاتيلو لإدارة المخزون</p>
+            </div>
+        </body>
+        </html>
+    `;
+},
+
+
+formatPercentage(value) {
+if (value === undefined || value === null) return '0%';
+return parseFloat(value).toFixed(1) + '%';
+}
+};
+}
 </script>
-{% endblock %}
 {% endblock %}
