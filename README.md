@@ -25,7 +25,7 @@ Katilo ERP is an integrated solution for inventory management, warehousing, prod
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.10.8 or higher
 - wkhtmltopdf (for PDF generation)
 
 ### Windows Installation
