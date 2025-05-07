@@ -116,8 +116,8 @@ For production deployment, the system uses Waitress WSGI server with automatic p
 
 ## 📱 Contact
 
-- Email: katilo@yahoo.katilo.net
-- Phone: +201066687353
+- Email: hussienmekawy38@gmail.com
+- Phone: +201099641402
 
 ## 📜 License
 
