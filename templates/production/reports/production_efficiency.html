@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: 'Arial', 'Tahoma', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            direction: rtl;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .report-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .report-meta {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .filters {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .filter-item {
+            display: inline-block;
+            margin-left: 15px;
+        }
+        .filter-label {
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        .summary-box {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-right: 4px solid #3182ce;
+        }
+        .summary-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .summary-stats {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .stat-item {
+            flex: 1;
+            min-width: 200px;
+            margin-bottom: 10px;
+        }
+        .stat-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 24px;
+            color: #3182ce;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: right;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .efficiency-high {
+            color: #38a169;
+            font-weight: bold;
+        }
+        .efficiency-medium {
+            color: #d69e2e;
+            font-weight: bold;
+        }
+        .efficiency-low {
+            color: #e53e3e;
+            font-weight: bold;
+        }
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <div class="report-title">{{ title }}</div>
+        <div class="report-meta">تم إنشاؤه في: {{ generated_at }}</div>
+        <div class="report-meta">بواسطة: {{ generated_by }}</div>
+    </div>
+    
+    <div class="filters">
+        {% if date_from %}
+        <div class="filter-item">
+            <span class="filter-label">من تاريخ:</span>
+            <span>{{ date_from.strftime('%Y-%m-%d') }}</span>
+        </div>
+        {% endif %}
+        
+        {% if date_to %}
+        <div class="filter-item">
+            <span class="filter-label">إلى تاريخ:</span>
+            <span>{{ date_to.strftime('%Y-%m-%d') }}</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if orders %}
+    <div class="summary-box">
+        <div class="summary-title">ملخص الكفاءة</div>
+        <div class="summary-stats">
+            <div class="stat-item">
+                <div class="stat-label">إجمالي ساعات العمل المخططة</div>
+                <div class="stat-value">{{ total_scheduled_hours }}</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">إجمالي ساعات العمل الفعلية</div>
+                <div class="stat-value">{{ total_actual_hours }}</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">الكفاءة الإجمالية</div>
+                <div class="stat-value">{{ overall_efficiency }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>رقم الأمر</th>
+                <th>المنتج</th>
+                <th>الكمية</th>
+                <th>بداية مخططة</th>
+                <th>نهاية مخططة</th>
+                <th>المدة المخططة (ساعات)</th>
+                <th>بداية فعلية</th>
+                <th>نهاية فعلية</th>
+                <th>المدة الفعلية (ساعات)</th>
+                <th>الكفاءة</th>
+                <th>الوحدات/ساعة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.id }}</td>
+                <td>{{ order.product_name }} ({{ order.sku }})</td>
+                <td>{{ order.quantity }}</td>
+                <td>{{ order.scheduled_start }}</td>
+                <td>{{ order.scheduled_end }}</td>
+                <td>{{ order.scheduled_duration }}</td>
+                <td>{{ order.actual_start }}</td>
+                <td>{{ order.actual_end }}</td>
+                <td>{{ order.actual_duration }}</td>
+                <td class="
+                    {% if order.efficiency|float > 90 %}efficiency-high
+                    {% elif order.efficiency|float > 70 %}efficiency-medium
+                    {% else %}efficiency-low{% endif %}">
+                    {{ order.efficiency }}
+                </td>
+                <td>{{ order.units_per_hour }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% else %}
+    <div class="no-data">لا توجد بيانات كفاءة إنتاج مسجلة</div>
+    {% endif %}
+</body>
+</html>

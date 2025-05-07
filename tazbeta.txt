@@ -44,8 +44,8 @@
     ✅User
 
 #  Customer & Distributor Relationship Management (CRM)
-    CustomerInteraction
-    DiscountPromotion
+    ✅CustomerInteraction
+    ✅DiscountPromotion
 
 #  Returns & Refunds Management
     ProductReturn

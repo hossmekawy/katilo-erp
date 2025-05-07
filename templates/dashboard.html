@@ -2,235 +2,1552 @@
 
 {% block title %}لوحة التحكم - كاتيلو{% endblock %}
 
+{% block styles %}
+<style>
+    .stat-card {
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .swiper-container, .swiper-container-products {
+        width: 100%;
+        height: 100%;
+        overflow: hidden; /* Prevent overflow */
+        touch-action: pan-y; /* Only allow vertical panning */
+        position: relative;
+    }
+    .swiper-container-products {
+        padding-bottom: 40px; /* Add padding for pagination */
+    }
+    .swiper-slide {
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: auto; /* Allow slides to size based on content */
+        touch-action: pan-y; /* Only allow vertical panning */
+    }
+
+    /* Prevent horizontal scrolling on the entire page */
+    html, body {
+        overflow-x: hidden;
+        max-width: 100%;
+        touch-action: pan-y;
+    }
+
+    .product-card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .product-card-header {
+        flex: 0 0 auto;
+    }
+
+    .product-card-body {
+        flex: 1 1 auto;
+    }
+
+    .product-card-footer {
+        flex: 0 0 auto;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div x-data="dashboardData()">
-    <h1 class="text-2xl font-bold mb-6">لوحة التحكم</h1>
-    
-    <!-- Summary Cards -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">لوحة التحكم</h1>
+        <div class="flex items-center space-x-4 space-x-reverse">
+            <button
+                @click="clearCache"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm flex items-center"
+                :disabled="isLoading"
+            >
+                <i class="fas fa-sync-alt mr-1" :class="{'animate-spin': isLoading}"></i>
+                تحديث البيانات
+            </button>
+            <div class="text-sm text-gray-500">
+                <span>آخر تحديث: </span>
+                <span x-text="new Date().toLocaleString('ar-EG')"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div x-show="isLoading" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white p-8 rounded-xl shadow-lg flex flex-col items-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
+            <p class="text-lg font-semibold text-gray-800">جاري تحميل البيانات...</p>
+            <p class="text-sm text-gray-500 mt-2">يرجى الانتظار قليلاً</p>
+        </div>
+    </div>
+
+    <!-- Main Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center">
+        <!-- Skeleton Loaders (shown when loading) -->
+        <template x-if="isLoading">
+            <div class="col-span-1 md:col-span-2 lg:col-span-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl shadow-md p-6 h-32"></div>
+                <div class="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl shadow-md p-6 h-32"></div>
+                <div class="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl shadow-md p-6 h-32"></div>
+                <div class="animate-pulse bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl shadow-md p-6 h-32"></div>
+            </div>
+        </template>
+
+        <!-- Actual Stats Cards (shown when data is loaded) -->
+        <template x-if="!isLoading">
+            <div class="col-span-1 md:col-span-2 lg:col-span-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Inventory Value Card -->
+                <div class="stat-card bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl shadow-md p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm font-medium mb-1">قيمة المخزون</p>
+                            <h3 class="text-2xl font-bold" x-text="formatCurrency(comprehensiveStats.inventory?.totalValue || 0)"></h3>
+                        </div>
+                        <div class="bg-white/20 p-3 rounded-lg">
+                            <i class="fas fa-cubes text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <a href="/inventory-management" class="text-blue-100 hover:text-white text-sm flex items-center">
+                            <span>إدارة المخزون</span>
+                            <i class="fas fa-arrow-left mr-1"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Sales Card -->
+                <div class="stat-card bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl shadow-md p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-orange-100 text-sm font-medium mb-1">إجمالي المبيعات</p>
+                            <h3 class="text-2xl font-bold" x-text="formatCurrency(comprehensiveStats.sales?.totalAmount || 0)"></h3>
+                        </div>
+                        <div class="bg-white/20 p-3 rounded-lg">
+                            <i class="fas fa-shopping-cart text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <a href="{{ url_for('sales.sales_dashboard') }}" class="text-orange-100 hover:text-white text-sm flex items-center">
+                            <span>إدارة المبيعات</span>
+                            <i class="fas fa-arrow-left mr-1"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Cash Card -->
+                <div class="stat-card bg-gradient-to-br from-green-500 to-green-700 rounded-xl shadow-md p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-100 text-sm font-medium mb-1">إجمالي النقدية</p>
+                            <h3 class="text-2xl font-bold" x-text="formatCurrency(comprehensiveStats.cash?.totalCash || 0)"></h3>
+                        </div>
+                        <div class="bg-white/20 p-3 rounded-lg">
+                            <i class="fas fa-money-bill-wave text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <a href="{{ url_for('cash.dashboard') }}" class="text-green-100 hover:text-white text-sm flex items-center">
+                            <span>إدارة الخزينة</span>
+                            <i class="fas fa-arrow-left mr-1"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Production Card -->
+                <div class="stat-card bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl shadow-md p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-purple-100 text-sm font-medium mb-1">أوامر الإنتاج</p>
+                            <h3 class="text-2xl font-bold" x-text="comprehensiveStats.production?.totalOrders || 0"></h3>
+                        </div>
+                        <div class="bg-white/20 p-3 rounded-lg">
+                            <i class="fas fa-industry text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <a href="{{ url_for('production.production_dashboard') }}" class="text-purple-100 hover:text-white text-sm flex items-center">
+                            <span>إدارة الإنتاج</span>
+                            <i class="fas fa-arrow-left mr-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Product Cards (Swipeable) -->
+    <div class="mb-8" x-data="productCardsData()">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold">المنتجات والمنتجات الوسيطة</h2>
+            <div class="flex space-x-2 space-x-reverse">
+                <button @click="loadProducts('FinalProduct')" class="px-3 py-1 text-sm rounded-md" :class="activeCategory === 'FinalProduct' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'">المنتجات النهائية</button>
+                <button @click="loadProducts('IntermediateProduct')" class="px-3 py-1 text-sm rounded-md" :class="activeCategory === 'IntermediateProduct' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'">المنتجات الوسيطة</button>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="mb-4 flex">
+            <div class="relative flex-1">
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+                <input
+                    type="text"
+                    x-model="searchTerm"
+                    @input="searchProducts()"
+                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pr-10 p-2.5 rtl:text-right"
+                    placeholder="بحث بالاسم أو رقم SKU..."
+                >
+            </div>
+            <button
+                @click="clearSearch()"
+                x-show="searchTerm"
+                class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg mr-2"
+            >
+                <i class="fas fa-times"></i> مسح
+            </button>
+        </div>
+
+        <div class="relative swiper-container-wrapper" style="overflow: hidden; touch-action: pan-y;">
+            <div class="swiper-container-products">
+                <div class="swiper-wrapper">
+                    <template x-for="product in products" :key="product.id">
+                        <div class="swiper-slide p-2">
+                            <div class="product-card bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200 hover:shadow-md transition-shadow">
+                                <!-- Header with product name and low stock badge -->
+                                <div class="product-card-header p-4 border-b">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex-1 ml-2">
+                                            <h3 class="text-lg font-bold text-gray-800 truncate" x-text="product.name"></h3>
+                                            <p class="text-sm text-gray-500" x-text="product.category_name"></p>
+                                        </div>
+                                        <div x-show="product.is_low_stock" class="flex-shrink-0">
+                                            <span class="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap">مخزون منخفض</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Product details -->
+                                <div class="product-card-body p-4 bg-gray-50">
+                                    <!-- Cost and Price -->
+                                    <div class="grid grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <p class="text-xs text-gray-500 mb-1">التكلفة</p>
+                                            <p class="text-lg font-bold text-gray-800" x-text="formatCurrency(product.cost)"></p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500 mb-1">السعر</p>
+                                            <p class="text-lg font-bold text-gray-800" x-text="formatCurrency(product.price)"></p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Profit margin and Inventory -->
+                                    <div class="grid grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <p class="text-xs text-gray-500 mb-1">هامش الربح</p>
+                                            <p class="text-base font-semibold" :class="product.profit_margin > 20 ? 'text-green-600' : 'text-amber-600'">
+                                                <span x-text="product.profit_margin + '%'"></span>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500 mb-1">المخزون</p>
+                                            <div class="flex items-center">
+                                                <span class="text-base font-semibold" :class="product.is_low_stock ? 'text-red-600' : 'text-gray-800'" x-text="product.quantity"></span>
+                                                <span class="text-xs text-gray-500 mx-1">/</span>
+                                                <span class="text-xs text-gray-500" x-text="product.reorder_level"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Inventory progress bar -->
+                                    <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                                        <div class="h-2.5 rounded-full" :class="product.is_low_stock ? 'bg-red-600' : 'bg-green-600'" :style="'width: ' + Math.min(100, Math.round((product.quantity / product.reorder_level) * 100)) + '%'"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Footer with SKU and details link -->
+                                <div class="product-card-footer p-4 flex justify-between items-center border-t bg-white">
+                                    <span class="text-xs text-gray-500" x-text="'SKU: ' + product.sku"></span>
+                                    <a :href="'/items/' + product.id" class="text-blue-600 hover:text-blue-800 text-sm">
+                                        تفاصيل
+                                        <i class="fas fa-arrow-left ml-1"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div class="swiper-pagination-products mt-4"></div>
+            </div>
+            <button @click="prevProduct" class="absolute top-1/2 right-0 transform -translate-y-1/2 -translate-x-3 bg-white rounded-full shadow-lg p-3 z-10 hover:bg-gray-100 focus:outline-none border border-gray-200">
+                <i class="fas fa-chevron-right text-blue-600"></i>
+            </button>
+            <button @click="nextProduct" class="absolute top-1/2 left-0 transform -translate-y-1/2 translate-x-3 bg-white rounded-full shadow-lg p-3 z-10 hover:bg-gray-100 focus:outline-none border border-gray-200">
+                <i class="fas fa-chevron-left text-blue-600"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Secondary Stats Cards (Swipeable) -->
+    <div class="mb-8">
+        <h2 class="text-lg font-semibold mb-4">إحصائيات النظام</h2>
+        <div class="bg-white rounded-xl shadow-sm p-4 mb-4" x-show="!swiper">
+            <div class="flex items-center justify-center">
                 <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
-                    <i class="fas fa-cubes text-xl"></i>
+                    <i class="fas fa-sync-alt fa-spin text-xl"></i>
                 </div>
                 <div>
-                    <p class="text-gray-500">إجمالي العناصر</p>
-                    <h3 class="text-2xl font-bold" x-text="stats.totalItems || 0"></h3>
+                    <p class="text-gray-700">جاري تحميل الإحصائيات...</p>
                 </div>
             </div>
         </div>
-        
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
-                    <i class="fas fa-warehouse text-xl"></i>
+        <!-- Fixed height container to prevent layout shifts -->
+        <div class="relative swiper-wrapper-outer" style="min-height: 200px; overflow: hidden; touch-action: pan-y; max-width: 100vw;">
+            <div class="swiper-container" style="touch-action: pan-y; overflow: hidden;">
+                <div class="swiper-wrapper">
+                <!-- Inventory Stats -->
+                <div class="swiper-slide">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+                                    <i class="fas fa-cubes text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">إجمالي العناصر</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.inventory?.totalItems || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+                                    <i class="fas fa-warehouse text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">المستودعات</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.inventory?.totalWarehouses || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-red-100 text-red-600 mr-4">
+                                    <i class="fas fa-exclamation-triangle text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">عناصر منخفضة المخزون</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.inventory?.lowStockCount || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <p class="text-gray-500">المستودعات</p>
-                    <h3 class="text-2xl font-bold" x-text="stats.totalWarehouses || 0"></h3>
+
+                <!-- Sales Stats -->
+                <div class="swiper-slide">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                                    <i class="fas fa-shopping-cart text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">طلبات المبيعات</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.sales?.totalOrders || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                                    <i class="fas fa-check-circle text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">طلبات مكتملة</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.sales?.completedOrders || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
+                                    <i class="fas fa-clock text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">طلبات قيد الانتظار</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.sales?.pendingOrders || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Production Stats -->
+                <div class="swiper-slide">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
+                                    <i class="fas fa-industry text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">أوامر الإنتاج</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.production?.totalOrders || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
+                                    <i class="fas fa-cogs text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">أوامر نشطة</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.production?.activeOrders || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
+                                    <i class="fas fa-check-double text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">أوامر مكتملة</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.production?.completedOrders || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Supplier Stats -->
+                <div class="swiper-slide">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
+                                    <i class="fas fa-truck-loading text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">الموردين</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.suppliers?.totalSuppliers || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
+                                    <i class="fas fa-file-invoice text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">طلبات الشراء</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.suppliers?.totalPurchaseOrders || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
+                                    <i class="fas fa-clock text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">طلبات قيد الانتظار</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.suppliers?.pendingPurchases || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Distribution Stats -->
+                <div class="swiper-slide">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-teal-100 text-teal-600 mr-4">
+                                    <i class="fas fa-shipping-fast text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">الشحنات</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.distribution?.totalShipments || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
+                                    <i class="fas fa-clock text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">شحنات قيد الانتظار</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.distribution?.pendingShipments || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card bg-white rounded-xl shadow-sm p-5">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                                    <i class="fas fa-check-circle text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 text-sm">شحنات تم تسليمها</p>
+                                    <h3 class="text-xl font-bold" x-text="comprehensiveStats.distribution?.deliveredShipments || 0"></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+            <div class="swiper-pagination mt-4"></div>
         </div>
-        
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
-                    <i class="fas fa-tags text-xl"></i>
+        </div>
+
+        <!-- Manual navigation buttons for better control -->
+        <div class="flex justify-center mt-4 space-x-2 space-x-reverse">
+            <button @click="if (swiper) swiper.slidePrev()" class="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none">
+                <i class="fas fa-chevron-right mr-1"></i>
+                السابق
+            </button>
+            <button @click="if (swiper) swiper.slideNext()" class="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none">
+                التالي
+                <i class="fas fa-chevron-left ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- AI Suggestions Section -->
+    <div class="mb-8" x-data="aiSuggestionsData()">
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-purple-50 to-indigo-50">
+                <div class="flex items-center space-x-3 space-x-reverse">
+                    <div class="bg-purple-100 p-2 rounded-lg">
+                        <i class="fas fa-robot text-purple-600 text-lg"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-gray-800">اقتراحات الذكاء الاصطناعي</h2>
                 </div>
-                <div>
-                    <p class="text-gray-500">الفئات</p>
-                    <h3 class="text-2xl font-bold" x-text="stats.totalCategories || 0"></h3>
+                <span class="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded-full" x-text="pendingSuggestions.length + ' اقتراح'"></span>
+            </div>
+
+            <div class="p-4" x-show="isLoading">
+                <div class="flex items-center justify-center p-4">
+                    <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
+                        <i class="fas fa-sync-alt fa-spin text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">جاري تحميل الاقتراحات...</p>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
-                    <i class="fas fa-exchange-alt text-xl"></i>
+
+            <div class="p-4" x-show="!isLoading && pendingSuggestions.length === 0">
+                <div class="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                        <i class="fas fa-check text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">لا توجد اقتراحات معلقة حالياً</p>
+                    </div>
                 </div>
-                <div>
-                    <p class="text-gray-500">المعاملات</p>
-                    <h3 class="text-2xl font-bold" x-text="stats.totalTransactions || 0"></h3>
+            </div>
+
+            <div class="p-4" x-show="!isLoading && pendingSuggestions.length > 0">
+                <div class="space-y-4">
+                    <template x-for="suggestion in pendingSuggestions.slice(0, 3)" :key="suggestion.id">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex items-start">
+                                <div class="p-2 rounded-full mr-3 flex-shrink-0"
+                                     :class="{
+                                        'bg-blue-100 text-blue-600': suggestion.suggestion_type === 'NameImprovement',
+                                        'bg-yellow-100 text-yellow-600': suggestion.suggestion_type === 'CategoryMismatch',
+                                        'bg-green-100 text-green-600': suggestion.suggestion_type === 'ReorderLevelAdjustment',
+                                        'bg-red-100 text-red-600': suggestion.suggestion_type === 'InventoryAnomaly'
+                                     }">
+                                    <i class="fas"
+                                       :class="{
+                                        'fa-font': suggestion.suggestion_type === 'NameImprovement',
+                                        'fa-tags': suggestion.suggestion_type === 'CategoryMismatch',
+                                        'fa-sort-amount-up': suggestion.suggestion_type === 'ReorderLevelAdjustment',
+                                        'fa-exclamation-triangle': suggestion.suggestion_type === 'InventoryAnomaly'
+                                       }"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <h4 class="text-sm font-semibold text-gray-800" x-text="suggestion.item ? suggestion.item.name : 'غير معروف'"></h4>
+                                            <span class="text-xs text-gray-500" x-text="suggestion.item ? suggestion.item.sku : ''"></span>
+                                        </div>
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                              :class="{
+                                                'bg-blue-100 text-blue-800': suggestion.suggestion_type === 'NameImprovement',
+                                                'bg-yellow-100 text-yellow-800': suggestion.suggestion_type === 'CategoryMismatch',
+                                                'bg-green-100 text-green-800': suggestion.suggestion_type === 'ReorderLevelAdjustment',
+                                                'bg-red-100 text-red-800': suggestion.suggestion_type === 'InventoryAnomaly'
+                                              }"
+                                              x-text="getSuggestionTypeName(suggestion.suggestion_type)"></span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-2" x-text="suggestion.suggestion_text"></p>
+                                    <div class="mt-3 flex justify-end space-x-2 space-x-reverse">
+                                        <!-- Edit button based on suggestion type -->
+                                        <button @click="openEditModal(suggestion)"
+                                                x-show="suggestion.suggestion_type === 'NameImprovement' ||
+                                                        suggestion.suggestion_type === 'CategoryMismatch' ||
+                                                        suggestion.suggestion_type === 'ReorderLevelAdjustment' ||
+                                                        suggestion.suggestion_type === 'InventoryAnomaly'"
+                                                class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 ml-2">
+                                            <i class="fas fa-edit ml-1"></i> تعديل
+                                        </button>
+                                        <button @click="applySuggestion(suggestion.id)" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">
+                                            <i class="fas fa-check ml-1"></i> تطبيق
+                                        </button>
+                                        <button @click="dismissSuggestion(suggestion.id)" class="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                                            <i class="fas fa-times ml-1"></i> تجاهل
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="mt-4 flex justify-center items-center space-x-4 space-x-reverse">
+                    <button @click="exportToExcel()" class="text-green-600 hover:text-green-800 text-sm font-medium">
+                        <i class="fas fa-file-excel ml-1"></i> تصدير Excel
+                    </button>
+                    <a href="/ai-suggestions-dashboard" class="text-purple-600 hover:text-purple-800 text-sm font-medium">
+                        عرض كل الاقتراحات (<span x-text="pendingSuggestions.length"></span>)
+                        <i class="fas fa-arrow-left ml-1"></i>
+                    </a>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Charts Section -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <!-- Chart 1: Inventory by Category -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">المخزون حسب الفئة</h3>
+        <!-- Sales Performance Chart -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="border-b pb-4 mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">أداء المبيعات</h3>
             </div>
-            <div class="p-6">
-                <canvas id="inventoryByCategoryChart" class="w-full h-64"></canvas>
+            <div class="h-64">
+                <canvas id="salesPerformanceChart"></canvas>
             </div>
         </div>
-        
-        <!-- Chart 2: Transactions Over Time -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">المعاملات عبر الزمن</h3>
+
+        <!-- Inventory Value Chart -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="border-b pb-4 mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">قيمة المخزون حسب الفئة</h3>
             </div>
-            <div class="p-6">
-                <canvas id="transactionsOverTimeChart" class="w-full h-64"></canvas>
+            <div class="h-64">
+                <canvas id="inventoryValueByCategory"></canvas>
             </div>
         </div>
     </div>
-    
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <!-- Chart 3: Top Items by Quantity -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">أعلى العناصر من حيث الكمية</h3>
+        <!-- Cash Flow Chart -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="border-b pb-4 mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">التدفق النقدي</h3>
             </div>
-            <div class="p-6">
-                <canvas id="topItemsChart" class="w-full h-64"></canvas>
+            <div class="h-64">
+                <canvas id="cashFlowChart"></canvas>
             </div>
         </div>
-        
-        <!-- Chart 4: Transaction Types Distribution -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">توزيع أنواع المعاملات</h3>
+
+        <!-- Production Status Chart -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="border-b pb-4 mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">حالة أوامر الإنتاج</h3>
             </div>
-            <div class="p-6">
-                <canvas id="transactionTypesChart" class="w-full h-64"></canvas>
+            <div class="h-64">
+                <canvas id="productionStatusChart"></canvas>
             </div>
         </div>
     </div>
-    
+
+    <!-- Low Stock Items and Recent Transactions -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <!-- Chart 5: Warehouse Capacity Utilization -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">استخدام سعة المستودع</h3>
-            </div>
-            <div class="p-6">
-                <canvas id="warehouseCapacityChart" class="w-full h-64"></canvas>
-            </div>
-        </div>
-        
-        <!-- Chart 6: Low Stock Items -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">العناصر منخفضة المخزون</h3>
-            </div>
-            <div class="p-6">
-                <canvas id="lowStockItemsChart" class="w-full h-64"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <!-- Chart 7: Inventory Value by Warehouse -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">قيمة المخزون حسب المستودع</h3>
-            </div>
-            <div class="p-6">
-                <canvas id="inventoryValueChart" class="w-full h-64"></canvas>
-            </div>
-        </div>
-        
-        <!-- Chart 8: Monthly Transaction Trends -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">اتجاهات المعاملات الشهرية</h3>
-            </div>
-            <div class="p-6">
-                <canvas id="monthlyTrendsChart" class="w-full h-64"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <!-- Chart 9: Item Price vs Cost Analysis -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">تحليل سعر العنصر مقابل التكلفة</h3>
-            </div>
-            <div class="p-6">
-                <canvas id="priceCostAnalysisChart" class="w-full h-64"></canvas>
-            </div>
-        </div>
-        
-        <!-- Chart 10: Warehouse Section Distribution -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">توزيع أقسام المستودع</h3>
-            </div>
-            <div class="p-6">
-                <canvas id="warehouseSectionsChart" class="w-full h-64"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Recent Transactions and Low Stock Items -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Recent Transactions -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">المعاملات الأخيرة</h3>
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="border-b pb-4 mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">المعاملات الأخيرة</h3>
             </div>
-            <div class="p-6">
+            <div class="space-y-4">
                 <template x-if="recentTransactions.length === 0">
-                    <p class="text-gray-500 text-center py-4">لا توجد معاملات حديثة</p>
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fas fa-exchange-alt text-gray-300 text-4xl mb-3"></i>
+                        <p>لا توجد معاملات حديثة</p>
+                    </div>
                 </template>
-                
+
                 <template x-for="transaction in recentTransactions" :key="transaction.id">
-                    <div class="border-b last:border-0 py-3">
-                        <div class="flex justify-between">
-                            <div>
-                                <span x-text="transaction.item_name || 'عنصر #' + transaction.item_id" class="font-medium"></span>
-                                <span class="text-sm text-gray-500 mr-2" x-text="formatDate(transaction.transaction_date)"></span>
-                            </div>
-                            <div>
-                                <span class="font-medium" :class="transaction.transaction_type === 'IN' ? 'text-green-600' : 'text-red-600'">
-                                    <span x-text="transaction.transaction_type === 'IN' ? '+' : '-'"></span>
-                                    <span x-text="transaction.quantity"></span>
-                                </span>
-                            </div>
+                    <div class="flex items-center p-3 rounded-lg" :class="transaction.transaction_type === 'IN' ? 'bg-green-50' : 'bg-red-50'">
+                        <div class="p-2 rounded-full ml-3" :class="transaction.transaction_type === 'IN' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'">
+                            <i class="fas" :class="transaction.transaction_type === 'IN' ? 'fa-arrow-down' : 'fa-arrow-up'"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800" x-text="transaction.item_name || 'عنصر #' + transaction.item_id"></p>
+                            <p class="text-xs text-gray-500" x-text="formatDate(transaction.transaction_date)"></p>
+                        </div>
+                        <div class="font-bold" :class="transaction.transaction_type === 'IN' ? 'text-green-600' : 'text-red-600'">
+                            <span x-text="transaction.transaction_type === 'IN' ? '+' : '-'"></span>
+                            <span x-text="transaction.quantity"></span>
                         </div>
                     </div>
                 </template>
+
+                <div class="text-center mt-4">
+                    <a href="/transactions-history" class="text-blue-600 hover:underline text-sm">
+                        عرض كل المعاملات
+                        <i class="fas fa-arrow-left mr-1"></i>
+                    </a>
+                </div>
             </div>
         </div>
-        
+
         <!-- Low Stock Items -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-6 py-4">
-                <h3 class="text-lg font-semibold">العناصر منخفضة المخزون</h3>
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="border-b pb-4 mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">العناصر منخفضة المخزون</h3>
             </div>
-            <div class="p-6">
+            <div class="space-y-4">
                 <template x-if="lowStockItems.length === 0">
-                    <p class="text-gray-500 text-center py-4">لا توجد عناصر منخفضة المخزون</p>
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fas fa-exclamation-triangle text-gray-300 text-4xl mb-3"></i>
+                        <p>لا توجد عناصر منخفضة المخزون</p>
+                    </div>
                 </template>
-                
+
                 <template x-for="item in lowStockItems" :key="item.id">
-                    <div class="border-b last:border-0 py-3">
-                        <div class="flex justify-between">
-                            <div>
-                                <span x-text="item.name" class="font-medium"></span>
+                    <div class="flex items-center p-3 rounded-lg bg-amber-50">
+                        <div class="p-2 rounded-full bg-amber-100 text-amber-600 ml-3">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800" x-text="item.name"></p>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                                <div class="bg-amber-600 h-2.5 rounded-full" :style="'width: ' + Math.min(100, Math.round((item.quantity / item.reorder_level) * 100)) + '%'"></div>
                             </div>
-                            <div>
-                                <span class="text-amber-600 font-medium" x-text="item.quantity + ' / ' + item.reorder_level"></span>
-                            </div>
+                        </div>
+                        <div class="font-bold text-amber-600">
+                            <span x-text="item.quantity + ' / ' + item.reorder_level"></span>
                         </div>
                     </div>
                 </template>
+
+                <div class="text-center mt-4">
+                    <a href="/low-stock-items" class="text-blue-600 hover:underline text-sm">
+                        عرض كل العناصر منخفضة المخزون
+                        <i class="fas fa-arrow-left mr-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Suppliers Section -->
+    <div class="mb-8" x-data="suppliersData()">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold">الموردين</h2>
+            <a href="/suppliers-management" class="text-blue-600 hover:text-blue-800 flex items-center">
+                <span>عرض كل الموردين</span>
+                <i class="fas fa-arrow-left mr-1"></i>
+            </a>
+        </div>
+
+        <!-- Suppliers Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
+                        <i class="fas fa-truck-loading text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 text-sm">إجمالي الموردين</p>
+                        <h3 class="text-xl font-bold" x-text="comprehensiveStats.suppliers?.totalSuppliers || 0"></h3>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
+                        <i class="fas fa-file-invoice text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 text-sm">طلبات الشراء</p>
+                        <h3 class="text-xl font-bold" x-text="comprehensiveStats.suppliers?.totalPurchaseOrders || 0"></h3>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
+                        <i class="fas fa-clock text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 text-sm">طلبات قيد الانتظار</p>
+                        <h3 class="text-xl font-bold" x-text="comprehensiveStats.suppliers?.pendingPurchases || 0"></h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Suppliers Cards -->
+        <div class="relative swiper-container-wrapper" style="overflow: hidden; touch-action: pan-y;">
+            <div class="swiper-container-suppliers">
+                <div class="swiper-wrapper">
+                    <template x-for="supplier in suppliers" :key="supplier.id">
+                        <div class="swiper-slide p-2">
+                            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200 hover:shadow-md transition-shadow h-full">
+                                <!-- Header with supplier name -->
+                                <div class="p-4 border-b bg-indigo-50">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex-1">
+                                            <h3 class="text-lg font-bold text-gray-800 truncate" x-text="supplier.supplier_name"></h3>
+                                            <p class="text-sm text-gray-500" x-text="supplier.contact_person || 'لا يوجد جهة اتصال'"></p>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <div class="flex items-center">
+                                                <template x-for="i in 5" :key="i">
+                                                    <i class="fas fa-star text-xs" :class="i <= supplier.rating ? 'text-yellow-400' : 'text-gray-300'"></i>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Supplier details -->
+                                <div class="p-4">
+                                    <div class="space-y-3">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-phone-alt text-indigo-500 w-5"></i>
+                                            <span class="mr-2 text-gray-700" x-text="supplier.phone || 'لا يوجد رقم هاتف'"></span>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <i class="fas fa-envelope text-indigo-500 w-5"></i>
+                                            <span class="mr-2 text-gray-700" x-text="supplier.email || 'لا يوجد بريد إلكتروني'"></span>
+                                        </div>
+                                        <div class="flex items-start">
+                                            <i class="fas fa-map-marker-alt text-indigo-500 w-5 mt-1"></i>
+                                            <span class="mr-2 text-gray-700" x-text="supplier.address || 'لا يوجد عنوان'"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Footer with payment terms and details link -->
+                                <div class="p-4 flex justify-between items-center border-t bg-gray-50">
+                                    <span class="text-xs text-gray-500" x-text="'شروط الدفع: ' + (supplier.payment_terms || 'غير محدد')"></span>
+                                    <a :href="'/supplier-items-management?supplier_id=' + supplier.id" class="text-indigo-600 hover:text-indigo-800 text-sm">
+                                        تفاصيل
+                                        <i class="fas fa-arrow-left ml-1"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div class="swiper-pagination-suppliers mt-4"></div>
+            </div>
+            <button @click="prevSupplier" class="absolute top-1/2 right-0 transform -translate-y-1/2 -translate-x-3 bg-white rounded-full shadow-lg p-3 z-10 hover:bg-gray-100 focus:outline-none border border-gray-200">
+                <i class="fas fa-chevron-right text-indigo-600"></i>
+            </button>
+            <button @click="nextSupplier" class="absolute top-1/2 left-0 transform -translate-y-1/2 translate-x-3 bg-white rounded-full shadow-lg p-3 z-10 hover:bg-gray-100 focus:outline-none border border-gray-200">
+                <i class="fas fa-chevron-left text-indigo-600"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Additional Charts (Collapsible) -->
+    <div x-data="{ showMoreCharts: false }" class="mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold">مخططات إضافية</h2>
+            <button @click="showMoreCharts = !showMoreCharts" class="text-blue-600 hover:text-blue-800 flex items-center">
+                <span x-text="showMoreCharts ? 'إخفاء المخططات' : 'عرض المزيد من المخططات'"></span>
+                <i class="fas ml-1" :class="showMoreCharts ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </button>
+        </div>
+
+        <div x-show="showMoreCharts" x-transition>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Chart 1: Inventory by Category -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">المخزون حسب الفئة</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="inventoryByCategoryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Transactions Over Time -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">المعاملات عبر الزمن</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="transactionsOverTimeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Chart 3: Top Items by Quantity -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">أعلى العناصر من حيث الكمية</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="topItemsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 4: Transaction Types Distribution -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">توزيع أنواع المعاملات</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="transactionTypesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Chart 5: Warehouse Capacity Utilization -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">استخدام سعة المستودع</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="warehouseCapacityChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 6: Low Stock Items -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">العناصر منخفضة المخزون</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="lowStockItemsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Chart 7: Inventory Value by Warehouse -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">قيمة المخزون حسب المستودع</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="inventoryValueChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 8: Monthly Transaction Trends -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">اتجاهات المعاملات الشهرية</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="monthlyTrendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Chart 9: Item Price vs Cost Analysis -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">تحليل سعر العنصر مقابل التكلفة</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="priceCostAnalysisChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 10: Warehouse Section Distribution -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="border-b pb-4 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">توزيع أقسام المستودع</h3>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="warehouseSectionsChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 {% block scripts %}
-<!-- Include Chart.js -->
+<!-- Include Chart.js and Swiper -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" />
 
 <script>
+// Prevent horizontal scrolling on touch devices
+document.addEventListener('DOMContentLoaded', function() {
+    // Prevent horizontal scrolling on touch devices
+    document.addEventListener('touchmove', function(e) {
+        // Check if the touch is happening on a swiper container
+        let target = e.target;
+        let isSwiperElement = false;
+
+        // Check if the target or any of its parents is a swiper element
+        while (target !== document.body) {
+            if (target.classList &&
+                (target.classList.contains('swiper-container') ||
+                 target.classList.contains('swiper-container-products') ||
+                 target.classList.contains('swiper-slide') ||
+                 target.classList.contains('swiper-wrapper'))) {
+                isSwiperElement = true;
+                break;
+            }
+            target = target.parentNode;
+            if (!target) break;
+        }
+
+        // If not in a swiper element and it's a horizontal swipe, prevent default
+        if (!isSwiperElement) {
+            const touchStartX = e.touches[0].clientX;
+            const touchStartY = e.touches[0].clientY;
+
+            // If horizontal movement is greater than vertical, prevent default
+            if (Math.abs(touchStartX) > Math.abs(touchStartY)) {
+                e.preventDefault();
+            }
+        }
+    }, { passive: false });
+});
+
+// Helper function to safely fetch API data with error handling and caching
+async function fetchAPI(url, defaultValue = [], useCache = true, cacheDuration = 5 * 60 * 1000) { // 5 minutes cache by default
+    try {
+        // Check if we have a cached version and it's not expired
+        if (useCache) {
+            const cacheKey = `dashboard_cache_${url}`;
+            const cachedData = sessionStorage.getItem(cacheKey);
+
+            if (cachedData) {
+                const { data, timestamp } = JSON.parse(cachedData);
+                const now = new Date().getTime();
+
+                // If the cache is still valid, use it
+                if (now - timestamp < cacheDuration) {
+                    console.log(`Using cached data for ${url}`);
+                    return data;
+                } else {
+                    console.log(`Cache expired for ${url}`);
+                }
+            }
+        }
+
+        // If no cache or expired, fetch fresh data
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.error(`Error fetching ${url}: ${response.status} ${response.statusText}`);
+            return defaultValue;
+        }
+
+        const data = await response.json();
+
+        // Cache the result if caching is enabled
+        if (useCache) {
+            const cacheKey = `dashboard_cache_${url}`;
+            const cacheData = {
+                data: data,
+                timestamp: new Date().getTime()
+            };
+            sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        }
+
+        return data;
+    } catch (error) {
+        console.error(`Error fetching ${url}:`, error);
+        return defaultValue;
+    }
+}
+function productCardsData() {
+    return {
+        products: [],
+        allProducts: [], // Store all products for search functionality
+        filteredProducts: [], // Store filtered products
+        activeCategory: 'FinalProduct',
+        productSwiper: null,
+        searchTerm: '', // For search functionality
+
+        async init() {
+            await this.loadProducts('FinalProduct');
+        },
+
+        async loadProducts(categoryType) {
+            this.activeCategory = categoryType;
+            this.searchTerm = ''; // Reset search when changing category
+            try {
+                // Use our enhanced fetchAPI with caching
+                const products = await fetchAPI(`/api/dashboard/products-by-category-type?category_type=${categoryType}`, [], true, 10 * 60 * 1000); // Cache for 10 minutes
+
+                this.allProducts = products; // Store all products
+                this.products = products; // Display all products initially
+                this.filteredProducts = products; // Initialize filtered products
+
+                // Reinitialize swiper after data is loaded with a longer delay to ensure DOM is ready
+                this.$nextTick(() => {
+                    // Destroy existing swiper if it exists
+                    if (this.productSwiper) {
+                        this.productSwiper.destroy();
+                        this.productSwiper = null;
+                    }
+
+                    // Wait a bit longer to ensure DOM is fully updated
+                    setTimeout(() => {
+                        this.initProductSwiper();
+                    }, 300);
+                });
+            } catch (error) {
+                console.error('Error loading products:', error);
+            }
+        },
+
+        initProductSwiper() {
+            try {
+                this.productSwiper = new Swiper('.swiper-container-products', {
+                    slidesPerView: 1,
+                    spaceBetween: 20,
+                    observer: true,  // Enable dynamic content observation
+                    observeParents: true,
+                    updateOnWindowResize: true,
+                    preloadImages: true,
+                    watchSlidesProgress: true,
+                    loop: false,
+                    speed: 500,
+                    allowTouchMove: true,
+                    resistance: true,
+                    resistanceRatio: 0.85,
+                    preventInteractionOnTransition: false,
+                    touchEventsTarget: 'container',
+                    touchRatio: 1,
+                    touchAngle: 45,
+                    simulateTouch: true,
+                    shortSwipes: false,
+                    longSwipes: true,
+                    longSwipesRatio: 0.5,
+                    longSwipesMs: 300,
+                    followFinger: true,
+                    threshold: 5,
+                    touchStartPreventDefault: false,
+                    touchStartForcePreventDefault: false,
+                    touchMoveStopPropagation: true,
+                    preventClicks: true,
+                    preventClicksPropagation: true,
+                    edgeSwipeDetection: true,
+                    edgeSwipeThreshold: 20,
+                    pagination: {
+                        el: '.swiper-pagination-products',
+                        clickable: true,
+                        dynamicBullets: true,
+                    },
+                    breakpoints: {
+                        640: {
+                            slidesPerView: 2,
+                            spaceBetween: 20,
+                        },
+                        1024: {
+                            slidesPerView: 3,
+                            spaceBetween: 30,
+                        },
+                        1280: {
+                            slidesPerView: 4,
+                            spaceBetween: 30,
+                        },
+                    },
+                    on: {
+                        init: function() {
+                            console.log('Product swiper initialized');
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing product swiper:', error);
+            }
+        },
+
+        searchProducts() {
+            if (!this.searchTerm || this.searchTerm.trim() === '') {
+                this.products = this.allProducts;
+            } else {
+                const term = this.searchTerm.toLowerCase().trim();
+                this.products = this.allProducts.filter(product =>
+                    product.name.toLowerCase().includes(term) ||
+                    (product.sku && product.sku.toLowerCase().includes(term))
+                );
+            }
+
+            // Reinitialize swiper after filtering
+            this.$nextTick(() => {
+                if (this.productSwiper) {
+                    this.productSwiper.destroy();
+                    this.productSwiper = null;
+                }
+                setTimeout(() => {
+                    this.initProductSwiper();
+                }, 300);
+            });
+        },
+
+        clearSearch() {
+            this.searchTerm = '';
+            this.products = this.allProducts;
+
+            // Reinitialize swiper after clearing search
+            this.$nextTick(() => {
+                if (this.productSwiper) {
+                    this.productSwiper.destroy();
+                    this.productSwiper = null;
+                }
+                setTimeout(() => {
+                    this.initProductSwiper();
+                }, 300);
+            });
+        },
+
+        formatCurrency(value) {
+            return new Intl.NumberFormat('ar-EG', {
+                style: 'currency',
+                currency: 'EGP',
+                minimumFractionDigits: 2
+            }).format(value);
+        },
+
+        prevProduct() {
+            if (this.productSwiper) {
+                this.productSwiper.slidePrev();
+            }
+        },
+
+        nextProduct() {
+            if (this.productSwiper) {
+                this.productSwiper.slideNext();
+            }
+        }
+    };
+}
+
+function suppliersData() {
+    return {
+        suppliers: [],
+        supplierSwiper: null,
+
+        async init() {
+            await this.loadSuppliers();
+            this.$nextTick(() => {
+                setTimeout(() => {
+                    this.initSupplierSwiper();
+                }, 300);
+            });
+        },
+
+        async loadSuppliers() {
+            try {
+                // Use our enhanced fetchAPI with caching
+                this.suppliers = await fetchAPI('/api/suppliers', [], true, 15 * 60 * 1000); // Cache for 15 minutes
+            } catch (error) {
+                console.error('Error loading suppliers:', error);
+            }
+        },
+
+        initSupplierSwiper() {
+            try {
+                if (this.supplierSwiper) {
+                    this.supplierSwiper.destroy();
+                    this.supplierSwiper = null;
+                }
+
+                this.supplierSwiper = new Swiper('.swiper-container-suppliers', {
+                    slidesPerView: 1,
+                    spaceBetween: 20,
+                    observer: true,
+                    observeParents: true,
+                    updateOnWindowResize: true,
+                    preloadImages: true,
+                    watchSlidesProgress: true,
+                    loop: false,
+                    speed: 500,
+                    allowTouchMove: true,
+                    resistance: true,
+                    resistanceRatio: 0.85,
+                    preventInteractionOnTransition: false,
+                    touchEventsTarget: 'container',
+                    touchRatio: 1,
+                    touchAngle: 45,
+                    simulateTouch: true,
+                    shortSwipes: false,
+                    longSwipes: true,
+                    longSwipesRatio: 0.5,
+                    longSwipesMs: 300,
+                    followFinger: true,
+                    threshold: 5,
+                    touchStartPreventDefault: false,
+                    touchStartForcePreventDefault: false,
+                    touchMoveStopPropagation: true,
+                    preventClicks: true,
+                    preventClicksPropagation: true,
+                    edgeSwipeDetection: true,
+                    edgeSwipeThreshold: 20,
+                    pagination: {
+                        el: '.swiper-pagination-suppliers',
+                        clickable: true,
+                        dynamicBullets: true,
+                    },
+                    breakpoints: {
+                        640: {
+                            slidesPerView: 2,
+                            spaceBetween: 20,
+                        },
+                        1024: {
+                            slidesPerView: 3,
+                            spaceBetween: 30,
+                        },
+                        1280: {
+                            slidesPerView: 4,
+                            spaceBetween: 30,
+                        },
+                    },
+                    on: {
+                        init: function() {
+                            console.log('Supplier swiper initialized');
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing supplier swiper:', error);
+            }
+        },
+
+        prevSupplier() {
+            if (this.supplierSwiper) {
+                this.supplierSwiper.slidePrev();
+            }
+        },
+
+        nextSupplier() {
+            if (this.supplierSwiper) {
+                this.supplierSwiper.slideNext();
+            }
+        }
+    };
+}
+
+function aiSuggestionsData() {
+    return {
+        pendingSuggestions: [],
+        isLoading: true,
+
+        // Modal states
+        showNameImprovementModal: false,
+        showCategoryMismatchModal: false,
+        showReorderLevelModal: false,
+        showInventoryAnomalyModal: false,
+
+        // Current item and suggestion being edited
+        currentItem: {
+            id: null,
+            name: '',
+            sku: '',
+            category: '',
+            reorderLevel: 0
+        },
+        currentSuggestion: {
+            id: null,
+            suggestion_type: '',
+            suggestion_text: '',
+            suggested_value: ''
+        },
+
+        // Edit form data
+        editForm: {
+            itemId: null,
+            suggestionId: null,
+            editType: '',
+            newValue: ''
+        },
+
+        init() {
+            this.loadSuggestions();
+        },
+
+        async loadSuggestions() {
+            this.isLoading = true;
+            try {
+                // Use our enhanced fetchAPI with caching - short cache time for suggestions
+                const data = await fetchAPI('/api/ai-suggestions?status=Pending', [], true, 2 * 60 * 1000); // Cache for 2 minutes
+                this.pendingSuggestions = data.items || data; // Handle both old and new API response format
+            } catch (error) {
+                console.error('Error loading suggestions:', error);
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        getSuggestionTypeName(type) {
+            const types = {
+                'NameImprovement': 'تحسين الاسم',
+                'CategoryMismatch': 'تصنيف غير مناسب',
+                'ReorderLevelAdjustment': 'تعديل مستوى إعادة الطلب',
+                'InventoryAnomaly': 'شذوذ في المخزون'
+            };
+            return types[type] || type;
+        },
+
+        // Modal methods
+        openEditModal(suggestion) {
+            if (!suggestion || !suggestion.item) return;
+
+            // Set current item and suggestion
+            this.currentItem = {
+                id: suggestion.item.id,
+                name: suggestion.item.name,
+                sku: suggestion.item.sku,
+                category: suggestion.item.category_name,
+                reorderLevel: suggestion.item.reorder_level
+            };
+
+            this.currentSuggestion = suggestion;
+
+            // Set edit form data
+            this.editForm = {
+                itemId: suggestion.item.id,
+                suggestionId: suggestion.id,
+                editType: suggestion.suggestion_type,
+                newValue: suggestion.suggested_value || ''
+            };
+
+            // Redirect to the AI suggestions dashboard with the suggestion ID
+            window.location.href = `/ai-suggestions-dashboard?suggestion_id=${suggestion.id}`;
+        },
+
+        async exportToExcel() {
+            try {
+                // Show loading state
+                this.isLoading = true;
+
+                // Make the request to the export endpoint
+                const response = await fetch('/api/ai-suggestions/export?status=Pending', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    }
+                });
+
+                if (response.ok) {
+                    // Create a blob from the response
+                    const blob = await response.blob();
+
+                    // Create a temporary URL for the blob
+                    const url = window.URL.createObjectURL(blob);
+
+                    // Create a temporary link element
+                    const a = document.createElement('a');
+                    a.href = url;
+
+                    // Set the filename from the Content-Disposition header or use a default
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'ai_suggestions.xlsx';
+
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+
+                    a.download = filename;
+
+                    // Append the link to the body, click it, and remove it
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    // Clean up the URL
+                    window.URL.revokeObjectURL(url);
+
+                    // Show success message
+                    alert('تم تصدير البيانات بنجاح');
+                } else {
+                    const error = await response.text();
+                    console.error('Error exporting data:', error);
+                    alert('فشل في تصدير البيانات');
+                }
+            } catch (error) {
+                console.error('Error exporting to Excel:', error);
+                alert('حدث خطأ أثناء تصدير البيانات');
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        async applySuggestion(id) {
+            if (!confirm('هل أنت متأكد من تطبيق هذا الاقتراح؟')) return;
+
+            try {
+                const response = await fetch(`/api/ai-suggestions/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: 'Applied' })
+                });
+
+                if (response.ok) {
+                    // Remove the suggestion from the list
+                    this.pendingSuggestions = this.pendingSuggestions.filter(s => s.id !== id);
+                } else {
+                    alert('فشل في تطبيق الاقتراح');
+                }
+            } catch (error) {
+                console.error('Error applying suggestion:', error);
+                alert('حدث خطأ أثناء تطبيق الاقتراح');
+            }
+        },
+
+        async dismissSuggestion(id) {
+            if (!confirm('هل أنت متأكد من تجاهل هذا الاقتراح؟')) return;
+
+            try {
+                const response = await fetch(`/api/ai-suggestions/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: 'Dismissed' })
+                });
+
+                if (response.ok) {
+                    // Remove the suggestion from the list
+                    this.pendingSuggestions = this.pendingSuggestions.filter(s => s.id !== id);
+                } else {
+                    alert('فشل في تجاهل الاقتراح');
+                }
+            } catch (error) {
+                console.error('Error dismissing suggestion:', error);
+                alert('حدث خطأ أثناء تجاهل الاقتراح');
+            }
+        }
+    };
+}
+
 function dashboardData() {
     return {
         stats: {
@@ -238,6 +1555,27 @@ function dashboardData() {
             totalWarehouses: 0,
             totalCategories: 0,
             totalTransactions: 0
+        },
+        comprehensiveStats: {
+            inventory: {
+                valueByCategory: [],
+                recentTransactions: []
+            },
+            sales: {
+                monthlySales: [],
+                topProducts: []
+            },
+            production: {
+                statusBreakdown: {}
+            },
+            cash: {
+                recentTransactions: [],
+                cashFlow: {}
+            },
+            suppliers: {
+                topSuppliers: []
+            },
+            distribution: {}
         },
         recentTransactions: [],
         lowStockItems: [],
@@ -247,52 +1585,330 @@ function dashboardData() {
         inventory: [],
         transactions: [],
         warehouseSections: [],
-        
+        swiper: null,
+        productSwiper: null,
+        isLoading: true,
+
+        formatCurrency(value) {
+            return new Intl.NumberFormat('ar-EG', {
+                style: 'currency',
+                currency: 'EGP',
+                minimumFractionDigits: 2
+            }).format(value);
+        },
+
+        // Function to clear all dashboard caches
+        clearCache() {
+            // Get all keys from sessionStorage
+            const keys = Object.keys(sessionStorage);
+
+            // Filter for dashboard cache keys
+            const cacheKeys = keys.filter(key => key.startsWith('dashboard_cache_'));
+
+            // Remove each cache key
+            cacheKeys.forEach(key => {
+                sessionStorage.removeItem(key);
+            });
+
+            console.log(`Cleared ${cacheKeys.length} dashboard cache items`);
+
+            // Reload the page to refresh all data
+            window.location.reload();
+        },
+
         async init() {
+            this.isLoading = true;
             try {
-                // Fetch all required data
-                const [items, warehouses, categories, inventory, transactions, sections] = await Promise.all([
-                    fetchAPI('/api/items'),
-                    fetchAPI('/api/warehouses'),
-                    fetchAPI('/api/categories'),
-                    fetchAPI('/api/inventory'),
-                    fetchAPI('/api/transactions'),
-                    fetchAPI('/api/warehouse-sections')
-                ]);
-                
-                this.items = items;
-                this.warehouses = warehouses;
-                this.categories = categories;
-                this.inventory = inventory;
-                this.transactions = transactions;
-                this.warehouseSections = sections;
-                
-                // Set stats
-                this.stats.totalItems = items.length;
-                this.stats.totalWarehouses = warehouses.length;
-                this.stats.totalCategories = categories.length;
-                this.stats.totalTransactions = transactions.length;
-                
-                // Get recent transactions
-                this.recentTransactions = this.prepareRecentTransactions();
-                
-                // Get low stock items
-                this.lowStockItems = this.prepareLowStockItems();
-                
-                // Initialize charts
-                this.initCharts();
-                
+                // Fetch comprehensive stats with error handling - use our new enhanced endpoint
+                try {
+                    // Don't cache the main dashboard stats to ensure we always have fresh data
+                    const dashboardData = await fetchAPI('/api/dashboard/stats', {}, false);
+                    this.comprehensiveStats = dashboardData || {
+                        inventory: {
+                            valueByCategory: [],
+                            recentTransactions: []
+                        },
+                        sales: {
+                            monthlySales: [],
+                            topProducts: []
+                        },
+                        production: {
+                            statusBreakdown: {}
+                        },
+                        cash: {
+                            recentTransactions: [],
+                            cashFlow: {}
+                        },
+                        suppliers: {
+                            topSuppliers: []
+                        },
+                        distribution: {}
+                    };
+
+                    // Set basic stats from comprehensive stats
+                    if (dashboardData && dashboardData.inventory) {
+                        this.stats = {
+                            totalItems: dashboardData.inventory.totalItems || 0,
+                            totalWarehouses: dashboardData.inventory.totalWarehouses || 0,
+                            totalCategories: dashboardData.inventory.totalCategories || 0,
+                            totalTransactions: dashboardData.inventory.totalTransactions || 0
+                        };
+
+                        // Set recent transactions from comprehensive stats
+                        if (dashboardData.inventory.recentTransactions) {
+                            this.recentTransactions = dashboardData.inventory.recentTransactions;
+                        }
+                    }
+                } catch (statsError) {
+                    console.error('Error fetching comprehensive stats:', statsError);
+                    this.comprehensiveStats = {
+                        inventory: {
+                            valueByCategory: [],
+                            recentTransactions: []
+                        },
+                        sales: {
+                            monthlySales: [],
+                            topProducts: []
+                        },
+                        production: {
+                            statusBreakdown: {}
+                        },
+                        cash: {
+                            recentTransactions: [],
+                            cashFlow: {}
+                        },
+                        suppliers: {
+                            topSuppliers: []
+                        },
+                        distribution: {}
+                    };
+                }
+
+                // Fetch all required data with individual error handling
+                try {
+                    // Use different cache durations for different types of data
+                    const [items, warehouses, categories, inventory, transactions, sections, lowStockItems] = await Promise.all([
+                        fetchAPI('/api/items', [], true, 15 * 60 * 1000).catch(e => { console.error('Error fetching items:', e); return []; }),
+                        fetchAPI('/api/warehouses', [], true, 30 * 60 * 1000).catch(e => { console.error('Error fetching warehouses:', e); return []; }),
+                        fetchAPI('/api/categories', [], true, 30 * 60 * 1000).catch(e => { console.error('Error fetching categories:', e); return []; }),
+                        fetchAPI('/api/inventory', [], true, 5 * 60 * 1000).catch(e => { console.error('Error fetching inventory:', e); return []; }),
+                        fetchAPI('/api/transactions', [], true, 5 * 60 * 1000).catch(e => { console.error('Error fetching transactions:', e); return []; }),
+                        fetchAPI('/api/warehouse-sections', [], true, 30 * 60 * 1000).catch(e => { console.error('Error fetching warehouse sections:', e); return []; }),
+                        fetchAPI('/api/dashboard/low-stock', [], true, 5 * 60 * 1000).catch(e => { console.error('Error fetching low stock items:', e); return []; })
+                    ]);
+
+                    this.items = items || [];
+                    this.warehouses = warehouses || [];
+                    this.categories = categories || [];
+                    this.inventory = inventory || [];
+                    this.transactions = transactions || [];
+                    this.warehouseSections = sections || [];
+                    this.lowStockItems = (lowStockItems || []).slice(0, 5); // Show only top 5
+
+                    // If stats weren't set from comprehensive stats, set them from individual data
+                    if (!this.stats.totalItems) {
+                        this.stats.totalItems = this.items.length;
+                        this.stats.totalWarehouses = this.warehouses.length;
+                        this.stats.totalCategories = this.categories.length;
+                        this.stats.totalTransactions = this.transactions.length;
+                    }
+
+                    // If recent transactions weren't set from comprehensive stats, prepare them
+                    if (!this.recentTransactions.length) {
+                        this.recentTransactions = this.prepareRecentTransactions();
+                    }
+
+                    // If low stock items weren't set, prepare them
+                    if (!this.lowStockItems.length) {
+                        this.lowStockItems = this.prepareLowStockItems();
+                    }
+                } catch (dataError) {
+                    console.error('Error processing dashboard data:', dataError);
+                }
+
+                // Initialize charts with error handling
+                try {
+                    this.initCharts();
+                } catch (chartError) {
+                    console.error('Error initializing charts:', chartError);
+                }
+
+                // Initialize Swiper
+                try {
+                    this.initSwiper();
+                } catch (swiperError) {
+                    console.error('Error initializing swiper:', swiperError);
+                }
+
             } catch (error) {
                 console.error('خطأ في جلب بيانات لوحة التحكم:', error);
+            } finally {
+                // Make sure to set isLoading to false when done
+                this.isLoading = false;
             }
         },
-        
+
+        // Add cleanup method to properly destroy swipers and charts
+        cleanup() {
+            try {
+                // Destroy swipers if they exist
+                if (this.swiper) {
+                    this.swiper.destroy(true, true);
+                    this.swiper = null;
+                }
+
+                if (this.productSwiper) {
+                    this.productSwiper.destroy(true, true);
+                    this.productSwiper = null;
+                }
+
+                // Get the supplier component and clean up its swiper if it exists
+                const suppliersComponent = document.querySelector('[x-data="suppliersData()"]')?.__x;
+                if (suppliersComponent && suppliersComponent.$data.supplierSwiper) {
+                    suppliersComponent.$data.supplierSwiper.destroy(true, true);
+                    suppliersComponent.$data.supplierSwiper = null;
+                }
+
+                // Clean up any other resources if needed
+                console.log('Dashboard resources cleaned up');
+            } catch (error) {
+                console.error('Error cleaning up dashboard resources:', error);
+            }
+        },
+
+        initSwiper() {
+            try {
+                // Clean up existing swipers if they exist
+                if (this.swiper) {
+                    this.swiper.destroy();
+                    this.swiper = null;
+                }
+
+                if (this.productSwiper) {
+                    this.productSwiper.destroy();
+                    this.productSwiper = null;
+                }
+
+                // Initialize Swiper after a longer delay to ensure DOM is fully ready
+                setTimeout(() => {
+                    try {
+                        // Check if the container exists before initializing
+                        const statsContainer = document.querySelector('.swiper-container');
+                        if (statsContainer) {
+                            this.swiper = new Swiper('.swiper-container', {
+                                slidesPerView: 1,
+                                spaceBetween: 30,
+                                pagination: {
+                                    el: '.swiper-pagination',
+                                    clickable: true,
+                                },
+                                autoplay: {
+                                    delay: 5000,
+                                    disableOnInteraction: false,
+                                },
+                                observer: true,
+                                observeParents: true,
+                                updateOnWindowResize: true,
+                                watchSlidesProgress: true,
+                                watchSlidesVisibility: true,
+                                allowTouchMove: true,
+                                loop: false,
+                                loopAdditionalSlides: 0,
+                                resistance: true,
+                                resistanceRatio: 0.85,
+                                preventInteractionOnTransition: false,
+                                touchEventsTarget: 'container',
+                                touchRatio: 1,
+                                touchAngle: 45,
+                                simulateTouch: true,
+                                shortSwipes: false,
+                                longSwipes: true,
+                                longSwipesRatio: 0.5,
+                                longSwipesMs: 300,
+                                followFinger: true,
+                                threshold: 5,
+                                touchStartPreventDefault: false,
+                                touchStartForcePreventDefault: false,
+                                touchMoveStopPropagation: true,
+                                preventClicks: true,
+                                preventClicksPropagation: true,
+                                edgeSwipeDetection: true,
+                                edgeSwipeThreshold: 20,
+                                on: {
+                                    init: function() {
+                                        console.log('System stats swiper initialized');
+                                    }
+                                }
+                            });
+                        } else {
+                            console.warn('System stats swiper container not found');
+                        }
+
+                        // Initialize product swiper if it exists
+                        const productsContainer = document.querySelector('.swiper-container-products');
+                        if (productsContainer) {
+                            this.productSwiper = new Swiper('.swiper-container-products', {
+                                slidesPerView: 1,
+                                spaceBetween: 20,
+                                pagination: {
+                                    el: '.swiper-pagination-products',
+                                    clickable: true,
+                                },
+                                observer: true,
+                                observeParents: true,
+                                updateOnWindowResize: true,
+                                watchSlidesProgress: true,
+                                watchSlidesVisibility: true,
+                                breakpoints: {
+                                    640: {
+                                        slidesPerView: 2,
+                                        spaceBetween: 20,
+                                    },
+                                    1024: {
+                                        slidesPerView: 3,
+                                        spaceBetween: 30,
+                                    },
+                                    1280: {
+                                        slidesPerView: 4,
+                                        spaceBetween: 30,
+                                    },
+                                },
+                                on: {
+                                    init: function() {
+                                        console.log('Product swiper initialized');
+                                    }
+                                }
+                            });
+                        } else {
+                            console.warn('Product swiper container not found');
+                        }
+                    } catch (error) {
+                        console.error('Error initializing swipers:', error);
+                    }
+                }, 1000); // Increased timeout to 1000ms
+            } catch (error) {
+                console.error('Error in initSwiper:', error);
+            }
+        },
+
+        prevProduct() {
+            if (this.productSwiper) {
+                this.productSwiper.slidePrev();
+            }
+        },
+
+        nextProduct() {
+            if (this.productSwiper) {
+                this.productSwiper.slideNext();
+            }
+        },
+
         prepareRecentTransactions() {
             // Sort transactions by date (newest first) and take the first 5
             const sortedTransactions = [...this.transactions]
                 .sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date))
                 .slice(0, 5);
-            
+
             // Add item names to transactions
             return sortedTransactions.map(txn => {
                 const item = this.items.find(i => i.id === txn.item_id);
@@ -302,7 +1918,7 @@ function dashboardData() {
                 };
             });
         },
-        
+
         prepareLowStockItems() {
             // Create a map of item quantities
             const itemQuantities = {};
@@ -312,7 +1928,7 @@ function dashboardData() {
                 }
                 itemQuantities[inv.item_id] += inv.quantity;
             });
-            
+
             // Find items with quantity below reorder level
             return this.items
                 .filter(item => {
@@ -327,88 +1943,399 @@ function dashboardData() {
                 }))
                 .slice(0, 5); // Take only the first 5
         },
-        
+
         initCharts() {
-            // Initialize all charts
-            this.initInventoryByCategoryChart();
-            this.initTransactionsOverTimeChart();
-            this.initTopItemsChart();
-            this.initTransactionTypesChart();
-            this.initWarehouseCapacityChart();
-            this.initLowStockItemsChart();
-            this.initInventoryValueChart();
-            this.initMonthlyTrendsChart();
-            this.initPriceCostAnalysisChart();
-            this.initWarehouseSectionsChart();
-        },
-        
-        formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('ar-EG');
-        },
-        
-        initInventoryByCategoryChart() {
-            // Group inventory by category
-            const categoryTotals = {};
-            
-            // First, get total quantity for each item
-            const itemQuantities = {};
-            this.inventory.forEach(inv => {
-                if (!itemQuantities[inv.item_id]) {
-                    itemQuantities[inv.item_id] = 0;
+            // Initialize all charts with error handling for each chart
+            const chartInitializers = [
+                { name: 'InventoryByCategoryChart', fn: this.initInventoryByCategoryChart.bind(this) },
+                { name: 'TransactionsOverTimeChart', fn: this.initTransactionsOverTimeChart.bind(this) },
+                { name: 'TopItemsChart', fn: this.initTopItemsChart.bind(this) },
+                { name: 'TransactionTypesChart', fn: this.initTransactionTypesChart.bind(this) },
+                { name: 'WarehouseCapacityChart', fn: this.initWarehouseCapacityChart.bind(this) },
+                { name: 'LowStockItemsChart', fn: this.initLowStockItemsChart.bind(this) },
+                { name: 'InventoryValueChart', fn: this.initInventoryValueChart.bind(this) },
+                { name: 'MonthlyTrendsChart', fn: this.initMonthlyTrendsChart.bind(this) },
+                { name: 'PriceCostAnalysisChart', fn: this.initPriceCostAnalysisChart.bind(this) },
+                { name: 'WarehouseSectionsChart', fn: this.initWarehouseSectionsChart.bind(this) },
+                { name: 'SalesPerformanceChart', fn: this.initSalesPerformanceChart.bind(this) },
+                { name: 'InventoryValueByCategoryChart', fn: this.initInventoryValueByCategoryChart.bind(this) },
+                { name: 'CashFlowChart', fn: this.initCashFlowChart.bind(this) },
+                { name: 'ProductionStatusChart', fn: this.initProductionStatusChart.bind(this) }
+            ];
+
+            // Initialize each chart with individual error handling
+            chartInitializers.forEach(chart => {
+                try {
+                    chart.fn();
+                } catch (error) {
+                    console.error(`Error initializing ${chart.name}:`, error);
                 }
-                itemQuantities[inv.item_id] += inv.quantity;
             });
-            
-            // Then, group by category
-            this.items.forEach(item => {
-                const categoryId = item.category_id;
-                const quantity = itemQuantities[item.id] || 0;
-                
-                if (!categoryTotals[categoryId]) {
-                    categoryTotals[categoryId] = 0;
+        },
+
+        initSalesPerformanceChart() {
+            // Get months in Arabic
+            const months = ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+            // Use real data from comprehensive stats if available
+            let monthlySalesData = [];
+            let monthLabels = [];
+            let salesData = [];
+            let ordersData = [];
+
+            if (this.comprehensiveStats && this.comprehensiveStats.sales && this.comprehensiveStats.sales.monthlySales && this.comprehensiveStats.sales.monthlySales.length > 0) {
+                monthlySalesData = this.comprehensiveStats.sales.monthlySales;
+
+                // Extract month names and sales amounts
+                monthLabels = monthlySalesData.map(item => {
+                    // Convert YYYY-MM to Arabic month name
+                    const [year, month] = item.month.split('-');
+                    return months[parseInt(month) - 1] + ' ' + year;
+                });
+
+                salesData = monthlySalesData.map(item => item.amount);
+
+                // Generate order data based on sales (if not available)
+                ordersData = salesData.map(amount => Math.round(amount / 1000));
+            } else {
+                // Fallback to sample data if real data is not available
+                const currentMonth = new Date().getMonth();
+                monthLabels = months.slice(Math.max(0, currentMonth - 5), currentMonth + 1);
+
+                // Generate random data
+                salesData = Array(monthLabels.length).fill(0).map(() => Math.floor(Math.random() * 50000) + 10000);
+                ordersData = Array(monthLabels.length).fill(0).map(() => Math.floor(Math.random() * 50) + 10);
+            }
+
+            const ctx = document.getElementById('salesPerformanceChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: monthLabels,
+                    datasets: [
+                        {
+                            label: 'المبيعات (ج.م)',
+                            data: salesData,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            yAxisID: 'y',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'عدد الطلبات',
+                            data: ordersData,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            yAxisID: 'y1',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'المبيعات (ج.م)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'عدد الطلبات'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
                 }
-                categoryTotals[categoryId] += quantity;
             });
-            
-            // Prepare chart data
-            const labels = [];
-            const data = [];
-            const backgroundColors = [];
-            
+        },
+
+        initInventoryValueByCategoryChart() {
+            // Use data from comprehensive stats if available
+            let labels = [];
+            let data = [];
+
+            if (this.comprehensiveStats &&
+                this.comprehensiveStats.inventory &&
+                this.comprehensiveStats.inventory.valueByCategory &&
+                this.comprehensiveStats.inventory.valueByCategory.length > 0) {
+
+                // Use the data from our comprehensive stats
+                const categoryValues = this.comprehensiveStats.inventory.valueByCategory;
+                labels = categoryValues.map(item => item.name);
+                data = categoryValues.map(item => item.value);
+            } else {
+                // Fallback to calculating from raw data
+                const categoryValues = {};
+
+                // Calculate value for each item
+                this.inventory.forEach(inv => {
+                    const item = this.items.find(i => i.id === inv.item_id);
+                    if (item) {
+                        const category = this.categories.find(c => c.id === item.category_id);
+                        if (category) {
+                            const categoryName = category.name;
+                            if (!categoryValues[categoryName]) {
+                                categoryValues[categoryName] = 0;
+                            }
+                            categoryValues[categoryName] += inv.quantity * item.cost;
+                        }
+                    }
+                });
+
+                // Prepare chart data
+                labels = Object.keys(categoryValues);
+                data = Object.values(categoryValues).map(value => parseFloat(value.toFixed(2)));
+            }
+
             // Generate colors
-            const colorPalette = [
+            const backgroundColors = [
                 'rgba(54, 162, 235, 0.7)',
                 'rgba(255, 99, 132, 0.7)',
                 'rgba(255, 206, 86, 0.7)',
                 'rgba(75, 192, 192, 0.7)',
                 'rgba(153, 102, 255, 0.7)',
                 'rgba(255, 159, 64, 0.7)',
-                'rgba(199, 199, 199, 0.7)',
-                'rgba(83, 102, 255, 0.7)',
-                'rgba(40, 159, 64, 0.7)',
-                'rgba(210, 199, 199, 0.7)'
+                'rgba(199, 199, 199, 0.7)'
             ];
-            
-            // Populate chart data
-            let colorIndex = 0;
-            for (const categoryId in categoryTotals) {
-                const category = this.categories.find(c => c.id == categoryId);
-                labels.push(category ? category.name : `فئة #${categoryId}`);
-                data.push(categoryTotals[categoryId]);
-                backgroundColors.push(colorPalette[colorIndex % colorPalette.length]);
-                colorIndex++;
-            }
-            
-            // Create chart
-            const ctx = document.getElementById('inventoryByCategoryChart').getContext('2d');
+
+            const ctx = document.getElementById('inventoryValueByCategory').getContext('2d');
             new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: labels,
                     datasets: [{
                         data: data,
-                        backgroundColor: backgroundColors,
+                        backgroundColor: backgroundColors.slice(0, labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    return `${context.label}: ${value.toLocaleString('ar-EG')} ج.م`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        },
+
+        initCashFlowChart() {
+            // Create data for cash flow
+            const days = Array.from({length: 30}, (_, i) => i + 1);
+
+            // Use data from comprehensive stats if available
+            let inflow = [];
+            let outflow = [];
+            let balance = [];
+
+            if (this.comprehensiveStats &&
+                this.comprehensiveStats.cash &&
+                this.comprehensiveStats.cash.cashFlow) {
+
+                const cashFlow = this.comprehensiveStats.cash.cashFlow;
+
+                // If we have real data, use it
+                if (cashFlow.in !== undefined && cashFlow.out !== undefined) {
+                    // For simplicity, we'll distribute the total cash flow evenly across the days
+                    const dailyIn = cashFlow.in / 30;
+                    const dailyOut = cashFlow.out / 30;
+
+                    inflow = Array(30).fill(dailyIn);
+                    outflow = Array(30).fill(dailyOut);
+
+                    // Calculate running balance
+                    let runningBalance = 0;
+                    balance = days.map((_, i) => {
+                        runningBalance += (inflow[i] - outflow[i]);
+                        return runningBalance;
+                    });
+                } else {
+                    // Generate random data if we don't have the right structure
+                    inflow = Array(30).fill(0).map(() => Math.floor(Math.random() * 5000) + 1000);
+                    outflow = Array(30).fill(0).map(() => Math.floor(Math.random() * 4000) + 500);
+
+                    // Calculate balance
+                    balance = days.map((_, i) => {
+                        let sum = 0;
+                        for (let j = 0; j <= i; j++) {
+                            sum += (inflow[j] - outflow[j]);
+                        }
+                        return sum;
+                    });
+                }
+            } else {
+                // Generate random data if real data is not available
+                inflow = Array(30).fill(0).map(() => Math.floor(Math.random() * 5000) + 1000);
+                outflow = Array(30).fill(0).map(() => Math.floor(Math.random() * 4000) + 500);
+
+                // Calculate balance
+                balance = days.map((_, i) => {
+                    let sum = 0;
+                    for (let j = 0; j <= i; j++) {
+                        sum += (inflow[j] - outflow[j]);
+                    }
+                    return sum;
+                });
+            }
+
+            const ctx = document.getElementById('cashFlowChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: days,
+                    datasets: [
+                        {
+                            label: 'الرصيد',
+                            data: balance,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'الإيرادات',
+                            data: inflow,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            fill: false,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'المصروفات',
+                            data: outflow,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            fill: false,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'اليوم'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'الرصيد (ج.م)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'التدفق اليومي (ج.م)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        },
+
+        initProductionStatusChart() {
+            // Use data from comprehensive stats if available
+            let labels = ['قيد التنفيذ', 'مكتملة', 'قيد الانتظار'];
+            let data = [];
+
+            if (this.comprehensiveStats &&
+                this.comprehensiveStats.production &&
+                this.comprehensiveStats.production.statusBreakdown &&
+                Object.keys(this.comprehensiveStats.production.statusBreakdown).length > 0) {
+
+                // Use the detailed status breakdown if available
+                const statusBreakdown = this.comprehensiveStats.production.statusBreakdown;
+
+                // Map status names to Arabic
+                const statusMap = {
+                    'InProgress': 'قيد التنفيذ',
+                    'Completed': 'مكتملة',
+                    'Planned': 'مخططة',
+                    'Cancelled': 'ملغية',
+                    'OnHold': 'معلقة'
+                };
+
+                // Create labels and data arrays from the status breakdown
+                labels = [];
+                data = [];
+
+                for (const [status, count] of Object.entries(statusBreakdown)) {
+                    labels.push(statusMap[status] || status);
+                    data.push(count);
+                }
+            } else {
+                // Fall back to basic counts
+                const totalOrders = this.comprehensiveStats.production?.totalOrders || 0;
+                const activeOrders = this.comprehensiveStats.production?.activeOrders || 0;
+                const completedOrders = this.comprehensiveStats.production?.completedOrders || 0;
+                const pendingOrders = totalOrders - activeOrders - completedOrders;
+
+                data = [activeOrders, completedOrders, pendingOrders];
+            }
+
+            const ctx = document.getElementById('productionStatusChart').getContext('2d');
+
+            // Generate colors based on the number of statuses
+            const backgroundColors = [
+                'rgba(255, 159, 64, 0.7)',  // Orange for in progress
+                'rgba(75, 192, 192, 0.7)',   // Green for completed
+                'rgba(153, 102, 255, 0.7)',  // Purple for pending
+                'rgba(255, 99, 132, 0.7)',   // Red for cancelled
+                'rgba(54, 162, 235, 0.7)'    // Blue for on hold
+            ];
+
+            // Ensure we have enough colors
+            const colors = backgroundColors.slice(0, labels.length);
+
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
                         borderWidth: 1
                     }]
                 },
@@ -423,12 +2350,120 @@ function dashboardData() {
                 }
             });
         },
-        
+
+        formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ar-EG');
+        },
+
+        initInventoryByCategoryChart() {
+            try {
+                // Check if the chart canvas exists
+                const chartCanvas = document.getElementById('inventoryByCategoryChart');
+                if (!chartCanvas) {
+                    console.warn('Inventory by category chart canvas not found');
+                    return;
+                }
+
+                // Group inventory by category
+                const categoryTotals = {};
+
+                // First, get total quantity for each item
+                const itemQuantities = {};
+                if (Array.isArray(this.inventory)) {
+                    this.inventory.forEach(inv => {
+                        if (!itemQuantities[inv.item_id]) {
+                            itemQuantities[inv.item_id] = 0;
+                        }
+                        itemQuantities[inv.item_id] += inv.quantity;
+                    });
+                } else {
+                    console.warn('Inventory data is not an array');
+                }
+
+                // Then, group by category
+                if (Array.isArray(this.items)) {
+                    this.items.forEach(item => {
+                        const categoryId = item.category_id;
+                        const quantity = itemQuantities[item.id] || 0;
+
+                        if (!categoryTotals[categoryId]) {
+                            categoryTotals[categoryId] = 0;
+                        }
+                        categoryTotals[categoryId] += quantity;
+                    });
+                } else {
+                    console.warn('Items data is not an array');
+                }
+
+                // Prepare chart data
+                const labels = [];
+                const data = [];
+                const backgroundColors = [];
+
+                // Generate colors
+                const colorPalette = [
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(153, 102, 255, 0.7)',
+                    'rgba(255, 159, 64, 0.7)',
+                    'rgba(199, 199, 199, 0.7)',
+                    'rgba(83, 102, 255, 0.7)',
+                    'rgba(40, 159, 64, 0.7)',
+                    'rgba(210, 199, 199, 0.7)'
+                ];
+
+                // Populate chart data
+                let colorIndex = 0;
+                for (const categoryId in categoryTotals) {
+                    const category = Array.isArray(this.categories) ?
+                        this.categories.find(c => c.id == categoryId) : null;
+                    labels.push(category ? category.name : `فئة #${categoryId}`);
+                    data.push(categoryTotals[categoryId]);
+                    backgroundColors.push(colorPalette[colorIndex % colorPalette.length]);
+                    colorIndex++;
+                }
+
+                // Check if we have data to display
+                if (labels.length === 0) {
+                    console.warn('No data available for inventory by category chart');
+                    return;
+                }
+
+                // Create chart
+                const ctx = chartCanvas.getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: backgroundColors,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error in initInventoryByCategoryChart:', error);
+            }
+        },
+
         initTransactionsOverTimeChart() {
             // Group transactions by date
             const transactionsByDate = {};
             const dates = [];
-            
+
             // Get last 30 days
             for (let i = 29; i >= 0; i--) {
                 const date = new Date();
@@ -437,7 +2472,7 @@ function dashboardData() {
                 dates.push(dateStr);
                 transactionsByDate[dateStr] = { in: 0, out: 0 };
             }
-            
+
             // Count transactions by type and date
             this.transactions.forEach(txn => {
                 const date = new Date(txn.transaction_date).toISOString().split('T')[0];
@@ -449,17 +2484,17 @@ function dashboardData() {
                     }
                 }
             });
-            
+
             // Prepare chart data
             const inData = dates.map(date => transactionsByDate[date].in);
             const outData = dates.map(date => transactionsByDate[date].out);
-            
+
             // Format dates for display
             const formattedDates = dates.map(date => {
                 const [year, month, day] = date.split('-');
                 return `${day}/${month}`;
             });
-            
+
             // Create chart
             const ctx = document.getElementById('transactionsOverTimeChart').getContext('2d');
             new Chart(ctx, {
@@ -496,7 +2531,7 @@ function dashboardData() {
                 }
             });
         },
-        
+
         initTopItemsChart() {
             // Calculate total quantity for each item
             const itemQuantities = {};
@@ -506,7 +2541,7 @@ function dashboardData() {
                 }
                 itemQuantities[inv.item_id] += inv.quantity;
             });
-            
+
             // Convert to array and sort by quantity
             const sortedItems = Object.keys(itemQuantities)
                 .map(itemId => {
@@ -519,11 +2554,11 @@ function dashboardData() {
                 })
                 .sort((a, b) => b.quantity - a.quantity)
                 .slice(0, 10); // Get top 10
-            
+
             // Prepare chart data
             const labels = sortedItems.map(item => item.name);
             const data = sortedItems.map(item => item.quantity);
-            
+
             // Create chart
             const ctx = document.getElementById('topItemsChart').getContext('2d');
             new Chart(ctx, {
@@ -550,7 +2585,7 @@ function dashboardData() {
                 }
             });
         },
-        
+
         initTransactionTypesChart() {
             // Count transactions by type
             const transactionCounts = {
@@ -558,13 +2593,13 @@ function dashboardData() {
                 'OUT': 0,
                 'TRANSFER': 0
             };
-            
+
             this.transactions.forEach(txn => {
                 if (transactionCounts[txn.transaction_type] !== undefined) {
                     transactionCounts[txn.transaction_type]++;
                 }
             });
-            
+
             // Prepare chart data
             const labels = ['إدخال', 'إخراج', 'نقل'];
             const data = [transactionCounts['IN'], transactionCounts['OUT'], transactionCounts['TRANSFER']];
@@ -573,7 +2608,7 @@ function dashboardData() {
                 'rgba(255, 99, 132, 0.7)',
                 'rgba(54, 162, 235, 0.7)'
             ];
-            
+
             // Create chart
             const ctx = document.getElementById('transactionTypesChart').getContext('2d');
             new Chart(ctx, {
@@ -592,7 +2627,7 @@ function dashboardData() {
                 }
             });
         },
-        
+
         initWarehouseCapacityChart() {
             // Calculate used capacity for each warehouse
             const warehouseUsage = this.warehouses.map(warehouse => {
@@ -600,12 +2635,12 @@ function dashboardData() {
                 const totalItems = this.inventory
                     .filter(inv => inv.warehouse_id === warehouse.id)
                     .reduce((sum, inv) => sum + inv.quantity, 0);
-                
+
                 // Calculate percentage if capacity is available
-                const capacityPercentage = warehouse.capacity 
+                const capacityPercentage = warehouse.capacity
                     ? Math.min(100, Math.round((totalItems / warehouse.capacity) * 100))
                     : 0;
-                
+
                 return {
                     id: warehouse.id,
                     name: warehouse.name,
@@ -614,12 +2649,12 @@ function dashboardData() {
                     percentage: capacityPercentage
                 };
             });
-            
+
             // Prepare chart data
             const labels = warehouseUsage.map(w => w.name);
             const usedData = warehouseUsage.map(w => w.used);
             const remainingData = warehouseUsage.map(w => Math.max(0, w.capacity - w.used));
-            
+
             // Create chart
             const ctx = document.getElementById('warehouseCapacityChart').getContext('2d');
             new Chart(ctx, {
@@ -658,7 +2693,7 @@ function dashboardData() {
                 }
             });
         },
-        
+
         initLowStockItemsChart() {
             // Get items with quantity below reorder level
             const itemQuantities = {};
@@ -668,19 +2703,19 @@ function dashboardData() {
                 }
                 itemQuantities[inv.item_id] += inv.quantity;
             });
-            
+
             const lowStockItems = this.items
                 .filter(item => {
                     const quantity = itemQuantities[item.id] || 0;
                     return quantity <= item.reorder_level;
                 })
                 .slice(0, 10); // Take only the first 10
-            
+
             // Prepare chart data
             const labels = lowStockItems.map(item => item.name);
             const currentData = lowStockItems.map(item => itemQuantities[item.id] || 0);
             const reorderData = lowStockItems.map(item => item.reorder_level);
-            
+
             // Create chart
             const ctx = document.getElementById('lowStockItemsChart').getContext('2d');
             new Chart(ctx, {
@@ -715,23 +2750,23 @@ function dashboardData() {
                 }
             });
         },
-        
+
         initInventoryValueChart() {
             // Calculate inventory value for each warehouse
             const warehouseValues = {};
-            
+
             this.inventory.forEach(inv => {
                 const item = this.items.find(i => i.id === inv.item_id);
                 if (item) {
                     const value = inv.quantity * item.cost;
-                    
+
                     if (!warehouseValues[inv.warehouse_id]) {
                         warehouseValues[inv.warehouse_id] = 0;
                     }
                     warehouseValues[inv.warehouse_id] += value;
                 }
             });
-            
+
             // Prepare chart data
             const labels = [];
             const data = [];
@@ -742,7 +2777,7 @@ function dashboardData() {
                 'rgba(75, 192, 192, 0.7)',
                 'rgba(153, 102, 255, 0.7)'
             ];
-            
+
             let colorIndex = 0;
             for (const warehouseId in warehouseValues) {
                 const warehouse = this.warehouses.find(w => w.id == warehouseId);
@@ -750,7 +2785,7 @@ function dashboardData() {
                 data.push(warehouseValues[warehouseId].toFixed(2));
                 colorIndex++;
             }
-            
+
                         // Create chart
                         const ctx = document.getElementById('inventoryValueChart').getContext('2d');
                         new Chart(ctx, {
@@ -778,11 +2813,11 @@ function dashboardData() {
                             }
                         });
                     },
-                    
+
                     initMonthlyTrendsChart() {
                         // Group transactions by month
                         const monthlyData = {};
-                        
+
                         // Initialize last 12 months
                         for (let i = 11; i >= 0; i--) {
                             const date = new Date();
@@ -790,12 +2825,12 @@ function dashboardData() {
                             const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
                             monthlyData[monthYear] = { in: 0, out: 0 };
                         }
-                        
+
                         // Count transactions by type and month
                         this.transactions.forEach(txn => {
                             const date = new Date(txn.transaction_date);
                             const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
-                            
+
                             if (monthlyData[monthYear]) {
                                 if (txn.transaction_type === 'IN') {
                                     monthlyData[monthYear].in += txn.quantity;
@@ -804,19 +2839,19 @@ function dashboardData() {
                                 }
                             }
                         });
-                        
+
                         // Prepare chart data
                         const labels = Object.keys(monthlyData);
                         const inData = labels.map(month => monthlyData[month].in);
                         const outData = labels.map(month => monthlyData[month].out);
-                        
+
                         // Format month labels
                         const monthNames = ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
                         const formattedLabels = labels.map(monthYear => {
                             const [month, year] = monthYear.split('/');
                             return `${monthNames[parseInt(month) - 1]} ${year}`;
                         });
-                        
+
                         // Create chart
                         const ctx = document.getElementById('monthlyTrendsChart').getContext('2d');
                         new Chart(ctx, {
@@ -853,7 +2888,7 @@ function dashboardData() {
                             }
                         });
                     },
-                    
+
                     initPriceCostAnalysisChart() {
                         // Get top 10 items by price-cost margin
                         const itemsWithMargin = this.items
@@ -867,12 +2902,12 @@ function dashboardData() {
                             }))
                             .sort((a, b) => b.margin - a.margin)
                             .slice(0, 10);
-                        
+
                         // Prepare chart data
                         const labels = itemsWithMargin.map(item => item.name);
                         const costData = itemsWithMargin.map(item => item.cost);
                         const priceData = itemsWithMargin.map(item => item.price);
-                        
+
                         // Create chart
                         const ctx = document.getElementById('priceCostAnalysisChart').getContext('2d');
                         new Chart(ctx, {
@@ -907,18 +2942,18 @@ function dashboardData() {
                             }
                         });
                     },
-                    
+
                     initWarehouseSectionsChart() {
                         // Group sections by warehouse
                         const warehouseSectionCounts = {};
-                        
+
                         this.warehouseSections.forEach(section => {
                             if (!warehouseSectionCounts[section.warehouse_id]) {
                                 warehouseSectionCounts[section.warehouse_id] = 0;
                             }
                             warehouseSectionCounts[section.warehouse_id]++;
                         });
-                        
+
                         // Prepare chart data
                         const labels = [];
                         const data = [];
@@ -930,7 +2965,7 @@ function dashboardData() {
                             'rgba(153, 102, 255, 0.7)',
                             'rgba(255, 159, 64, 0.7)'
                         ];
-                        
+
                         let colorIndex = 0;
                         for (const warehouseId in warehouseSectionCounts) {
                             const warehouse = this.warehouses.find(w => w.id == warehouseId);
@@ -938,7 +2973,7 @@ function dashboardData() {
                             data.push(warehouseSectionCounts[warehouseId]);
                             colorIndex++;
                         }
-                        
+
                         // Create chart
                         const ctx = document.getElementById('warehouseSectionsChart').getContext('2d');
                         new Chart(ctx, {
@@ -967,5 +3002,5 @@ function dashboardData() {
             </script>
             {% endblock %}
             {% endblock %}
-            
+
 

@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الخزينة - تفاصيل دفعة{% endblock %}
+
+{% block page_header %}تفاصيل دفعة لمورد{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="max-w-3xl mx-auto">
+        <!-- Payment Voucher Card -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+            <div class="p-6 border-b">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-gray-800">سند دفع لمورد</h2>
+                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                        {{ voucher.status }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500 mb-2">معلومات السند</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-xs text-gray-500">رقم السند</p>
+                                <p class="font-medium text-gray-800">{{ voucher.voucher_number }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">تاريخ الدفع</p>
+                                <p class="font-medium text-gray-800">{{ voucher.transfer_date.strftime('%Y-%m-%d %H:%M') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">المبلغ</p>
+                                <p class="font-medium text-gray-800">
+                                    {{ voucher.amount|round(2) }}
+                                    {% if voucher.from_account %}
+                                    {{ voucher.from_account.currency }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">الحالة</p>
+                                <p class="font-medium text-gray-800">{{ voucher.status }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500 mb-2">معلومات المورد والحساب</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-xs text-gray-500">المورد</p>
+                                <p class="font-medium text-gray-800">
+                                    {% if voucher.supplier %}
+                                    {{ voucher.supplier.supplier_name }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">من حساب</p>
+                                <p class="font-medium text-gray-800">
+                                    {% if voucher.from_account %}
+                                    {{ voucher.from_account.name }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">تم بواسطة</p>
+                                <p class="font-medium text-gray-800">
+                                    {% if voucher.creator %}
+                                    {{ voucher.creator.username }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">تاريخ الإنشاء</p>
+                                <p class="font-medium text-gray-800">{{ voucher.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if voucher.notes %}
+                <div class="mt-6 pt-6 border-t">
+                    <h3 class="text-sm font-medium text-gray-500 mb-2">ملاحظات</h3>
+                    <p class="text-gray-700">{{ voucher.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="bg-gray-50 px-6 py-4 flex justify-between items-center">
+                <a href="{{ url_for('cash.supplier_payments') }}" class="text-blue-600 hover:text-blue-800">
+                    <i class="fas fa-arrow-right ml-1"></i>
+                    العودة إلى قائمة الدفعات
+                </a>
+
+                <div class="flex space-x-2 space-x-reverse">
+                    <button onclick="printVoucher()" class="btn bg-gray-200 hover:bg-gray-300 text-gray-800">
+                        <i class="fas fa-print ml-1"></i>
+                        طباعة السند
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Related Transactions -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div class="p-6 border-b">
+                <h2 class="text-lg font-semibold text-gray-800">المعاملات المرتبطة</h2>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-right">
+                    <thead class="bg-gray-50 text-gray-600 font-medium">
+                        <tr>
+                            <th class="px-6 py-3">الحساب</th>
+                            <th class="px-6 py-3">النوع</th>
+                            <th class="px-6 py-3">المبلغ</th>
+                            <th class="px-6 py-3">التاريخ</th>
+                            <th class="px-6 py-3">الوصف</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        {% for transaction in voucher.from_account.transactions %}
+                        {% if transaction.reference_type == 'supplier_payment' and transaction.reference_id == voucher.id %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">{{ transaction.account.name }}</td>
+                            <td class="px-6 py-4">
+                                {% if transaction.transaction_type == 'deposit' %}
+                                <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">إيداع</span>
+                                {% else %}
+                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">سحب</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 font-medium
+                                {% if transaction.transaction_type == 'deposit' %}text-green-600
+                                {% else %}text-red-600{% endif %}">
+                                {{ transaction.amount|round(2) }}
+                            </td>
+                            <td class="px-6 py-4">{{ transaction.transaction_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="px-6 py-4">{{ transaction.description }}</td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if voucher.supplier %}
+                        {% for entry in voucher.supplier.ledger_entries %}
+                        {% if entry.reference_type == 'payment' and entry.reference_id == voucher.id %}
+                        <tr class="hover:bg-gray-50 bg-blue-50">
+                            <td class="px-6 py-4">حساب المورد</td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">دفعة</span>
+                            </td>
+                            <td class="px-6 py-4 font-medium text-blue-600">
+                                {{ entry.credit|round(2) }}
+                            </td>
+                            <td class="px-6 py-4">{{ entry.entry_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="px-6 py-4">{{ entry.description }}</td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function printVoucher() {
+        // Create a new window for printing
+        const printWindow = window.open('', '_blank');
+
+        // Generate the print content
+        const voucherNumber = "{{ voucher.voucher_number }}";
+        const transferDate = "{{ voucher.transfer_date.strftime('%Y-%m-%d %H:%M') }}";
+        const amount = "{{ voucher.amount|round(2) }}";
+        const currency = "{% if voucher.from_account %}{{ voucher.from_account.currency }}{% endif %}";
+        const supplierName = "{% if voucher.supplier %}{{ voucher.supplier.supplier_name }}{% endif %}";
+        const accountName = "{% if voucher.from_account %}{{ voucher.from_account.name }}{% endif %}";
+        const notes = "{{ voucher.notes|default('') }}";
+
+        // Create the HTML content for printing
+        const printContent = `
+            <!DOCTYPE html>
+            <html dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>سند دفع رقم ${voucherNumber}</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 0;
+                        padding: 20px;
+                    }
+                    .voucher {
+                        border: 1px solid #000;
+                        padding: 20px;
+                        max-width: 800px;
+                        margin: 0 auto;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 20px;
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 10px;
+                    }
+                    .title {
+                        font-size: 24px;
+                        font-weight: bold;
+                    }
+                    .voucher-number {
+                        font-size: 18px;
+                        margin-top: 5px;
+                    }
+                    .info-row {
+                        display: flex;
+                        margin-bottom: 15px;
+                    }
+                    .info-label {
+                        font-weight: bold;
+                        width: 150px;
+                    }
+                    .info-value {
+                        flex: 1;
+                    }
+                    .amount {
+                        font-size: 20px;
+                        font-weight: bold;
+                        text-align: center;
+                        margin: 20px 0;
+                        padding: 10px;
+                        border: 1px dashed #000;
+                    }
+                    .signatures {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 50px;
+                    }
+                    .signature {
+                        text-align: center;
+                        width: 200px;
+                    }
+                    .signature-line {
+                        border-top: 1px solid #000;
+                        margin-top: 50px;
+                        padding-top: 5px;
+                    }
+                    @media print {
+                        body {
+                            padding: 0;
+                        }
+                        .no-print {
+                            display: none;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="voucher">
+                    <div class="header">
+                        <div class="title">سند دفع لمورد</div>
+                        <div class="voucher-number">رقم السند: ${voucherNumber}</div>
+                    </div>
+
+                    <div class="info-row">
+                        <div class="info-label">التاريخ:</div>
+                        <div class="info-value">${transferDate}</div>
+                    </div>
+
+                    <div class="info-row">
+                        <div class="info-label">المورد:</div>
+                        <div class="info-value">${supplierName}</div>
+                    </div>
+
+                    <div class="info-row">
+                        <div class="info-label">من حساب:</div>
+                        <div class="info-value">${accountName}</div>
+                    </div>
+
+                    <div class="amount">
+                        المبلغ: ${amount} ${currency}
+                    </div>
+
+                    <div class="info-row">
+                        <div class="info-label">ملاحظات:</div>
+                        <div class="info-value">${notes}</div>
+                    </div>
+
+                    <div class="signatures">
+                        <div class="signature">
+                            <div class="signature-line">توقيع المستلم</div>
+                        </div>
+                        <div class="signature">
+                            <div class="signature-line">توقيع المحاسب</div>
+                        </div>
+                        <div class="signature">
+                            <div class="signature-line">ختم الشركة</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="no-print" style="text-align: center; margin-top: 20px;">
+                    <button onclick="window.print();" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">
+                        طباعة السند
+                    </button>
+                </div>
+            </body>
+            </html>
+        `;
+
+        // Write the content to the new window and print
+        printWindow.document.open();
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+
+        // Focus the window for printing
+        printWindow.focus();
+    }
+</script>
+{% endblock %}

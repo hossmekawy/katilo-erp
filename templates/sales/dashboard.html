@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة المبيعات{% endblock %}
+
+{% block page_header %}لوحة المبيعات{% endblock %}
+
+{% block breadcrumbs %}
+<li>
+    <a href="/sales/" class="text-blue-600 hover:text-blue-800">
+لوحة المبيعات
+    </a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">لوحة المبيعات</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <!-- Total Orders Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+            <div class="p-5 flex items-center">
+                <div class="flex-1">
+                    <h3 class="text-sm font-bold text-indigo-600 mb-1">إجمالي الطلبات</h3>
+                    <p class="text-2xl font-bold text-gray-800">{{ total_orders }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-500">
+                    <i class="fas fa-shopping-cart fa-lg"></i>
+                </div>
+            </div>
+            <div class="bg-indigo-50 px-5 py-2">
+                <a href="{{ url_for('sales.list_orders') }}" class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center justify-end">
+                    <span>عرض الكل</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Total Sales Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+            <div class="p-5 flex items-center">
+                <div class="flex-1">
+                    <h3 class="text-sm font-bold text-green-600 mb-1">إجمالي المبيعات</h3>
+                    <p class="text-2xl font-bold text-gray-800">{{ total_sales | currency }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-500">
+                    <i class="fas fa-dollar-sign fa-lg"></i>
+                </div>
+            </div>
+            <div class="bg-green-50 px-5 py-2">
+                <a href="{{ url_for('sales.list_orders') }}" class="text-xs text-green-600 hover:text-green-800 flex items-center justify-end">
+                    <span>تفاصيل المبيعات</span>
+                    <i class="fas fa-chart-line mr-1"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Pending Orders Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+            <div class="p-5 flex items-center">
+                <div class="flex-1">
+                    <h3 class="text-sm font-bold text-yellow-600 mb-1">الطلبات المعلقة</h3>
+                    <p class="text-2xl font-bold text-gray-800">{{ pending_orders }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-500">
+                    <i class="fas fa-clipboard-list fa-lg"></i>
+                </div>
+            </div>
+            <div class="bg-yellow-50 px-5 py-2">
+                <a href="{{ url_for('sales.list_orders') }}?status=Pending" class="text-xs text-yellow-600 hover:text-yellow-800 flex items-center justify-end">
+                    <span>عرض المعلقة</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Delivered Orders Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+            <div class="p-5 flex items-center">
+                <div class="flex-1">
+                    <h3 class="text-sm font-bold text-blue-600 mb-1">الطلبات المسلمة</h3>
+                    <p class="text-2xl font-bold text-gray-800">{{ delivered_orders }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-500">
+                    <i class="fas fa-truck fa-lg"></i>
+                </div>
+            </div>
+            <div class="bg-blue-50 px-5 py-2">
+                <a href="{{ url_for('sales.list_orders') }}?status=Delivered" class="text-xs text-blue-600 hover:text-blue-800 flex items-center justify-end">
+                    <span>عرض المسلمة</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders and Top Products -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent Orders -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-bold text-gray-800">
+                    <i class="fas fa-shopping-cart text-indigo-500 mr-2"></i>
+                    أحدث الطلبات
+                </h3>
+                <a href="{{ url_for('sales.list_orders') }}" class="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded-lg transition-colors">
+                    عرض الكل
+                </a>
+            </div>
+            <div class="p-5">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">رقم الطلب</th>
+                                <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">العميل</th>
+                                <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">التاريخ</th>
+                                <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">المبلغ</th>
+                                <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for order in recent_orders %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-indigo-600">
+                                    <a href="{{ url_for('sales.view_order', order_id=order.id) }}" class="hover:underline">
+                                        #{{ order.id }}
+                                    </a>
+                                </td>
+                                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">{{ order.customer.customer_name }}</td>
+                                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">{{ order.order_date | date }}</td>
+                                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">{{ order.total_amount | currency }}</td>
+                                <td class="px-3 py-3 whitespace-nowrap text-sm">
+                                    {% set status_colors = {
+                                        'Pending': 'bg-yellow-100 text-yellow-800',
+                                        'Shipped': 'bg-blue-100 text-blue-800',
+                                        'Delivered': 'bg-green-100 text-green-800',
+                                        'Cancelled': 'bg-red-100 text-red-800'
+                                    } %}
+                                    {% set status_arabic = {
+                                        'Pending': 'معلق',
+                                        'Shipped': 'تم الشحن',
+                                        'Delivered': 'تم التسليم',
+                                        'Cancelled': 'ملغي'
+                                    } %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ status_colors.get(order.status, 'bg-gray-100 text-gray-800') }}">
+                                        {{ status_arabic.get(order.status, order.status) }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if not recent_orders %}
+                            <tr>
+                                <td colspan="5" class="px-3 py-4 text-center text-sm text-gray-500">لا توجد طلبات حديثة</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <!-- Top Selling Products -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h3 class="font-bold text-gray-800">
+                        <i class="fas fa-star text-yellow-500 mr-2"></i>
+                        المنتجات الأكثر مبيعاً
+                    </h3>
+                </div>
+                <div class="p-5">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">المنتج</th>
+                                    <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">التصنيف</th>
+                                    <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">الوحدات المباعة</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for product, total_sold in top_products %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">{{ product.name }}</td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">{{ product.category.name }}</td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ total_sold }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if not top_products %}
+                                <tr>
+                                    <td colspan="3" class="px-3 py-4 text-center text-sm text-gray-500">لا توجد بيانات متاحة</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Customers -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h3 class="font-bold text-gray-800">
+                        <i class="fas fa-users text-blue-500 mr-2"></i>
+                        كبار العملاء
+                    </h3>
+                </div>
+                <div class="p-5">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">العميل</th>
+                                    <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500">إجمالي الإنفاق</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for customer, total_spent in top_customers %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-700">{{ customer.customer_name }}</td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-green-600">{{ total_spent | currency }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if not top_customers %}
+                                <tr>
+                                    <td colspan="2" class="px-3 py-4 text-center text-sm text-gray-500">لا توجد بيانات متاحة</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Any dashboard-specific JavaScript can go here
+    });
+</script>
+{% endblock %}

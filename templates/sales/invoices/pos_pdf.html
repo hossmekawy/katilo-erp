@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فاتورة #{{ invoice.invoice_number }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Cairo', Arial, sans-serif;
+            background-color: white;
+            color: #333;
+            line-height: 1.5;
+            font-size: 12px;
+            padding: 0;
+            margin: 0 auto;
+            width: 80mm; /* Standard receipt width */
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .receipt-container {
+            width: 100%;
+            max-width: 72mm;
+            background: white;
+            padding: 10px;
+            margin: 0 auto;
+            border: 1px solid #eee;
+        }
+
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #ccc;
+        }
+
+        .company-logo {
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .company-logo img {
+            max-width: 50px;
+            max-height: 30px;
+            object-fit: contain;
+        }
+
+        .company-name {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .company-details {
+            font-size: 10px;
+            margin-bottom: 5px;
+            line-height: 1.4;
+            color: #666;
+        }
+
+        .server-info {
+            font-size: 10px;
+            margin-top: 5px;
+            color: #666;
+        }
+
+        .items-list {
+            margin-bottom: 15px;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .item-name {
+            flex: 2;
+            text-align: right;
+        }
+
+        .item-price {
+            flex: 1;
+            text-align: left;
+        }
+
+        .item-quantity {
+            margin-right: 5px;
+            color: #666;
+        }
+
+        .total-line {
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px dashed #ccc;
+            padding-top: 8px;
+            margin-top: 8px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .payment-info {
+            margin-bottom: 15px;
+        }
+
+        .payment-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .divider {
+            border-top: 1px dashed #ccc;
+            margin: 10px 0;
+        }
+
+        .order-number {
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .order-date {
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+        }
+
+        .payment-terms {
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            margin: 5px 0;
+            padding: 5px;
+            background-color: #f9f9f9;
+            border-radius: 3px;
+        }
+
+        @media print {
+            body {
+                width: 100%;
+                margin: 0 auto;
+            }
+
+            .receipt-container {
+                border: none;
+                width: 100%;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        <div class="receipt-header">
+            <div class="company-logo">
+                <img src="file:///{{ logo_path }}" alt="{{ company_info.name }}" onerror="this.innerHTML='Your logo'"/>
+            </div>
+            <div class="company-name">{{ company_info.name }}</div>
+            <div class="company-details">
+                هاتف: {{ company_info.phone }}<br>
+                {{ company_info.email }}<br>
+                {{ company_info.website or 'http://www.example.com' }}
+            </div>
+            <div class="divider"></div>
+            <div class="server-info">
+                تم الخدمة بواسطة {{ user_name or 'Admin' }}
+            </div>
+        </div>
+
+        <div class="items-list">
+            {% for detail in invoice.sales_order.details %}
+            <div class="item-row">
+                <div class="item-name">
+                    {% if detail.quantity_ordered > 1 %}
+                    <span class="item-quantity">{{ detail.quantity_ordered }} x {{ "%.2f"|format(detail.unit_price) }}</span>
+                    {% endif %}
+                    {{ detail.item.name }}
+                </div>
+                <div class="item-price">{{ "%.2f"|format(detail.unit_price * detail.quantity_ordered) }}</div>
+            </div>
+            {% endfor %}
+
+            <div class="total-line">
+                <div>الإجمالي</div>
+                <div>{{ "%.2f"|format(invoice.total_amount) }}</div>
+            </div>
+        </div>
+
+        <div class="payment-info">
+            {% for payment in invoice.payments %}
+            <div class="payment-row">
+                <div>
+                    {% if payment.payment_method == 'Cash' %}
+                        نقداً
+                    {% elif payment.payment_method == 'Credit Card' %}
+                        بطاقة ائتمان
+                    {% elif payment.payment_method == 'Bank Transfer' %}
+                        تحويل بنكي
+                    {% elif payment.payment_method == 'Check' %}
+                        شيك
+                    {% else %}
+                        {{ payment.payment_method }}
+                    {% endif %}
+                </div>
+                <div>{{ "%.2f"|format(payment.amount) }}</div>
+            </div>
+            {% endfor %}
+
+            {% if invoice.payments %}
+            <div class="payment-row">
+                <div>الباقي</div>
+                <div>{{ "%.2f"|format(invoice.total_amount - (invoice.payments|sum(attribute='amount') or 0)) }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if invoice.tax_amount > 0 %}
+        <div class="payment-row">
+            <div>إجمالي الضرائب</div>
+            <div>{{ "%.2f"|format(invoice.tax_amount) }}</div>
+        </div>
+        {% endif %}
+
+        <div class="divider"></div>
+
+        <div class="order-number">
+            طلب {{ invoice.sales_order_id }}-{{ invoice.invoice_number }}
+        </div>
+        <div class="order-date">
+            {{ invoice.invoice_date.strftime('%d/%m/%Y %H:%M:%S') }}
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="payment-terms">
+            {{ payment_terms }}
+        </div>
+    </div>
+</body>
+</html>

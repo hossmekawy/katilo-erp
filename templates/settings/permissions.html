@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الصلاحيات{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="permissionsApp">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">إدارة الصلاحيات</h1>
+            <a href="{{ url_for('settings.settings_index') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">
+                <i class="fas fa-arrow-right ml-1"></i> العودة
+            </a>
+        </div>
+        
+        <div class="mb-6">
+            <p class="text-gray-600 dark:text-gray-300">
+                قم بإدارة صلاحيات النظام والأدوار المختلفة للمستخدمين. يمكنك عرض جميع الصلاحيات المتاحة في النظام وتعديل الأدوار المرتبطة بها.
+            </p>
+        </div>
+        
+        <!-- Permissions List -->
+        <div class="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-100 dark:border-orange-800 mb-6">
+            <div class="flex items-center mb-4">
+                <i class="fas fa-shield-alt text-orange-500 text-xl mr-3"></i>
+                <h2 class="text-lg font-semibold text-orange-700 dark:text-orange-300">قائمة الصلاحيات</h2>
+            </div>
+            
+            <div class="mb-4">
+                <input type="text" x-model="searchQuery" placeholder="البحث عن صلاحية..." 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-100 dark:bg-gray-800">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">اسم الصلاحية</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الوصف</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الأدوار</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        <template x-for="permission in filteredPermissions" :key="permission.id">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white" x-text="permission.name"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300" x-text="getPermissionDescription(permission.name)"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="role in permission.roles" :key="role.id">
+                                            <span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full text-xs" x-text="role.name"></span>
+                                        </template>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div x-show="filteredPermissions.length === 0" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                لا توجد صلاحيات مطابقة للبحث
+            </div>
+        </div>
+        
+        <!-- Roles Management -->
+        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
+            <div class="flex items-center mb-4">
+                <i class="fas fa-user-tag text-blue-500 text-xl mr-3"></i>
+                <h2 class="text-lg font-semibold text-blue-700 dark:text-blue-300">إدارة الأدوار</h2>
+            </div>
+            
+            <p class="text-gray-600 dark:text-gray-300 mb-4">
+                لإدارة الأدوار وتعيين الصلاحيات، يرجى الانتقال إلى صفحة إدارة الأدوار.
+            </p>
+            
+            <div class="flex justify-center">
+                <a href="/admin/roles" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    <i class="fas fa-user-tag mr-1"></i> إدارة الأدوار
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('permissionsApp', () => ({
+            permissions: [],
+            searchQuery: '',
+            
+            init() {
+                this.loadPermissions();
+            },
+            
+            get filteredPermissions() {
+                if (!this.searchQuery) {
+                    return this.permissions;
+                }
+                
+                const query = this.searchQuery.toLowerCase();
+                return this.permissions.filter(permission => {
+                    return permission.name.toLowerCase().includes(query) || 
+                           this.getPermissionDescription(permission.name).toLowerCase().includes(query);
+                });
+            },
+            
+            async loadPermissions() {
+                try {
+                    // Convert the permissions from Jinja to JavaScript
+                    const permissionsData = [
+                        {% for permission in permissions %}
+                        {
+                            id: {{ permission.id }},
+                            name: "{{ permission.permission_name }}",
+                            roles: [] // We'll load roles separately or pre-populate from backend
+                        },
+                        {% endfor %}
+                    ];
+                    
+                    this.permissions = permissionsData;
+                    
+                    // Group permissions by category for better display
+                    this.groupPermissionsByCategory();
+                } catch (error) {
+                    console.error('Error loading permissions:', error);
+                }
+            },
+            
+            groupPermissionsByCategory() {
+                // Group permissions by their prefix (e.g., view_users, edit_users -> users category)
+                const categories = {};
+                
+                this.permissions.forEach(permission => {
+                    const parts = permission.name.split('_');
+                    if (parts.length > 1) {
+                        const category = parts.slice(1).join('_');
+                        if (!categories[category]) {
+                            categories[category] = [];
+                        }
+                        categories[category].push(permission);
+                    }
+                });
+                
+                // We could use this for a more organized display if needed
+                this.permissionCategories = categories;
+            },
+            
+            getPermissionDescription(permissionName) {
+                // Map permission names to human-readable descriptions
+                const descriptions = {
+                    // User Management
+                    'view_users': 'عرض المستخدمين',
+                    'create_users': 'إنشاء مستخدمين جدد',
+                    'edit_users': 'تعديل بيانات المستخدمين',
+                    'delete_users': 'حذف المستخدمين',
+                    'view_roles': 'عرض الأدوار',
+                    'create_roles': 'إنشاء أدوار جديدة',
+                    'edit_roles': 'تعديل الأدوار',
+                    'delete_roles': 'حذف الأدوار',
+                    
+                    // Inventory Management
+                    'view_inventory': 'عرض المخزون',
+                    'manage_inventory': 'إدارة المخزون',
+                    'view_categories': 'عرض التصنيفات',
+                    'manage_categories': 'إدارة التصنيفات',
+                    'view_items': 'عرض العناصر',
+                    'manage_items': 'إدارة العناصر',
+                    'view_transactions': 'عرض المعاملات',
+                    'manage_transactions': 'إدارة المعاملات',
+                    
+                    // Warehouse Management
+                    'view_warehouses': 'عرض المستودعات',
+                    'manage_warehouses': 'إدارة المستودعات',
+                    'view_warehouse_layout': 'عرض تخطيط المستودع',
+                    'manage_warehouse_layout': 'إدارة تخطيط المستودع',
+                    
+                    // BOM Management
+                    'view_bom': 'عرض قوائم المواد',
+                    'create_bom': 'إنشاء قوائم مواد جديدة',
+                    'edit_bom': 'تعديل قوائم المواد',
+                    'delete_bom': 'حذف قوائم المواد',
+                    
+                    // Supplier Management
+                    'view_suppliers': 'عرض الموردين',
+                    'create_suppliers': 'إضافة موردين جدد',
+                    'edit_suppliers': 'تعديل بيانات الموردين',
+                    'delete_suppliers': 'حذف الموردين',
+                    'view_supplier_items': 'عرض عناصر الموردين',
+                    'manage_supplier_items': 'إدارة عناصر الموردين',
+                    
+                    // Production Management
+                    'view_production': 'عرض الإنتاج',
+                    'manage_production': 'إدارة الإنتاج',
+                    'view_production_orders': 'عرض أوامر الإنتاج',
+                    'create_production_orders': 'إنشاء أوامر إنتاج جديدة',
+                    'edit_production_orders': 'تعديل أوامر الإنتاج',
+                    'delete_production_orders': 'حذف أوامر الإنتاج',
+                    
+                    // Sales Management
+                    'view_sales': 'عرض المبيعات',
+                    'create_sales': 'إنشاء مبيعات جديدة',
+                    'edit_sales': 'تعديل المبيعات',
+                    'delete_sales': 'حذف المبيعات',
+                    'view_customers': 'عرض العملاء',
+                    'manage_customers': 'إدارة العملاء',
+                    
+                    // Support System
+                    'view_support_tickets': 'عرض تذاكر الدعم',
+                    'create_support_tickets': 'إنشاء تذاكر دعم جديدة',
+                    'respond_to_tickets': 'الرد على تذاكر الدعم',
+                    'manage_all_tickets': 'إدارة جميع تذاكر الدعم',
+                    
+                    // Profile Management
+                    'view_profile': 'عرض الملف الشخصي',
+                    'edit_profile': 'تعديل الملف الشخصي',
+                    
+                    // Chatbot Access
+                    'use_chatbot': 'استخدام المساعد الذكي'
+                };
+                
+                return descriptions[permissionName] || permissionName;
+            }
+        }));
+    });
+</script>
+{% endblock %}

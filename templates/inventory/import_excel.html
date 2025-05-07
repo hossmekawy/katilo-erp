@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}استيراد البيانات من ملف Excel{% endblock %}
+
+{% block page_header %}استيراد البيانات من ملف Excel{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/dashboard" class="text-blue-600 hover:text-blue-800">لوحة التحكم</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/items-management" class="text-blue-600 hover:text-blue-800">إدارة العناصر</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">استيراد من Excel</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+    <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="bg-blue-100 p-2 rounded-lg">
+                <i class="fas fa-file-excel text-blue-600 text-lg"></i>
+            </div>
+            <h2 class="text-lg font-bold text-gray-800">استيراد البيانات من ملف Excel</h2>
+        </div>
+    </div>
+
+    <div class="p-6">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-4 rounded-md {{ 'bg-red-50 text-red-700' if category == 'error' else 'bg-green-50 text-green-700' }}">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                {% if category == 'error' %}
+                                    <i class="fas fa-exclamation-circle"></i>
+                                {% else %}
+                                    <i class="fas fa-check-circle"></i>
+                                {% endif %}
+                            </div>
+                            <div class="mr-3">
+                                <p class="text-sm">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                </div>
+                <div class="mr-3">
+                    <p class="text-sm text-yellow-700">
+                        قم برفع ملف Excel أولاً، ثم ستتمكن من اختيار الأعمدة التي تحتوي على بيانات المنتج.
+                    </p>
+                    <p class="mt-2 text-sm text-yellow-700">
+                        <i class="fas fa-info-circle ml-1"></i> إذا كان ملف Excel يحتوي على أكثر من ورقة عمل، سيتم عرض صفحة لاختيار ورقة العمل المطلوبة.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <form action="{{ url_for('inventory.upload_excel') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+            <div>
+                <label for="excel_file" class="block text-sm font-medium text-gray-700 mb-1">
+                    <i class="fas fa-file-excel text-green-500 ml-1"></i> اختر ملف Excel
+                </label>
+                <input type="file" id="excel_file" name="excel_file" accept=".xlsx,.xls" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-md file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-blue-50 file:text-blue-700
+                    hover:file:bg-blue-100
+                    cursor-pointer">
+                <p class="mt-1 text-sm text-gray-500">يجب أن يكون الملف بصيغة Excel (.xlsx أو .xls)</p>
+            </div>
+
+            <div>
+                <label for="default_category" class="block text-sm font-medium text-gray-700 mb-1">
+                    <i class="fas fa-folder text-yellow-500 ml-1"></i> التصنيف الافتراضي للعناصر <span class="text-red-500">*</span>
+                </label>
+                <select id="default_category" name="default_category" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <option value="">-- اختر التصنيف الافتراضي --</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}">{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1 text-sm text-gray-500">سيتم استخدام هذا التصنيف للعناصر التي تم اختيار إضافتها كمنتجات (إلزامي)</p>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload ml-1"></i> رفع الملف
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-8 border-t pt-6">
+            <h3 class="text-lg font-semibold mb-4">تنسيق الملف المطلوب</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">اسم العمود</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الوصف</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">إلزامي</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">name</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">اسم العنصر</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">نعم</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">description</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">وصف العنصر</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">لا</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">sku</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">الرمز التعريفي للعنصر</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">لا (سيتم إنشاؤه تلقائيًا)</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">unit_of_measure</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">وحدة القياس</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">لا (الافتراضي: وحدة)</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">cost</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">تكلفة العنصر</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">لا (الافتراضي: 0)</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">price</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">سعر البيع</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">لا (الافتراضي: 0)</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">reorder_level</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">مستوى إعادة الطلب</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">لا (الافتراضي: 0)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block title %}عرض المرتجع #{{ return_.id }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">مرتجع #{{ return_.id }}</h1>
+        <div class="flex space-x-3 rtl:space-x-reverse">
+            <a href="{{ url_for('sales.list_returns') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-right ml-2"></i>
+                العودة إلى المرتجعات
+            </a>
+            {% if return_.return_status == 'Pending' %}
+                <button onclick="approveReturn({{ return_.id }})" class="btn btn-success">
+                    <i class="fas fa-check ml-2"></i>
+                    الموافقة على المرتجع
+                </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4 pb-2 border-b">معلومات المرتجع</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">رقم الطلب:</span>
+                    <a href="{{ url_for('sales.view_order', order_id=return_.sales_order_id) }}" class="text-blue-600 hover:underline">{{ return_.sales_order_id }}</a>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">العميل:</span>
+                    <span>{{ return_.sales_order.customer.customer_name }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">تاريخ المرتجع:</span>
+                    <span>{{ return_.return_date.strftime('%Y-%m-%d') }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">سبب المرتجع:</span>
+                    <span>
+                        {% if return_.return_reason == 'Defective' %}
+                            معيب
+                        {% elif return_.return_reason == 'WrongItem' %}
+                            منتج خاطئ
+                        {% elif return_.return_reason == 'Damaged' %}
+                            تالف
+                        {% else %}
+                            أخرى
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">الحالة:</span>
+                    <span>
+                        {% if return_.return_status == 'Pending' %}
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">قيد الانتظار</span>
+                        {% elif return_.return_status == 'Approved' %}
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">تمت الموافقة</span>
+                        {% elif return_.return_status == 'Denied' %}
+                            <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">مرفوض</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4 pb-2 border-b">معلومات الاسترداد</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">إجمالي المبلغ المسترد:</span>
+                    <span class="font-bold">{{ return_.total_refund_amount }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">طريقة الاسترداد:</span>
+                    <span>
+                        {% if return_.refund_method == 'cash' %}
+                            نقدي
+                        {% elif return_.refund_method == 'credit_card' %}
+                            بطاقة ائتمان
+                        {% elif return_.refund_method == 'bank_transfer' %}
+                            تحويل بنكي
+                        {% endif %}
+                    </span>
+                </div>
+                {% if return_.cash_account %}
+                <div class="flex justify-between">
+                    <span class="text-gray-600">حساب الخزينة:</span>
+                    <span>{{ return_.cash_account.name }}</span>
+                </div>
+                {% endif %}
+                {% if return_.refund_reference %}
+                <div class="flex justify-between">
+                    <span class="text-gray-600">مرجع الاسترداد:</span>
+                    <span>{{ return_.refund_reference }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4 pb-2 border-b">معلومات إضافية</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">تم إنشاؤه بواسطة:</span>
+                    <span>{{ return_.creator.username if return_.creator else 'N/A' }}</span>
+                </div>
+                {% if return_.approved_by %}
+                <div class="flex justify-between">
+                    <span class="text-gray-600">تمت الموافقة بواسطة:</span>
+                    <span>{{ return_.approver.username }}</span>
+                </div>
+                {% endif %}
+                {% if return_.approved_at %}
+                <div class="flex justify-between">
+                    <span class="text-gray-600">تاريخ الموافقة:</span>
+                    <span>{{ return_.approved_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                {% endif %}
+                {% if return_.notes %}
+                <div class="mt-4">
+                    <span class="text-gray-600 block mb-1">ملاحظات:</span>
+                    <p class="text-gray-800 bg-gray-50 p-3 rounded">{{ return_.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b">
+            <h3 class="text-lg font-semibold">العناصر المرتجعة</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-right">
+                <thead class="bg-gray-50 text-gray-600 font-medium border-b">
+                    <tr>
+                        <th class="px-4 py-3">المنتج</th>
+                        <th class="px-4 py-3">الكمية</th>
+                        <th class="px-4 py-3">سعر الوحدة</th>
+                        <th class="px-4 py-3">المبلغ المسترد</th>
+                        <th class="px-4 py-3">الحالة</th>
+                        <th class="px-4 py-3">إعادة للمخزون</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for item in return_.items %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">{{ item.item.name }}</td>
+                            <td class="px-4 py-3">{{ item.quantity }}</td>
+                            <td class="px-4 py-3">{{ item.unit_price }}</td>
+                            <td class="px-4 py-3 font-medium">{{ item.refund_amount }}</td>
+                            <td class="px-4 py-3">
+                                {% if item.condition == 'Good' %}
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">جيدة</span>
+                                {% elif item.condition == 'Damaged' %}
+                                    <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">تالفة</span>
+                                {% elif item.condition == 'Defective' %}
+                                    <span class="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">معيبة</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                {% if item.restocked %}
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">نعم</span>
+                                {% else %}
+                                    <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">لا</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="bg-gray-50 font-medium">
+                    <tr>
+                        <td colspan="3" class="px-4 py-3 text-left">إجمالي المبلغ المسترد:</td>
+                        <td class="px-4 py-3 font-bold">{{ return_.total_refund_amount }}</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function approveReturn(returnId) {
+        if (confirm('هل أنت متأكد من الموافقة على هذا المرتجع؟')) {
+            fetchAPI(`/sales/returns/${returnId}/approve`, 'POST')
+                .then(response => {
+                    showNotification('تمت الموافقة على المرتجع بنجاح', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                })
+                .catch(error => {
+                    showNotification('حدث خطأ أثناء الموافقة على المرتجع', 'error');
+                });
+        }
+    }
+</script>
+{% endblock %}

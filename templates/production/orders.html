@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+
+{% block title %}أوامر الإنتاج | نظام قاتيلو{% endblock %}
+
+{% block page_header %}إدارة أوامر الإنتاج{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('production.production_dashboard') }}" class="text-blue-600 hover:text-blue-800">الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">أوامر الإنتاج</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with action buttons -->
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <h1 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-clipboard-list text-blue-600 mr-2"></i>
+            أوامر الإنتاج
+        </h1>
+
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ url_for('production.create_production_order') }}" class="btn btn-primary flex items-center">
+                <i class="fas fa-plus mr-2"></i>
+                إنشاء أمر إنتاج جديد
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters and search -->
+    <div class="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+        <div class="flex flex-wrap gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">تصفية حسب الحالة</label>
+                <select id="status-filter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">جميع الحالات</option>
+                    <option value="Planned">مخطط</option>
+                    <option value="InProgress">قيد التنفيذ</option>
+                    <option value="Completed">مكتمل</option>
+                    <option value="Cancelled">ملغي</option>
+                </select>
+            </div>
+
+            <div class="flex-1 min-w-[200px]">
+                <label for="line-filter" class="block text-sm font-medium text-gray-700 mb-1">تصفية حسب خط الإنتاج</label>
+                <select id="line-filter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">جميع الخطوط</option>
+                    {% for line in production_lines %}
+                    <option value="{{ line.id }}">{{ line.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex-1 min-w-[200px]">
+                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">بحث</label>
+                <div class="relative">
+                    <input type="text" id="search" placeholder="بحث عن منتج أو رقم أمر..."
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pl-10">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-end">
+                <button id="apply-filters" class="btn btn-primary h-10">
+                    <i class="fas fa-filter mr-2"></i>
+                    تطبيق
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders table -->
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الأمر
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المنتج
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الكمية
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            خط الإنتاج
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ البدء المخطط
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="orders-table-body">
+                    {% if orders %}
+                        {% for order in orders %}
+                        <tr class="hover:bg-gray-50 transition-colors order-row"
+                            data-status="{{ order.status }}"
+                            data-line="{{ order.production_line_id or '' }}">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                #{{ order.id }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ order.product.name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ order.quantity }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if order.production_line %}
+                                    {{ order.production_line.name }}
+                                {% else %}
+                                    <span class="text-yellow-600">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                                        غير معين
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ order.scheduled_start.strftime('%Y-%m-%d %H:%M') if order.scheduled_start else 'غير محدد' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if order.status == 'Planned' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                        مخطط
+                                    </span>
+                                {% elif order.status == 'InProgress' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                        قيد التنفيذ
+                                    </span>
+                                {% elif order.status == 'Completed' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                        مكتمل
+                                    </span>
+                                {% elif order.status == 'Cancelled' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                        ملغي
+                                    </span>
+                                {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        {{ order.status }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex items-center space-x-3 space-x-reverse">
+                                    <a href="{{ url_for('production.view_production_order', order_id=order.id) }}"
+                                       class="text-blue-600 hover:text-blue-900" title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+
+                                    {% if not order.production_line_id and order.status == 'Planned' %}
+                                    <button type="button"
+                                            class="text-green-600 hover:text-green-900 assign-line-btn"
+                                            data-order-id="{{ order.id }}"
+                                            title="تعيين خط إنتاج">
+                                        <i class="fas fa-tasks"></i>
+                                    </button>
+                                    {% endif %}
+
+                                    {% if order.status == 'Planned' %}
+                                    <button type="button"
+                                            class="text-yellow-600 hover:text-yellow-900 start-production-btn"
+                                            data-order-id="{{ order.id }}"
+                                            title="بدء الإنتاج">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                    {% endif %}
+
+                                    {% if order.status == 'Planned' %}
+                                    <button type="button"
+                                            class="text-red-600 hover:text-red-900 cancel-order-btn"
+                                            data-order-id="{{ order.id }}"
+                                            title="إلغاء الأمر">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                                لا توجد أوامر إنتاج حالياً
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if orders|length > 10 %}
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div class="flex-1 flex justify-between sm:hidden">
+                <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    السابق
+                </a>
+                <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    التالي
+                </a>
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        عرض
+                        <span class="font-medium">1</span>
+                        إلى
+                        <span class="font-medium">{{ orders|length }}</span>
+                        من
+                        <span class="font-medium">{{ orders|length }}</span>
+                        نتائج
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">السابق</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        <a href="#" aria-current="page" class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                            1
+                        </a>
+                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">التالي</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Assign Production Line Modal -->
+<div id="assign-line-modal" x-data="$store.assignLineModal" x-show="open" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-tasks text-blue-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            تعيين خط إنتاج
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                يرجى اختيار خط الإنتاج الذي تريد تعيين أمر الإنتاج إليه.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <form id="assign-line-form" action="{{ url_for('production.assign_production_line') }}" method="POST">
+                        <input type="hidden" name="order_id" x-bind:value="orderId">
+
+                        <div class="mb-4">
+                            <label for="line_id" class="block text-sm font-medium text-gray-700 mb-1">خط الإنتاج</label>
+                            <select id="line_id" name="line_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                                <option value="">-- اختر خط الإنتاج --</option>
+                                {% for line in production_lines %}
+                                <option value="{{ line.id }}">{{ line.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="assign-line-form" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    تعيين
+                </button>
+                <button type="button" @click="open = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start Production Modal -->
+<div id="start-production-modal" x-data="$store.startProductionModal" x-show="open" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-play text-yellow-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            بدء الإنتاج
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                هل أنت متأكد من أنك تريد بدء هذا الأمر؟ سيتم تحديث حالة الأمر إلى "قيد التنفيذ".
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <form id="start-production-form" action="{{ url_for('production.start_production_order') }}" method="POST">
+                        <input type="hidden" name="order_id" x-bind:value="orderId">
+                    </form>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="start-production-form" onclick="console.log('Form submitted with order ID:', document.querySelector('#start-production-form input[name=order_id]').value)" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-yellow-600 text-base font-medium text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    بدء الإنتاج
+                </button>
+                <button type="button" @click="open = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Order Modal -->
+<div id="cancel-order-modal" x-data="$store.cancelOrderModal" x-show="open" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-exclamation-triangle text-red-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            إلغاء أمر الإنتاج
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                هل أنت متأكد من أنك تريد إلغاء هذا الأمر؟ سيتم إعادة المواد المحجوزة إلى المخزون.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <form id="cancel-order-form" action="{{ url_for('production.cancel_production_order') }}" method="POST">
+                        <input type="hidden" name="order_id" x-bind:value="orderId">
+
+                        <div class="mb-4">
+                            <label for="cancel_reason" class="block text-sm font-medium text-gray-700 mb-1">سبب الإلغاء</label>
+                            <textarea id="cancel_reason" name="cancel_reason" rows="3" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required></textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="cancel-order-form" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء الأمر
+                </button>
+                <button type="button" @click="open = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    تراجع
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Initialize Alpine.js stores
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('assignLineModal', {
+            open: false,
+            orderId: null
+        });
+
+        Alpine.store('startProductionModal', {
+            open: false,
+            orderId: null
+        });
+
+        Alpine.store('cancelOrderModal', {
+            open: false,
+            orderId: null
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Assign line button click
+        const assignLineBtns = document.querySelectorAll('.assign-line-btn');
+        assignLineBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const orderId = this.getAttribute('data-order-id');
+                // Use Alpine.js v3 syntax to access the component data
+                const store = Alpine.store('assignLineModal');
+                store.orderId = orderId;
+                store.open = true;
+            });
+        });
+
+        // Start production button click
+        const startProductionBtns = document.querySelectorAll('.start-production-btn');
+        startProductionBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const orderId = this.getAttribute('data-order-id');
+                // Use Alpine.js v3 syntax to access the component data
+                const store = Alpine.store('startProductionModal');
+                store.orderId = orderId;
+                store.open = true;
+                console.log('Start production clicked for order:', orderId);
+            });
+        });
+
+        // Cancel order button click
+        const cancelOrderBtns = document.querySelectorAll('.cancel-order-btn');
+        cancelOrderBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const orderId = this.getAttribute('data-order-id');
+                // Use Alpine.js v3 syntax to access the component data
+                const store = Alpine.store('cancelOrderModal');
+                store.orderId = orderId;
+                store.open = true;
+            });
+        });
+
+        // Filter functionality
+        const statusFilter = document.getElementById('status-filter');
+        const lineFilter = document.getElementById('line-filter');
+        const searchInput = document.getElementById('search');
+        const applyFiltersBtn = document.getElementById('apply-filters');
+
+        applyFiltersBtn.addEventListener('click', function() {
+            filterOrders();
+        });
+
+        function filterOrders() {
+            const statusValue = statusFilter.value;
+            const lineValue = lineFilter.value;
+            const searchValue = searchInput.value.toLowerCase();
+
+            const rows = document.querySelectorAll('.order-row');
+
+            rows.forEach(row => {
+                const rowStatus = row.getAttribute('data-status');
+                const rowLine = row.getAttribute('data-line');
+                const rowText = row.textContent.toLowerCase();
+
+                let statusMatch = true;
+                let lineMatch = true;
+                let searchMatch = true;
+
+                if (statusValue && rowStatus !== statusValue) {
+                    statusMatch = false;
+                }
+
+                if (lineValue && rowLine !== lineValue) {
+                    lineMatch = false;
+                }
+
+                if (searchValue && !rowText.includes(searchValue)) {
+                    searchMatch = false;
+                }
+
+                if (statusMatch && lineMatch && searchMatch) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

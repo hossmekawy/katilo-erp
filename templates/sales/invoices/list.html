@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الفواتير - نظام قاتيلو{% endblock %}
+
+{% block page_header %}إدارة الفواتير{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">الفواتير</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="invoicesManager()">
+    <!-- Header with actions -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">قائمة الفواتير</h1>
+        <div class="flex space-x-2 space-x-reverse">
+            <a href="/sales/orders" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center">
+                <i class="fas fa-shopping-cart ml-2"></i>
+                الطلبات
+            </a>
+        </div>
+    </div>
+
+    <!-- Search and filters -->
+    <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div class="flex flex-col md:flex-row md:items-center gap-4">
+            <div class="flex-1">
+                <div class="relative">
+                    <input type="text" x-model="searchQuery" @input="filterInvoices()" placeholder="البحث عن فاتورة..."
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 space-x-reverse">
+                <select x-model="statusFilter" @change="filterInvoices()" class="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">جميع الحالات</option>
+                    <option value="Unpaid">غير مدفوعة</option>
+                    <option value="Partially Paid">مدفوعة جزئياً</option>
+                    <option value="Paid">مدفوعة</option>
+                </select>
+                <button @click="resetFilters()" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700">
+                    <i class="fas fa-redo-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoices list -->
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الفاتورة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الطلب
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            العميل
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ الفاتورة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ الاستحقاق
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المبلغ
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="filteredInvoices.length === 0">
+                        <tr>
+                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                                <div class="flex flex-col items-center justify-center py-6">
+                                    <i class="fas fa-file-invoice text-gray-300 text-5xl mb-4"></i>
+                                    <p class="text-lg font-medium">لا توجد فواتير</p>
+                                    <p class="text-sm text-gray-500 mt-1">قم بإنشاء فاتورة جديدة من خلال طلب المبيعات</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="invoice in filteredInvoices" :key="invoice.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="invoice.invoice_number"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <a :href="'/sales/orders/' + invoice.sales_order_id" class="text-blue-600 hover:text-blue-900">
+                                    #<span x-text="invoice.sales_order_id"></span>
+                                </a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="invoice.customer_name"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="formatDate(invoice.invoice_date)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="formatDate(invoice.due_date)"></div>
+                                <div x-show="isOverdue(invoice)" class="text-xs text-red-600 mt-1">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>
+                                    متأخرة
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="formatCurrency(invoice.total_amount)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="{
+                                          'bg-red-100 text-red-800': invoice.status === 'Unpaid',
+                                          'bg-yellow-100 text-yellow-800': invoice.status === 'Partially Paid',
+                                          'bg-green-100 text-green-800': invoice.status === 'Paid'
+                                      }">
+                                    <span x-text="translateStatus(invoice.status)"></span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                                <div class="flex space-x-2 space-x-reverse">
+                                    <a :href="'/sales/invoices/' + invoice.id" class="text-blue-600 hover:text-blue-900" title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button x-show="invoice.status !== 'Paid'" @click="openPaymentModal(invoice)" class="text-green-600 hover:text-green-900" title="تسجيل دفعة">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                    </button>
+                                    <a :href="'/sales/orders/' + invoice.sales_order_id" class="text-indigo-600 hover:text-indigo-900" title="عرض الطلب">
+                                        <i class="fas fa-shopping-cart"></i>
+                                    </a>
+                                    <button @click="printInvoice(invoice)" class="text-gray-600 hover:text-gray-900" title="طباعة الفاتورة">
+                                        <i class="fas fa-print"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Process Payment Modal -->
+    <div x-show="showPaymentModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="showPaymentModal = false">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex justify-between items-start mb-4">
+                        <button @click="showPaymentModal = false" class="text-gray-400 hover:text-gray-500">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">تسجيل دفعة</h3>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm text-gray-500">رقم الفاتورة:</span>
+                                <span class="text-sm font-medium" x-text="currentInvoice.invoice_number"></span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm text-gray-500">إجمالي الفاتورة:</span>
+                                <span class="text-sm font-medium" x-text="formatCurrency(currentInvoice.total_amount)"></span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm text-gray-500">المبلغ المتبقي:</span>
+                                <span class="text-sm font-medium text-red-600" x-text="formatCurrency(remainingAmount)"></span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="paymentAmount" class="block text-sm font-medium text-gray-700 mb-1">مبلغ الدفعة <span class="text-red-500">*</span></label>
+                            <input type="number" id="paymentAmount" x-model="payment.amount" min="0.01" step="0.01" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <p x-show="errors.amount" x-text="errors.amount" class="mt-1 text-sm text-red-600"></p>
+                        </div>
+
+                        <div>
+                            <label for="paymentMethod" class="block text-sm font-medium text-gray-700 mb-1">طريقة الدفع <span class="text-red-500">*</span></label>
+                            <select id="paymentMethod" x-model="payment.payment_method" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="Cash">نقداً</option>
+                                <option value="Credit Card">بطاقة ائتمان</option>
+                                <option value="Bank Transfer">تحويل بنكي</option>
+                                <option value="Check">شيك</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="referenceNumber" class="block text-sm font-medium text-gray-700 mb-1">رقم المرجع</label>
+                            <input type="text" id="referenceNumber" x-model="payment.reference_number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+
+                        <div>
+                            <label for="paymentNotes" class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                            <textarea id="paymentNotes" x-model="payment.notes" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="processPayment()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        تسجيل الدفعة
+                    </button>
+                    <button @click="showPaymentModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global currency formatter function
+    function formatCurrency(amount) {
+        if (amount === undefined || amount === null) return '';
+        return new Intl.NumberFormat('ar-EG', {
+            style: 'currency',
+            currency: 'EGP'
+        }).format(amount);
+    }
+
+    function invoicesManager() {
+        return {
+            invoices: [],
+            filteredInvoices: [],
+            searchQuery: '',
+            statusFilter: 'all',
+            showPaymentModal: false,
+            currentInvoice: {},
+            remainingAmount: 0,
+            payment: {
+                amount: 0,
+                payment_method: 'Cash',
+                reference_number: '',
+                notes: ''
+            },
+            errors: {},
+
+            init() {
+                this.fetchInvoices();
+            },
+
+            fetchInvoices() {
+                fetchAPI('/sales/api/invoices')
+                    .then(data => {
+                        this.invoices = data;
+                        this.filteredInvoices = data;
+                    })
+                    .catch(error => {
+                        showNotification('فشل في تحميل بيانات الفواتير', 'error');
+                    });
+            },
+
+            filterInvoices() {
+                const query = this.searchQuery.toLowerCase();
+                let filtered = this.invoices;
+
+                // Apply status filter
+                if (this.statusFilter !== 'all') {
+                    filtered = filtered.filter(invoice => invoice.status === this.statusFilter);
+                }
+
+                // Apply search query
+                if (query) {
+                    filtered = filtered.filter(invoice =>
+                        invoice.invoice_number.toLowerCase().includes(query) ||
+                        invoice.customer_name.toLowerCase().includes(query) ||
+                        invoice.sales_order_id.toString().includes(query)
+                    );
+                }
+
+                this.filteredInvoices = filtered;
+            },
+
+            resetFilters() {
+                this.searchQuery = '';
+                this.statusFilter = 'all';
+                this.filteredInvoices = this.invoices;
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return '--';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+            },
+
+            formatCurrency(amount) {
+                // Use the global formatCurrency function
+                if (amount === undefined || amount === null) return '--';
+                return formatCurrency(amount);
+            },
+
+            translateStatus(status) {
+                const statusMap = {
+                    'Unpaid': 'غير مدفوعة',
+                    'Partially Paid': 'مدفوعة جزئياً',
+                    'Paid': 'مدفوعة'
+                };
+                return statusMap[status] || status;
+            },
+
+            isOverdue(invoice) {
+                if (invoice.status === 'Paid') return false;
+                const dueDate = new Date(invoice.due_date);
+                const today = new Date();
+                return dueDate < today;
+            },
+
+            openPaymentModal(invoice) {
+                this.currentInvoice = invoice;
+
+                // Calculate remaining amount
+                fetchAPI(`/sales/invoices/${invoice.id}/remaining-balance`)
+                    .then(data => {
+                        this.remainingAmount = data.remaining_balance;
+                        this.payment = {
+                            amount: this.remainingAmount,
+                            payment_method: 'Cash',
+                            reference_number: '',
+                            notes: ''
+                        };
+                        this.errors = {};
+                        this.showPaymentModal = true;
+                    })
+                    .catch(error => {
+                        showNotification('فشل في حساب المبلغ المتبقي', 'error');
+                    });
+            },
+
+            validatePayment() {
+                this.errors = {};
+
+                if (!this.payment.amount || this.payment.amount <= 0) {
+                    this.errors.amount = 'يجب أن يكون مبلغ الدفعة أكبر من صفر';
+                    return false;
+                }
+
+                if (this.payment.amount > this.remainingAmount) {
+                    this.errors.amount = `مبلغ الدفعة يتجاوز المبلغ المتبقي (${this.formatCurrency(this.remainingAmount)})`;
+                    return false;
+                }
+
+                return true;
+            },
+
+            processPayment() {
+                if (!this.validatePayment()) {
+                    return;
+                }
+
+                fetchAPI(`/sales/invoices/${this.currentInvoice.id}/process-payment`, 'POST', this.payment)
+                    .then(response => {
+                        showNotification('تم تسجيل الدفعة بنجاح', 'success');
+                        this.showPaymentModal = false;
+                        this.fetchInvoices();
+                    })
+                    .catch(error => {
+                        showNotification('حدث خطأ أثناء تسجيل الدفعة', 'error');
+                    });
+            },
+
+            printInvoice(invoice) {
+                window.open(`/sales/invoices/${invoice.id}/print`, '_blank');
+            }
+        };
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,1122 @@
+{% extends "base.html" %}
+
+{% block title %}إنشاء مسار توصيل جديد{% endblock %}
+
+{% block styles %}
+<style>
+    .route-stop {
+        @apply bg-white rounded-lg border border-gray-200 p-4 mb-4 transition-all duration-200;
+    }
+    .route-stop:hover {
+        @apply border-indigo-300 shadow-sm;
+    }
+    .route-stop.selected {
+        @apply border-indigo-500 shadow-md;
+    }
+    .map-container {
+        height: 500px;
+        @apply rounded-lg overflow-hidden border border-gray-200;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="routeCreationApp()">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">إنشاء مسار توصيل جديد</h1>
+        <div>
+            <a href="{{ url_for('distribution.routes') }}" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                <i class="fas fa-arrow-right ml-2"></i>
+                العودة إلى المسارات
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Route Form -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">معلومات المسار</h2>
+
+                <form @submit.prevent="createRoute()">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">اسم المسار *</label>
+                            <input type="text" x-model="routeForm.name" required
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">المركبة *</label>
+                            <select x-model="routeForm.vehicle_id" required
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">اختر المركبة</option>
+                                {% for vehicle in vehicles %}
+                                <option value="{{ vehicle.id }}">{{ vehicle.name }} ({{ vehicle.plate_number }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">تاريخ المسار *</label>
+                            <input type="date" x-model="routeForm.planned_date" required
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                            <textarea x-model="routeForm.notes" rows="3"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <h3 class="text-md font-medium text-gray-800 mb-2">المحطات</h3>
+                        <p class="text-sm text-gray-500 mb-4">
+                            <i class="fas fa-info-circle ml-1"></i>
+                            أضف محطات إلى المسار عن طريق اختيار الشحنات من القائمة أدناه.
+                        </p>
+
+                        <div x-show="routeStops.length === 0" class="text-center py-4 text-gray-500 border border-dashed border-gray-300 rounded-lg">
+                            <i class="fas fa-map-marker-alt text-3xl mb-2"></i>
+                            <p>لم يتم إضافة أي محطات بعد</p>
+                        </div>
+
+                        <div x-show="routeStops.length > 0" class="space-y-3">
+                            <template x-for="(stop, index) in routeStops" :key="index">
+                                <div class="route-stop" :class="{ 'selected': selectedStopIndex === index }">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="flex items-center">
+                                                <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-1 rounded-full ml-2" x-text="index + 1"></span>
+                                                <h4 class="font-medium text-gray-900" x-text="stop.customer_name"></h4>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mt-1" x-text="stop.address || (stop.latitude && stop.longitude ? `الإحداثيات: ${stop.latitude.toFixed(6)}, ${stop.longitude.toFixed(6)}` : 'بدون عنوان')"></p>
+                                        </div>
+                                        <div class="flex space-x-2 space-x-reverse">
+                                            <button type="button" @click="moveStopUp(index)" :disabled="index === 0"
+                                                class="text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <i class="fas fa-arrow-up"></i>
+                                            </button>
+                                            <button type="button" @click="moveStopDown(index)" :disabled="index === routeStops.length - 1"
+                                                class="text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <i class="fas fa-arrow-down"></i>
+                                            </button>
+                                            <button type="button" @click="removeStop(index)"
+                                                class="text-red-500 hover:text-red-700">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div x-show="stop.shipment_order_id" class="mt-2 text-sm">
+                                        <span class="text-blue-600">
+                                            <i class="fas fa-shipping-fast ml-1"></i>
+                                            شحنة #<span x-text="stop.shipment_order_id"></span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <h3 class="text-md font-medium text-gray-800 mb-2">معلومات المسار</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-sm text-gray-600">
+                                    <i class="fas fa-road ml-1"></i>
+                                    المسافة الإجمالية: <span class="font-medium" x-text="(routeForm.total_distance || 0) + ' كم'"></span>
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">
+                                    <i class="fas fa-clock ml-1"></i>
+                                    الوقت المقدر: <span class="font-medium" x-text="formatDuration(routeForm.estimated_duration)"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <button type="submit" class="btn btn-primary w-full" :disabled="routeStops.length === 0">
+                            <i class="fas fa-save ml-2"></i>
+                            حفظ المسار
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Map and Shipments -->
+        <div class="lg:col-span-2">
+            <!-- Map -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">خريطة المسار</h2>
+
+                <div class="mb-4 flex flex-wrap gap-2">
+                    <button type="button" @click="addCurrentLocation()" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-map-marker-alt ml-1"></i>
+                        إضافة الموقع الحالي
+                    </button>
+                    <button type="button" @click="showAddStationModal = true" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-plus ml-1"></i>
+                        إضافة محطة جديدة
+                    </button>
+                </div>
+
+                <div id="route-map" class="map-container"></div>
+
+                <div class="mt-4 flex justify-end">
+                    <button type="button" @click="optimizeRoute()" class="btn btn-secondary" :disabled="routeStops.length < 2">
+                        <i class="fas fa-magic ml-2"></i>
+                        تحسين المسار
+                    </button>
+                </div>
+            </div>
+
+            <!-- Add Station Modal -->
+            <div x-show="showAddStationModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+                <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                    <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                        <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                    </div>
+                    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                    <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">إضافة محطة جديدة</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">اسم المحطة *</label>
+                                    <input type="text" x-model="newStation.name" required
+                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">العنوان</label>
+                                    <div id="address-search-container" class="relative">
+                                        <input type="text" x-model="newStation.address" placeholder="أدخل العنوان للبحث"
+                                            @input="searchAddress()" id="address-search"
+                                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">خط العرض</label>
+                                        <input type="number" step="0.000001" x-model="newStation.latitude"
+                                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">خط الطول</label>
+                                        <input type="number" step="0.000001" x-model="newStation.longitude"
+                                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                                    <textarea x-model="newStation.notes" rows="2"
+                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <button type="button" @click="addCustomStation()" class="btn btn-primary ml-3">
+                                إضافة
+                            </button>
+                            <button type="button" @click="showAddStationModal = false" class="btn btn-secondary">
+                                إلغاء
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Shipments -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">الشحنات المتاحة</h2>
+
+                <div class="mb-4">
+                    <input type="text" x-model="shipmentSearch" placeholder="البحث عن شحنة أو عميل"
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    رقم الشحنة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    العميل
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    العنوان
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الإجراءات
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <template x-if="filteredShipments.length === 0">
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                        لا توجد شحنات متاحة
+                                    </td>
+                                </tr>
+                            </template>
+                            <template x-for="shipment in filteredShipments" :key="shipment.id">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900" x-text="shipment.id"></div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900" x-text="shipment.customer_name"></div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm text-gray-900" x-text="shipment.customer_address || (shipment.customer_latitude && shipment.customer_longitude ? `الإحداثيات: ${shipment.customer_latitude.toFixed(6)}, ${shipment.customer_longitude.toFixed(6)}` : 'بدون عنوان')"></div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button @click="addShipmentToRoute(shipment)"
+                                            class="text-indigo-600 hover:text-indigo-900"
+                                            :disabled="isShipmentInRoute(shipment.id)"
+                                            :class="{'opacity-50 cursor-not-allowed': isShipmentInRoute(shipment.id)}">
+                                            <i class="fas fa-plus ml-1"></i>
+                                            إضافة
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let map;
+    let directionsService;
+    let directionsRenderer;
+    let markers = [];
+    let googleMapsLoaded = false;
+
+    // Function to load Google Maps API
+    function loadGoogleMapsAPI() {
+        return new Promise((resolve, reject) => {
+            // Check if Google Maps API is already loaded
+            if (window.google && window.google.maps) {
+                googleMapsLoaded = true;
+                resolve();
+                return;
+            }
+
+            // Create script element
+            const script = document.createElement('script');
+            script.src = "https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places,geometry,drawing,marker&callback=googleMapsCallback";
+            script.async = true;
+            script.defer = true;
+
+            // Define callback function
+            window.googleMapsCallback = function() {
+                googleMapsLoaded = true;
+                resolve();
+            };
+
+            // Handle errors
+            script.onerror = function() {
+                reject(new Error('Google Maps failed to load'));
+            };
+
+            // Add script to document
+            document.head.appendChild(script);
+        });
+    }
+
+    function routeCreationApp() {
+        return {
+            routeForm: {
+                name: '',
+                vehicle_id: '',
+                planned_date: new Date().toISOString().split('T')[0],
+                notes: '',
+                total_distance: 0,
+                estimated_duration: 0
+            },
+            routeStops: [],
+            selectedStopIndex: -1,
+            shipments: [],
+            shipmentSearch: '',
+            mapInitialized: false,
+            showAddStationModal: false,
+            geocoder: null,
+            autocomplete: null,
+            // Default customer ID for custom stations (provided by the server)
+            defaultCustomerId: {{ default_customer_id }},
+            newStation: {
+                name: '',
+                address: '',
+                latitude: null,
+                longitude: null,
+                notes: ''
+            },
+
+            init() {
+                this.loadShipments();
+
+                // Load Google Maps API and initialize map
+                loadGoogleMapsAPI()
+                    .then(() => {
+                        this.$nextTick(() => {
+                            this.initMap();
+                            this.mapInitialized = true;
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Failed to load Google Maps:', error);
+                        this.showToast('فشل تحميل خرائط Google. يرجى تحديث الصفحة والمحاولة مرة أخرى.', 'error');
+                    });
+            },
+
+            loadShipments() {
+                // Load assigned shipments that don't have a route yet
+                fetch('{{ url_for("distribution.get_shipments") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.shipments = data.filter(s =>
+                            s.status === 'Assigned' && !s.route_id
+                        );
+                    })
+                    .catch(error => {
+                        console.error('Error loading shipments:', error);
+                        this.showToast('حدث خطأ أثناء تحميل بيانات الشحنات', 'error');
+                    });
+            },
+
+            get filteredShipments() {
+                if (!this.shipmentSearch) return this.shipments;
+
+                const search = this.shipmentSearch.toLowerCase();
+                return this.shipments.filter(s =>
+                    s.id.toString().includes(search) ||
+                    (s.customer_name && s.customer_name.toLowerCase().includes(search))
+                );
+            },
+
+            initMap() {
+                map = new google.maps.Map(document.getElementById('route-map'), {
+                    center: { lat: 30.0444, lng: 31.2357 }, // Cairo, Egypt
+                    zoom: 10
+                });
+
+                directionsService = new google.maps.DirectionsService();
+                directionsRenderer = new google.maps.DirectionsRenderer({
+                    map: map,
+                    suppressMarkers: true
+                });
+
+                // Initialize geocoder for address search and coordinate lookup
+                this.geocoder = new google.maps.Geocoder();
+
+                // Add click listener to map for adding stops
+                map.addListener('click', (event) => {
+                    // Populate the new station form with the clicked coordinates
+                    this.newStation.latitude = event.latLng.lat();
+                    this.newStation.longitude = event.latLng.lng();
+
+                    // Reverse geocode to get address
+                    this.geocoder.geocode({ 'location': event.latLng }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            this.newStation.address = results[0].formatted_address;
+                        }
+                    });
+
+                    // Show the add station modal
+                    this.showAddStationModal = true;
+                });
+
+                // Initialize place autocomplete for address search
+                this.$nextTick(() => {
+                    const addressInputContainer = document.getElementById('address-search-container');
+                    const addressInput = document.getElementById('address-search');
+
+                    if (addressInputContainer && addressInput) {
+                        try {
+                            // Check if PlaceAutocompleteElement is available
+                            if (google.maps.places.PlaceAutocompleteElement) {
+                                // Remove the old input
+                                addressInput.style.display = 'none';
+
+                                // Create the new PlaceAutocompleteElement
+                                const placeAutocomplete = new google.maps.places.PlaceAutocompleteElement({
+                                    inputType: 'text',
+                                    fields: ['formatted_address', 'geometry', 'name'],
+                                    componentRestrictions: { country: 'eg' } // Egypt
+                                });
+
+                                // Add the element to the container
+                                addressInputContainer.appendChild(placeAutocomplete);
+
+                                // Style the element to match the site's design
+                                const placeInput = placeAutocomplete.querySelector('input');
+                                if (placeInput) {
+                                    placeInput.className = 'block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500';
+                                    placeInput.placeholder = 'أدخل العنوان للبحث';
+                                    placeInput.dir = 'rtl';
+                                }
+
+                                // Add event listener for place selection
+                                placeAutocomplete.addEventListener('gmp-placeselect', (event) => {
+                                    const place = event.detail.place;
+                                    if (place.geometry && place.geometry.location) {
+                                        this.newStation.latitude = place.geometry.location.lat();
+                                        this.newStation.longitude = place.geometry.location.lng();
+                                        this.newStation.address = place.formatted_address;
+                                    }
+                                });
+                            } else {
+                                // Fall back to the old Autocomplete if PlaceAutocompleteElement is not available
+                                console.warn('PlaceAutocompleteElement not available, falling back to Autocomplete');
+                                this.autocomplete = new google.maps.places.Autocomplete(addressInput);
+                                this.autocomplete.addListener('place_changed', () => {
+                                    const place = this.autocomplete.getPlace();
+                                    if (place.geometry && place.geometry.location) {
+                                        this.newStation.latitude = place.geometry.location.lat();
+                                        this.newStation.longitude = place.geometry.location.lng();
+                                        this.newStation.address = place.formatted_address;
+                                    }
+                                });
+                            }
+                        } catch (error) {
+                            console.error('Error initializing place autocomplete:', error);
+                        }
+                    }
+                });
+            },
+
+            searchAddress() {
+                // This function is called when the user types in the address search field
+                // The autocomplete functionality is handled by the Google Places Autocomplete
+            },
+
+            addCurrentLocation() {
+                if (!navigator.geolocation) {
+                    this.showToast('خدمة تحديد الموقع غير متوفرة في متصفحك', 'error');
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+
+                        // Reverse geocode to get address
+                        this.geocoder.geocode({ 'location': { lat, lng } }, (results, status) => {
+                            let address = '';
+                            if (status === 'OK' && results[0]) {
+                                address = results[0].formatted_address;
+                            }
+
+                            // Create a new stop for the current location
+                            const stop = {
+                                customer_id: this.defaultCustomerId, // Use default customer ID instead of null
+                                customer_name: 'الموقع الحالي',
+                                address: address || 'الموقع الحالي', // Provide a default address if none exists
+                                latitude: lat,
+                                longitude: lng,
+                                shipment_order_id: null,
+                                planned_arrival_time: null
+                            };
+
+                            // Add to route stops
+                            this.routeStops.push(stop);
+
+                            // Update the map
+                            this.updateRouteMap();
+
+                            // Select the new stop
+                            this.selectedStopIndex = this.routeStops.length - 1;
+
+                            this.showToast('تم إضافة الموقع الحالي بنجاح', 'success');
+                        });
+                    },
+                    (error) => {
+                        console.error('Error getting current location:', error);
+                        let errorMessage = 'حدث خطأ أثناء تحديد الموقع';
+
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMessage = 'تم رفض طلب تحديد الموقع. يرجى السماح للتطبيق بالوصول إلى موقعك.';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMessage = 'معلومات الموقع غير متوفرة.';
+                                break;
+                            case error.TIMEOUT:
+                                errorMessage = 'انتهت مهلة طلب تحديد الموقع.';
+                                break;
+                        }
+
+                        this.showToast(errorMessage, 'error');
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            },
+
+            addCustomStation() {
+                // Validate required fields
+                if (!this.newStation.name) {
+                    this.showToast('يرجى إدخال اسم المحطة', 'error');
+                    return;
+                }
+
+                if (!this.newStation.latitude || !this.newStation.longitude) {
+                    this.showToast('يرجى تحديد موقع المحطة على الخريطة أو إدخال الإحداثيات', 'error');
+                    return;
+                }
+
+                // Create a new stop
+                const stop = {
+                    customer_id: this.defaultCustomerId, // Use default customer ID instead of null
+                    customer_name: this.newStation.name,
+                    address: this.newStation.address || 'محطة مخصصة', // Provide a default address if none exists
+                    latitude: parseFloat(this.newStation.latitude),
+                    longitude: parseFloat(this.newStation.longitude),
+                    shipment_order_id: null,
+                    planned_arrival_time: null,
+                    notes: this.newStation.notes
+                };
+
+                // Add to route stops
+                this.routeStops.push(stop);
+
+                // Update the map
+                this.updateRouteMap();
+
+                // Select the new stop
+                this.selectedStopIndex = this.routeStops.length - 1;
+
+                // Reset the form and close the modal
+                this.newStation = {
+                    name: '',
+                    address: '',
+                    latitude: null,
+                    longitude: null,
+                    notes: ''
+                };
+
+                this.showAddStationModal = false;
+
+                this.showToast('تم إضافة المحطة بنجاح', 'success');
+            },
+
+            addShipmentToRoute(shipment) {
+                if (this.isShipmentInRoute(shipment.id)) return;
+
+                console.log('Adding shipment to route:', shipment);
+
+                // Get customer information
+                const customer = {
+                    id: shipment.customer_id || this.defaultCustomerId,
+                    name: shipment.customer_name || 'عميل',
+                    address: shipment.customer_address || '',
+                    latitude: parseFloat(shipment.customer_latitude),
+                    longitude: parseFloat(shipment.customer_longitude)
+                };
+
+                // Check if we have valid coordinates
+                if (!customer.latitude || !customer.longitude || isNaN(customer.latitude) || isNaN(customer.longitude)) {
+                    console.warn('Missing coordinates for shipment:', shipment.id);
+
+                    // If we have an address but no coordinates, try to geocode it
+                    if (customer.address && this.geocoder) {
+                        this.showToast('جاري البحث عن إحداثيات العنوان...', 'info');
+
+                        this.geocoder.geocode({ 'address': customer.address }, (results, status) => {
+                            if (status === google.maps.GeocoderStatus.OK && results[0]) {
+                                const location = results[0].geometry.location;
+
+                                // Create a new stop with the geocoded coordinates
+                                const stop = {
+                                    customer_id: customer.id,
+                                    customer_name: customer.name,
+                                    address: customer.address,
+                                    latitude: location.lat(),
+                                    longitude: location.lng(),
+                                    shipment_order_id: shipment.id,
+                                    planned_arrival_time: null
+                                };
+
+                                // Add to route stops
+                                this.routeStops.push(stop);
+
+                                // Update the map
+                                this.updateRouteMap();
+
+                                // Select the new stop
+                                this.selectedStopIndex = this.routeStops.length - 1;
+
+                                this.showToast('تم إضافة الشحنة بنجاح', 'success');
+                            } else {
+                                this.showToast('لم يتم العثور على إحداثيات للعنوان. يرجى إضافة الإحداثيات يدويًا.', 'error');
+
+                                // Create a stop without coordinates
+                                const stop = {
+                                    customer_id: customer.id,
+                                    customer_name: customer.name,
+                                    address: customer.address,
+                                    latitude: null,
+                                    longitude: null,
+                                    shipment_order_id: shipment.id,
+                                    planned_arrival_time: null
+                                };
+
+                                // Add to route stops
+                                this.routeStops.push(stop);
+
+                                // Select the new stop
+                                this.selectedStopIndex = this.routeStops.length - 1;
+                            }
+                        });
+                        return;
+                    }
+
+                    // If we can't geocode, show a warning
+                    this.showToast('الشحنة ليس لها إحداثيات. سيتم إضافتها ولكن لن تظهر على الخريطة.', 'warning');
+                }
+
+                // Create a new stop
+                const stop = {
+                    customer_id: customer.id,
+                    customer_name: customer.name,
+                    address: customer.address,
+                    latitude: customer.latitude,
+                    longitude: customer.longitude,
+                    shipment_order_id: shipment.id,
+                    planned_arrival_time: null
+                };
+
+                // Add to route stops
+                this.routeStops.push(stop);
+
+                // Update the map
+                this.updateRouteMap();
+
+                // Select the new stop
+                this.selectedStopIndex = this.routeStops.length - 1;
+
+                this.showToast('تم إضافة الشحنة بنجاح', 'success');
+            },
+
+            isShipmentInRoute(shipmentId) {
+                return this.routeStops.some(stop => stop.shipment_order_id === shipmentId);
+            },
+
+            removeStop(index) {
+                this.routeStops.splice(index, 1);
+
+                if (this.selectedStopIndex === index) {
+                    this.selectedStopIndex = -1;
+                } else if (this.selectedStopIndex > index) {
+                    this.selectedStopIndex--;
+                }
+
+                this.updateRouteMap();
+            },
+
+            moveStopUp(index) {
+                if (index === 0) return;
+
+                const temp = this.routeStops[index];
+                this.routeStops[index] = this.routeStops[index - 1];
+                this.routeStops[index - 1] = temp;
+
+                if (this.selectedStopIndex === index) {
+                    this.selectedStopIndex--;
+                } else if (this.selectedStopIndex === index - 1) {
+                    this.selectedStopIndex++;
+                }
+
+                this.updateRouteMap();
+            },
+
+            moveStopDown(index) {
+                if (index === this.routeStops.length - 1) return;
+
+                const temp = this.routeStops[index];
+                this.routeStops[index] = this.routeStops[index + 1];
+                this.routeStops[index + 1] = temp;
+
+                if (this.selectedStopIndex === index) {
+                    this.selectedStopIndex++;
+                } else if (this.selectedStopIndex === index + 1) {
+                    this.selectedStopIndex--;
+                }
+
+                this.updateRouteMap();
+            },
+
+            updateRouteMap() {
+                // Check if Google Maps is loaded and map is initialized
+                if (!googleMapsLoaded || !this.mapInitialized || !map) {
+                    console.log('Map not initialized yet, waiting...');
+                    setTimeout(() => this.updateRouteMap(), 500);
+                    return;
+                }
+
+                // Clear existing markers
+                try {
+                    // Use the clearMarkers function from google_maps_integration.js if available
+                    if (typeof clearMarkers === 'function') {
+                        clearMarkers();
+                    } else {
+                        // Fall back to direct marker clearing
+                        markers.forEach(marker => {
+                            if (marker) {
+                                if (marker instanceof google.maps.marker.AdvancedMarkerElement) {
+                                    marker.map = null;
+                                } else if (marker.setMap) {
+                                    marker.setMap(null);
+                                }
+                            }
+                        });
+                        markers = [];
+                    }
+                } catch (error) {
+                    console.error('Error clearing markers:', error);
+                    // Ensure markers array is reset even if there's an error
+                    markers = [];
+                }
+
+                if (this.routeStops.length === 0) {
+                    if (directionsRenderer) {
+                        directionsRenderer.setDirections({ routes: [] });
+                    }
+                    this.routeForm.total_distance = 0;
+                    this.routeForm.estimated_duration = 0;
+                    return;
+                }
+
+                // Add markers for each stop
+                this.routeStops.forEach((stop, index) => {
+                    if (!stop.latitude || !stop.longitude) return;
+
+                    try {
+                        // Use the addMarker function from google_maps_integration.js if available
+                        if (typeof addMarker === 'function') {
+                            const position = { lat: stop.latitude, lng: stop.longitude };
+                            const title = stop.customer_name;
+                            const content = `
+                                <div dir="rtl" class="p-2">
+                                    <h3 class="font-bold">${stop.customer_name}</h3>
+                                    <p>${stop.address || ''}</p>
+                                    ${stop.shipment_order_id ? `<p>شحنة #${stop.shipment_order_id}</p>` : ''}
+                                </div>
+                            `;
+
+                            // Create marker with label
+                            const marker = addMarker(
+                                position,
+                                title,
+                                null,
+                                content,
+                                {
+                                    label: (index + 1).toString(),
+                                    fillColor: stop.shipment_order_id ? '#4285F4' : '#34A853' // Blue for shipments, green for custom stops
+                                }
+                            );
+
+                            // Add click handler to select the stop
+                            if (marker) {
+                                if (marker instanceof google.maps.marker.AdvancedMarkerElement) {
+                                    marker.addEventListener('click', () => {
+                                        this.selectedStopIndex = index;
+                                    });
+                                } else if (marker instanceof google.maps.Marker) {
+                                    marker.addListener('click', () => {
+                                        this.selectedStopIndex = index;
+                                    });
+                                }
+                            }
+                        } else {
+                            // Fall back to direct marker creation if addMarker is not available
+                            console.warn('addMarker function not available, falling back to direct marker creation');
+
+                            const marker = new google.maps.Marker({
+                                position: { lat: stop.latitude, lng: stop.longitude },
+                                map: map,
+                                label: (index + 1).toString(),
+                                title: stop.customer_name
+                            });
+
+                            const infoWindow = new google.maps.InfoWindow({
+                                content: `
+                                    <div dir="rtl" class="p-2">
+                                        <h3 class="font-bold">${stop.customer_name}</h3>
+                                        <p>${stop.address || ''}</p>
+                                        ${stop.shipment_order_id ? `<p>شحنة #${stop.shipment_order_id}</p>` : ''}
+                                    </div>
+                                `
+                            });
+
+                            marker.addListener('click', () => {
+                                infoWindow.open(map, marker);
+                                this.selectedStopIndex = index;
+                            });
+
+                            markers.push(marker);
+                        }
+                    } catch (error) {
+                        console.error('Error adding marker for stop:', error, stop);
+                    }
+                });
+
+                // Calculate route if there are at least 2 stops
+                if (this.routeStops.length >= 2) {
+                    this.calculateRoute();
+                } else {
+                    // If only one stop, center the map on it
+                    const stop = this.routeStops[0];
+                    if (stop.latitude && stop.longitude) {
+                        map.setCenter({ lat: stop.latitude, lng: stop.longitude });
+                        map.setZoom(14);
+                    }
+                }
+            },
+
+            calculateRoute() {
+                // Check if Google Maps is loaded and map is initialized
+                if (!googleMapsLoaded || !this.mapInitialized || !map || !directionsService || !directionsRenderer) {
+                    console.log('Map services not initialized yet, waiting...');
+                    setTimeout(() => this.calculateRoute(), 500);
+                    return;
+                }
+
+                const validStops = this.routeStops.filter(stop => stop.latitude && stop.longitude);
+
+                if (validStops.length < 2) return;
+
+                const origin = { lat: validStops[0].latitude, lng: validStops[0].longitude };
+                const destination = {
+                    lat: validStops[validStops.length - 1].latitude,
+                    lng: validStops[validStops.length - 1].longitude
+                };
+
+                const waypoints = validStops.slice(1, validStops.length - 1).map(stop => ({
+                    location: { lat: stop.latitude, lng: stop.longitude },
+                    stopover: true
+                }));
+
+                directionsService.route({
+                    origin: origin,
+                    destination: destination,
+                    waypoints: waypoints,
+                    optimizeWaypoints: false,
+                    travelMode: google.maps.TravelMode.DRIVING
+                }, (response, status) => {
+                    if (status === google.maps.DirectionsStatus.OK) {
+                        directionsRenderer.setDirections(response);
+
+                        // Calculate total distance and duration
+                        let totalDistance = 0;
+                        let totalDuration = 0;
+
+                        const route = response.routes[0];
+                        route.legs.forEach(leg => {
+                            totalDistance += leg.distance.value;
+                            totalDuration += leg.duration.value;
+                        });
+
+                        // Convert to km and minutes
+                        this.routeForm.total_distance = Math.round(totalDistance / 100) / 10;
+                        this.routeForm.estimated_duration = Math.round(totalDuration / 60);
+
+                        // Update planned arrival times
+                        this.updatePlannedArrivalTimes(route);
+                    } else {
+                        console.error('Directions request failed due to ' + status);
+                    }
+                });
+            },
+
+            updatePlannedArrivalTimes(route) {
+                // Assuming the route starts at 9:00 AM
+                const startTime = new Date();
+                startTime.setHours(9, 0, 0, 0);
+
+                let currentTime = new Date(startTime);
+
+                route.legs.forEach((leg, index) => {
+                    // Add travel time to current time
+                    currentTime = new Date(currentTime.getTime() + leg.duration.value * 1000);
+
+                    // Update planned arrival time for the destination stop
+                    if (index < this.routeStops.length - 1) {
+                        this.routeStops[index + 1].planned_arrival_time = currentTime.toISOString();
+                    }
+
+                    // Add 15 minutes for each stop (loading/unloading time)
+                    currentTime = new Date(currentTime.getTime() + 15 * 60 * 1000);
+                });
+            },
+
+            optimizeRoute() {
+                // Check if Google Maps is loaded and map is initialized
+                if (!googleMapsLoaded || !this.mapInitialized || !map || !directionsService || !directionsRenderer) {
+                    console.log('Map services not initialized yet, waiting...');
+                    setTimeout(() => this.optimizeRoute(), 500);
+                    return;
+                }
+
+                if (this.routeStops.length < 2) return;
+
+                const validStops = this.routeStops.filter(stop => stop.latitude && stop.longitude);
+
+                if (validStops.length < 2) {
+                    this.showToast('يجب أن يكون هناك على الأقل محطتين بإحداثيات صالحة لتحسين المسار', 'error');
+                    return;
+                }
+
+                const origin = { lat: validStops[0].latitude, lng: validStops[0].longitude };
+                const destination = {
+                    lat: validStops[validStops.length - 1].latitude,
+                    lng: validStops[validStops.length - 1].longitude
+                };
+
+                const waypoints = validStops.slice(1, validStops.length - 1).map(stop => ({
+                    location: { lat: stop.latitude, lng: stop.longitude },
+                    stopover: true
+                }));
+
+                directionsService.route({
+                    origin: origin,
+                    destination: destination,
+                    waypoints: waypoints,
+                    optimizeWaypoints: true,
+                    travelMode: google.maps.TravelMode.DRIVING
+                }, (response, status) => {
+                    if (status === google.maps.DirectionsStatus.OK) {
+                        directionsRenderer.setDirections(response);
+
+                        // Get the optimized waypoint order
+                        const waypointOrder = response.routes[0].waypoint_order;
+
+                        // Reorder the stops based on the optimized waypoint order
+                        const newStops = [this.routeStops[0]]; // Keep the first stop
+
+                        waypointOrder.forEach(index => {
+                            newStops.push(this.routeStops[index + 1]); // +1 because we skipped the first stop in waypoints
+                        });
+
+                        newStops.push(this.routeStops[this.routeStops.length - 1]); // Keep the last stop
+
+                        // Update the route stops
+                        this.routeStops = newStops;
+
+                        // Calculate total distance and duration
+                        let totalDistance = 0;
+                        let totalDuration = 0;
+
+                        const route = response.routes[0];
+                        route.legs.forEach(leg => {
+                            totalDistance += leg.distance.value;
+                            totalDuration += leg.duration.value;
+                        });
+
+                        // Convert to km and minutes
+                        this.routeForm.total_distance = Math.round(totalDistance / 100) / 10;
+                        this.routeForm.estimated_duration = Math.round(totalDuration / 60);
+
+                        // Update planned arrival times
+                        this.updatePlannedArrivalTimes(route);
+
+                        this.showToast('تم تحسين المسار بنجاح', 'success');
+                    } else {
+                        console.error('Directions request failed due to ' + status);
+                        this.showToast('فشل تحسين المسار', 'error');
+                    }
+                });
+            },
+
+            formatDuration(minutes) {
+                if (!minutes) return '-';
+
+                if (minutes < 60) {
+                    return minutes + ' دقيقة';
+                } else {
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMinutes = minutes % 60;
+
+                    if (remainingMinutes === 0) {
+                        return hours + ' ساعة';
+                    } else {
+                        return hours + ' ساعة ' + remainingMinutes + ' دقيقة';
+                    }
+                }
+            },
+
+            createRoute() {
+                if (this.routeStops.length === 0) {
+                    this.showToast('يجب إضافة محطة واحدة على الأقل', 'error');
+                    return;
+                }
+
+                const routeData = {
+                    name: this.routeForm.name,
+                    vehicle_id: this.routeForm.vehicle_id,
+                    planned_date: this.routeForm.planned_date,
+                    total_distance: this.routeForm.total_distance,
+                    estimated_duration: this.routeForm.estimated_duration,
+                    notes: this.routeForm.notes,
+                    stops: this.routeStops.map(stop => ({
+                        customer_id: stop.customer_id,
+                        shipment_order_id: stop.shipment_order_id,
+                        planned_arrival_time: stop.planned_arrival_time,
+                        address: stop.address,
+                        latitude: stop.latitude,
+                        longitude: stop.longitude
+                    }))
+                };
+
+                fetch('{{ url_for("distribution.create_route") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(routeData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.showToast('تم إنشاء المسار بنجاح', 'success');
+                        // Redirect to routes page
+                        window.location.href = '{{ url_for("distribution.routes") }}';
+                    } else {
+                        this.showToast(data.message || 'حدث خطأ أثناء إنشاء المسار', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error creating route:', error);
+                    this.showToast('حدث خطأ أثناء إنشاء المسار', 'error');
+                });
+            },
+
+            showToast(message, type = 'info') {
+                // This assumes you have a toast notification system
+                // You can implement this based on your application's UI
+                if (window.showToast) {
+                    window.showToast(message, type);
+                } else {
+                    alert(message);
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}

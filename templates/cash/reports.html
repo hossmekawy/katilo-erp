@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الخزينة - التقارير{% endblock %}
+
+{% block page_header %}تقارير الخزينة{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- Report Selection Form -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-6 border-b">
+            <h2 class="text-lg font-semibold text-gray-800">إنشاء تقرير جديد</h2>
+            <p class="text-sm text-gray-600 mt-1">حدد نوع التقرير والمعايير المطلوبة</p>
+        </div>
+
+        <form id="reportForm" action="{{ url_for('cash.generate_report') }}" method="POST" class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Report Type -->
+                <div>
+                    <label for="report_type" class="block text-sm font-medium text-gray-700 mb-1">نوع التقرير</label>
+                    <select id="report_type" name="report_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                        <option value="">اختر نوع التقرير</option>
+                        <option value="account_statement">كشف حساب</option>
+                        <option value="cash_flow">التدفق النقدي</option>
+                        <option value="supplier_payments">دفعات الموردين</option>
+                        <option value="transactions_summary">ملخص المعاملات</option>
+                        <option value="reconciliation">تقرير الجرد</option>
+                    </select>
+                </div>
+
+                <!-- Date Range -->
+                <div>
+                    <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label>
+                    <input type="date" id="date_from" name="date_from" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+
+                <div>
+                    <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label>
+                    <input type="date" id="date_to" name="date_to" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+
+                <!-- Account Selection (shown only for relevant reports) -->
+                <div id="account_selection" style="display: none;">
+                    <label for="account_id" class="block text-sm font-medium text-gray-700 mb-1">الحساب</label>
+                    <select id="account_id" name="account_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">جميع الحسابات</option>
+                        {% for account in accounts %}
+                        <option value="{{ account.id }}">{{ account.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Supplier Selection (shown only for supplier payments report) -->
+                <div id="supplier_selection" style="display: none;">
+                    <label for="supplier_id" class="block text-sm font-medium text-gray-700 mb-1">المورد</label>
+                    <select id="supplier_id" name="supplier_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">جميع الموردين</option>
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}">{{ supplier.supplier_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Transaction Type (shown only for relevant reports) -->
+                <div id="transaction_type_selection" style="display: none;">
+                    <label for="transaction_type" class="block text-sm font-medium text-gray-700 mb-1">نوع المعاملة</label>
+                    <select id="transaction_type" name="transaction_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">جميع المعاملات</option>
+                        <option value="deposit">إيداع</option>
+                        <option value="withdrawal">سحب</option>
+                    </select>
+                </div>
+
+                <!-- Format Selection -->
+                <div>
+                    <label for="report_format" class="block text-sm font-medium text-gray-700 mb-1">تنسيق التقرير</label>
+                    <select id="report_format" name="report_format" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                        <option value="pdf">PDF</option>
+                        <option value="excel">Excel</option>
+                        <option value="html">عرض على الشاشة</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                <button type="button" id="printPreviewBtn" class="btn bg-gray-200 hover:bg-gray-300 text-gray-800">
+                    <i class="fas fa-print ml-1"></i>
+                    معاينة الطباعة
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-file-export ml-1"></i>
+                    إنشاء التقرير
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Report Templates Section -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-6 border-b">
+            <h2 class="text-lg font-semibold text-gray-800">تقارير سريعة</h2>
+            <p class="text-sm text-gray-600 mt-1">اختر من التقارير الجاهزة</p>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Quick Report: Today's Transactions -->
+            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <h3 class="font-medium text-gray-800 mb-2">معاملات اليوم</h3>
+                <p class="text-sm text-gray-600 mb-3">تقرير بجميع معاملات الخزينة لليوم الحالي</p>
+                <form action="{{ url_for('cash.generate_report') }}" method="POST">
+                    <input type="hidden" name="report_type" value="transactions_summary">
+                    <input type="hidden" name="date_from" value="{{ ''|now }}">
+                    <input type="hidden" name="date_to" value="{{ ''|now }}">
+                    <input type="hidden" name="report_format" value="pdf">
+                    <button type="submit" class="btn btn-sm btn-primary w-full">
+                        <i class="fas fa-download ml-1"></i>
+                        تنزيل التقرير
+                    </button>
+                </form>
+            </div>
+
+            <!-- Quick Report: Monthly Cash Flow -->
+            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <h3 class="font-medium text-gray-800 mb-2">التدفق النقدي الشهري</h3>
+                <p class="text-sm text-gray-600 mb-3">تقرير التدفق النقدي للشهر الحالي</p>
+                <form action="{{ url_for('cash.generate_report') }}" method="POST">
+                    <input type="hidden" name="report_type" value="cash_flow">
+                    <input type="hidden" name="date_from" value="{{ ''|month_start }}">
+                    <input type="hidden" name="date_to" value="{{ ''|month_end }}">
+                    <input type="hidden" name="report_format" value="pdf">
+                    <button type="submit" class="btn btn-sm btn-primary w-full">
+                        <i class="fas fa-download ml-1"></i>
+                        تنزيل التقرير
+                    </button>
+                </form>
+            </div>
+
+            <!-- Quick Report: Supplier Payments -->
+            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <h3 class="font-medium text-gray-800 mb-2">دفعات الموردين</h3>
+                <p class="text-sm text-gray-600 mb-3">تقرير بدفعات الموردين للشهر الحالي</p>
+                <form action="{{ url_for('cash.generate_report') }}" method="POST">
+                    <input type="hidden" name="report_type" value="supplier_payments">
+                    <input type="hidden" name="date_from" value="{{ ''|month_start }}">
+                    <input type="hidden" name="date_to" value="{{ ''|month_end }}">
+                    <input type="hidden" name="report_format" value="pdf">
+                    <button type="submit" class="btn btn-sm btn-primary w-full">
+                        <i class="fas fa-download ml-1"></i>
+                        تنزيل التقرير
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Reports Section -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="p-6 border-b">
+            <h2 class="text-lg font-semibold text-gray-800">التقارير الأخيرة</h2>
+            <p class="text-sm text-gray-600 mt-1">التقارير التي تم إنشاؤها مؤخرًا</p>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-right">
+                <thead class="bg-gray-50 text-gray-600 font-medium">
+                    <tr>
+                        <th class="px-6 py-3">اسم التقرير</th>
+                        <th class="px-6 py-3">النوع</th>
+                        <th class="px-6 py-3">تاريخ الإنشاء</th>
+                        <th class="px-6 py-3">التنسيق</th>
+                        <th class="px-6 py-3">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% if recent_reports %}
+                        {% for report in recent_reports %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 font-medium text-gray-800">{{ report.name }}</td>
+                            <td class="px-6 py-4">{{ report.type }}</td>
+                            <td class="px-6 py-4">{{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                    {{ report.format }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex space-x-2 space-x-reverse">
+                                    <a href="{{ url_for('cash.download_report', report_id=report.id) }}" class="text-blue-600 hover:text-blue-800" title="تنزيل">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    <button onclick="printReport('{{ report.file_path }}')" class="text-gray-600 hover:text-gray-800" title="طباعة">
+                                        <i class="fas fa-print"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                                <i class="fas fa-file-alt text-gray-300 text-4xl mb-3"></i>
+                                <p>لا توجد تقارير سابقة</p>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const reportTypeSelect = document.getElementById('report_type');
+        const accountSelection = document.getElementById('account_selection');
+        const supplierSelection = document.getElementById('supplier_selection');
+        const transactionTypeSelection = document.getElementById('transaction_type_selection');
+        const dateFromInput = document.getElementById('date_from');
+        const dateToInput = document.getElementById('date_to');
+        const printPreviewBtn = document.getElementById('printPreviewBtn');
+
+        // Set default dates (current month)
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+        dateFromInput.valueAsDate = firstDay;
+        dateToInput.valueAsDate = today;
+
+        // Show/hide fields based on report type
+        reportTypeSelect.addEventListener('change', function() {
+            const reportType = this.value;
+
+            // Reset all selections
+            accountSelection.style.display = 'none';
+            supplierSelection.style.display = 'none';
+            transactionTypeSelection.style.display = 'none';
+
+            // Show relevant selections based on report type
+            if (reportType === 'account_statement') {
+                accountSelection.style.display = 'block';
+                transactionTypeSelection.style.display = 'block';
+            } else if (reportType === 'cash_flow') {
+                accountSelection.style.display = 'block';
+            } else if (reportType === 'supplier_payments') {
+                supplierSelection.style.display = 'block';
+                accountSelection.style.display = 'block';
+            } else if (reportType === 'transactions_summary') {
+                accountSelection.style.display = 'block';
+                transactionTypeSelection.style.display = 'block';
+            } else if (reportType === 'reconciliation') {
+                accountSelection.style.display = 'block';
+            }
+        });
+
+        // Print preview functionality
+        printPreviewBtn.addEventListener('click', function() {
+            const form = document.getElementById('reportForm');
+            const formData = new FormData(form);
+            formData.append('preview', 'true');
+
+            // Submit the form with the preview parameter
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.preview_url) {
+                    // Open the preview in a new window
+                    const printWindow = window.open(data.preview_url, '_blank');
+                    if (printWindow) {
+                        printWindow.focus();
+                    } else {
+                        alert('يرجى السماح بالنوافذ المنبثقة لعرض المعاينة');
+                    }
+                } else {
+                    alert(data.message || 'حدث خطأ أثناء إنشاء المعاينة');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('حدث خطأ أثناء إنشاء المعاينة');
+            });
+        });
+
+        // Function to print a report
+        window.printReport = function(reportPath) {
+            fetch(`/cash/print-report?path=${encodeURIComponent(reportPath)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.print_url) {
+                    const printWindow = window.open(data.print_url, '_blank');
+                    if (printWindow) {
+                        printWindow.onload = function() {
+                            setTimeout(function() {
+                                printWindow.print();
+                            }, 500);
+                        };
+                    } else {
+                        alert('يرجى السماح بالنوافذ المنبثقة للطباعة');
+                    }
+                } else {
+                    alert(data.message || 'حدث خطأ أثناء الطباعة');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('حدث خطأ أثناء الطباعة');
+            });
+        };
+
+        // Validate date range
+        form.addEventListener('submit', function(event) {
+            const dateFrom = new Date(dateFromInput.value);
+            const dateTo = new Date(dateToInput.value);
+
+            if (dateFrom > dateTo) {
+                event.preventDefault();
+                alert('تاريخ البداية يجب أن يكون قبل تاريخ النهاية');
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,718 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة المركبات{% endblock %}
+
+{% block styles %}
+<style>
+    .vehicle-card {
+        @apply bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-200;
+    }
+    .vehicle-card:hover {
+        @apply shadow-md transform -translate-y-1;
+    }
+    .vehicle-image {
+        height: 160px;
+        @apply bg-gray-100 flex items-center justify-center overflow-hidden;
+    }
+    .vehicle-image img {
+        @apply object-cover w-full h-full;
+    }
+    .vehicle-status {
+        @apply px-2 py-1 text-xs font-semibold rounded-full;
+    }
+    .status-active {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-maintenance {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .status-inactive {
+        @apply bg-red-100 text-red-800;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="vehiclesApp()">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">إدارة المركبات</h1>
+        <div class="flex space-x-2 space-x-reverse">
+            <a href="{{ url_for('inventory.item_weights') }}" class="btn bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center ml-2">
+                <i class="fas fa-weight-hanging ml-2"></i> إدارة أوزان وأحجام المنتجات
+            </a>
+            <button @click="showAddVehicleModal = true" class="btn btn-primary">
+                <i class="fas fa-plus ml-2"></i>
+                إضافة مركبة جديدة
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div class="flex flex-wrap gap-4">
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">البحث</label>
+                <input type="text" x-model="filters.search" placeholder="البحث بالاسم أو رقم اللوحة"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                <select x-model="filters.status"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">جميع الحالات</option>
+                    <option value="Active">نشط</option>
+                    <option value="Maintenance">صيانة</option>
+                    <option value="Inactive">غير نشط</option>
+                </select>
+            </div>
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">نوع المركبة</label>
+                <select x-model="filters.type"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">جميع الأنواع</option>
+                    <template x-for="type in vehicleTypes" :key="type">
+                        <option :value="type" x-text="type"></option>
+                    </template>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vehicles Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <template x-for="vehicle in filteredVehicles" :key="vehicle.id">
+            <div class="vehicle-card">
+                <div class="vehicle-image">
+                    <template x-if="vehicle.image_data">
+                        <img :src="'data:image/jpeg;base64,' + vehicle.image_data" :alt="vehicle.name" class="h-full w-full object-cover">
+                    </template>
+                    <template x-if="!vehicle.image_data && vehicle.image_path">
+                        <img :src="vehicle.image_path" :alt="vehicle.name" class="h-full w-full object-cover">
+                    </template>
+                    <template x-if="!vehicle.image_data && !vehicle.image_path">
+                        <div class="text-gray-400 flex items-center justify-center h-full">
+                            <i class="fas fa-truck text-5xl"></i>
+                        </div>
+                    </template>
+                </div>
+                <div class="p-4">
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-semibold text-lg text-gray-900" x-text="vehicle.name"></h3>
+                        <span class="vehicle-status"
+                            :class="{
+                                'status-active': vehicle.status === 'Active',
+                                'status-maintenance': vehicle.status === 'Maintenance',
+                                'status-inactive': vehicle.status === 'Inactive'
+                            }"
+                            x-text="getStatusText(vehicle.status)"></span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1" x-text="vehicle.vehicle_type"></p>
+                    <p class="text-sm text-gray-600 mt-1">
+                        <i class="fas fa-id-card ml-1"></i>
+                        <span x-text="vehicle.plate_number"></span>
+                    </p>
+
+                    <!-- Capacity Indicators -->
+                    <div class="mt-3 space-y-2" x-show="vehicle.storage">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>استخدام الوزن</span>
+                                <span :class="{
+                                    'text-red-600 font-semibold': vehicle.storage.weight_utilization > 90,
+                                    'text-amber-600 font-semibold': vehicle.storage.weight_utilization > 80 && vehicle.storage.weight_utilization <= 90,
+                                    'text-green-600 font-semibold': vehicle.storage.weight_utilization > 60 && vehicle.storage.weight_utilization <= 80,
+                                    'text-blue-600': vehicle.storage.weight_utilization <= 60
+                                }" x-text="Math.round(vehicle.storage.weight_utilization) + '%'"></span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="h-2 rounded-full"
+                                    :class="{
+                                        'bg-red-500': vehicle.storage.weight_utilization > 90,
+                                        'bg-amber-500': vehicle.storage.weight_utilization > 80 && vehicle.storage.weight_utilization <= 90,
+                                        'bg-green-500': vehicle.storage.weight_utilization > 60 && vehicle.storage.weight_utilization <= 80,
+                                        'bg-blue-500': vehicle.storage.weight_utilization <= 60
+                                    }"
+                                    :style="'width: ' + vehicle.storage.weight_utilization + '%'"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>استخدام الحجم</span>
+                                <span :class="{
+                                    'text-red-600 font-semibold': vehicle.storage.volume_utilization > 90,
+                                    'text-amber-600 font-semibold': vehicle.storage.volume_utilization > 80 && vehicle.storage.volume_utilization <= 90,
+                                    'text-green-600 font-semibold': vehicle.storage.volume_utilization > 60 && vehicle.storage.volume_utilization <= 80,
+                                    'text-blue-600': vehicle.storage.volume_utilization <= 60
+                                }" x-text="Math.round(vehicle.storage.volume_utilization) + '%'"></span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="h-2 rounded-full"
+                                    :class="{
+                                        'bg-red-500': vehicle.storage.volume_utilization > 90,
+                                        'bg-amber-500': vehicle.storage.volume_utilization > 80 && vehicle.storage.volume_utilization <= 90,
+                                        'bg-green-500': vehicle.storage.volume_utilization > 60 && vehicle.storage.volume_utilization <= 80,
+                                        'bg-blue-500': vehicle.storage.volume_utilization <= 60
+                                    }"
+                                    :style="'width: ' + vehicle.storage.volume_utilization + '%'"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex justify-between">
+                        <button @click="editVehicle(vehicle)" class="text-sm text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-edit ml-1"></i> تعديل
+                        </button>
+                        <button @click="viewVehicle(vehicle)" class="text-sm text-gray-600 hover:text-gray-800">
+                            <i class="fas fa-eye ml-1"></i> عرض
+                        </button>
+                        <button @click="confirmDeleteVehicle(vehicle)" class="text-sm text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash ml-1"></i> حذف
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Empty State -->
+        <template x-if="filteredVehicles.length === 0">
+            <div class="col-span-full text-center py-12">
+                <div class="text-gray-400 mb-4">
+                    <i class="fas fa-truck text-6xl"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">لا توجد مركبات</h3>
+                <p class="text-gray-500" x-show="!isFiltering()">لم يتم إضافة أي مركبات بعد. أضف مركبة جديدة للبدء.</p>
+                <p class="text-gray-500" x-show="isFiltering()">لا توجد مركبات تطابق معايير البحث. حاول تغيير المعايير.</p>
+                <button @click="showAddVehicleModal = true" class="mt-4 btn btn-primary">
+                    <i class="fas fa-plus ml-2"></i>
+                    إضافة مركبة جديدة
+                </button>
+            </div>
+        </template>
+    </div>
+
+    <!-- Add/Edit Vehicle Modal -->
+    <div x-show="showAddVehicleModal || showEditVehicleModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div @click.outside="closeModals()" class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800" x-text="showEditVehicleModal ? 'تعديل المركبة' : 'إضافة مركبة جديدة'"></h2>
+            </div>
+            <div class="p-6">
+                <form @submit.prevent="showEditVehicleModal ? updateVehicle() : addVehicle()" enctype="multipart/form-data" id="vehicleForm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Basic Information -->
+                        <div class="md:col-span-2">
+                            <h3 class="text-lg font-medium text-gray-900 mb-3">المعلومات الأساسية</h3>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">اسم المركبة *</label>
+                            <input type="text" x-model="vehicleForm.name" required
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">رقم اللوحة *</label>
+                            <input type="text" x-model="vehicleForm.plate_number" required
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">نوع المركبة *</label>
+                            <select x-model="vehicleForm.vehicle_type" required
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">اختر نوع المركبة</option>
+                                <option value="شاحنة صغيرة">شاحنة صغيرة</option>
+                                <option value="شاحنة متوسطة">شاحنة متوسطة</option>
+                                <option value="شاحنة كبيرة">شاحنة كبيرة</option>
+                                <option value="سيارة توصيل">سيارة توصيل</option>
+                                <option value="دراجة نارية">دراجة نارية</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                            <select x-model="vehicleForm.status"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="Active">نشط</option>
+                                <option value="Maintenance">صيانة</option>
+                                <option value="Inactive">غير نشط</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الموديل</label>
+                            <input type="text" x-model="vehicleForm.model"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">سنة الصنع</label>
+                            <input type="number" x-model="vehicleForm.year"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+
+                        <!-- Capacity Information -->
+                        <div class="md:col-span-2 mt-4">
+                            <h3 class="text-lg font-medium text-gray-900 mb-3">معلومات السعة <span class="text-red-500">*</span></h3>
+                            <p class="text-sm text-gray-500 mb-3">يجب تحديد الوزن والحجم الأقصى للمركبة لحساب استخدام السعة بشكل صحيح</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الوزن الأقصى (كجم) <span class="text-red-500">*</span></label>
+                            <input type="number" step="0.01" x-model="vehicleForm.max_weight" required
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <p class="text-xs text-gray-500 mt-1">الحد الأقصى للوزن الذي يمكن للمركبة حمله</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الحجم الأقصى (متر مكعب) <span class="text-red-500">*</span></label>
+                            <input type="number" step="0.01" x-model="vehicleForm.max_volume" required
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <p class="text-xs text-gray-500 mt-1">الحد الأقصى للحجم الذي يمكن للمركبة حمله</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الطول الأقصى (مم)</label>
+                            <input type="number" step="1" x-model="vehicleForm.max_length"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الارتفاع الأقصى (مم)</label>
+                            <input type="number" step="1" x-model="vehicleForm.max_height"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+
+                        <!-- Additional Information -->
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                            <textarea x-model="vehicleForm.notes" rows="3"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">صورة المركبة</label>
+                            <div class="mt-1 flex items-center">
+                                <div x-show="vehicleForm.image_data || vehicleForm.image_path" class="mr-3 h-20 w-20 overflow-hidden rounded-md bg-gray-100">
+                                    <img x-show="vehicleForm.image_data" :src="'data:image/jpeg;base64,' + vehicleForm.image_data" class="h-full w-full object-cover">
+                                    <img x-show="!vehicleForm.image_data && vehicleForm.image_path" :src="vehicleForm.image_path" class="h-full w-full object-cover">
+                                </div>
+                                <div class="flex-1">
+                                    <input type="file" id="vehicle_image" name="vehicle_image" @change="handleImageUpload($event)"
+                                        accept="image/*" class="block w-full text-sm text-gray-500
+                                        file:mr-4 file:py-2 file:px-4
+                                        file:rounded-md file:border-0
+                                        file:text-sm file:font-semibold
+                                        file:bg-blue-50 file:text-blue-700
+                                        hover:file:bg-blue-100">
+                                    <p class="mt-1 text-xs text-gray-500">اختر صورة للمركبة (اختياري)</p>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">أو أدخل رابط الصورة</label>
+                                <input type="text" x-model="vehicleForm.image_path"
+                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                        <button type="button" @click="closeModals()" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                            إلغاء
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save ml-2"></i>
+                            <span x-text="showEditVehicleModal ? 'حفظ التغييرات' : 'إضافة المركبة'"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div @click.outside="showDeleteModal = false" class="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">تأكيد الحذف</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700">
+                    هل أنت متأكد من رغبتك في حذف المركبة
+                    <span class="font-semibold" x-text="vehicleToDelete?.name"></span>؟
+                </p>
+                <p class="text-sm text-red-600 mt-2">
+                    <i class="fas fa-exclamation-triangle ml-1"></i>
+                    هذا الإجراء لا يمكن التراجع عنه.
+                </p>
+
+                <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showDeleteModal = false" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                        إلغاء
+                    </button>
+                    <button @click="deleteVehicle()" class="btn bg-red-600 text-white hover:bg-red-700">
+                        <i class="fas fa-trash ml-2"></i>
+                        تأكيد الحذف
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('vehiclesApp', () => ({
+            vehicles: [],
+            filteredVehicles: [],
+            vehicleTypes: [],
+            filters: {
+                search: '',
+                status: '',
+                type: ''
+            },
+            showAddVehicleModal: false,
+            showEditVehicleModal: false,
+            showDeleteModal: false,
+            vehicleForm: {
+                id: null,
+                name: '',
+                plate_number: '',
+                vehicle_type: '',
+                model: '',
+                year: null,
+                status: 'Active',
+                max_weight: null,
+                max_volume: null,
+                max_length: null,
+                max_height: null,
+                notes: '',
+                image_path: '',
+                image_data: null
+            },
+            vehicleToDelete: null,
+
+            init() {
+                this.loadVehicles();
+
+                this.$watch('filters', () => {
+                    this.applyFilters();
+                }, { deep: true });
+            },
+
+            loadVehicles() {
+                fetch('{{ url_for("distribution.get_vehicles") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        // Check if we received an error response
+                        if (data.error) {
+                            console.error('Error from server:', data.error);
+                            this.showToast(data.error, 'error');
+                            // Initialize with empty arrays to prevent errors
+                            this.vehicles = [];
+                            this.filteredVehicles = [];
+                            this.vehicleTypes = [];
+                            return;
+                        }
+
+                        // Check if data is an array
+                        if (!Array.isArray(data)) {
+                            console.error('Expected array but got:', typeof data, data);
+                            this.showToast('حدث خطأ أثناء تحميل بيانات المركبات: البيانات بتنسيق غير صحيح', 'error');
+                            // Initialize with empty arrays
+                            this.vehicles = [];
+                            this.filteredVehicles = [];
+                            this.vehicleTypes = [];
+                            return;
+                        }
+
+                        // Process the data
+                        this.vehicles = data;
+                        this.filteredVehicles = [...data];
+
+                        // Extract unique vehicle types
+                        this.vehicleTypes = [...new Set(data.map(v => v.vehicle_type))].filter(Boolean);
+                    })
+                    .catch(error => {
+                        console.error('Error loading vehicles:', error);
+                        this.showToast('حدث خطأ أثناء تحميل بيانات المركبات', 'error');
+                        // Initialize with empty arrays
+                        this.vehicles = [];
+                        this.filteredVehicles = [];
+                        this.vehicleTypes = [];
+                    });
+            },
+
+            applyFilters() {
+                this.filteredVehicles = this.vehicles.filter(vehicle => {
+                    // Search filter
+                    const searchMatch = !this.filters.search ||
+                        vehicle.name.toLowerCase().includes(this.filters.search.toLowerCase()) ||
+                        vehicle.plate_number.toLowerCase().includes(this.filters.search.toLowerCase());
+
+                    // Status filter
+                    const statusMatch = !this.filters.status || vehicle.status === this.filters.status;
+
+                    // Type filter
+                    const typeMatch = !this.filters.type || vehicle.vehicle_type === this.filters.type;
+
+                    return searchMatch && statusMatch && typeMatch;
+                });
+            },
+
+            isFiltering() {
+                return this.filters.search || this.filters.status || this.filters.type;
+            },
+
+            getStatusText(status) {
+                switch(status) {
+                    case 'Active': return 'نشط';
+                    case 'Maintenance': return 'صيانة';
+                    case 'Inactive': return 'غير نشط';
+                    default: return status;
+                }
+            },
+
+            resetForm() {
+                this.vehicleForm = {
+                    id: null,
+                    name: '',
+                    plate_number: '',
+                    vehicle_type: '',
+                    model: '',
+                    year: null,
+                    status: 'Active',
+                    max_weight: null,
+                    max_volume: null,
+                    max_length: null,
+                    max_height: null,
+                    notes: '',
+                    image_path: '',
+                    image_data: null
+                };
+                // Reset file input if it exists
+                const fileInput = document.getElementById('vehicle_image');
+                if (fileInput) fileInput.value = '';
+            },
+
+            handleImageUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                // Check file size (limit to 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    this.showToast('حجم الصورة كبير جدًا. الحد الأقصى هو 5 ميجابايت', 'error');
+                    event.target.value = '';
+                    return;
+                }
+
+                // Check file type
+                const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!validTypes.includes(file.type)) {
+                    this.showToast('نوع الملف غير مدعوم. يرجى استخدام JPEG أو PNG أو GIF أو WEBP', 'error');
+                    event.target.value = '';
+                    return;
+                }
+
+                console.log('Processing image file:', file.name, file.type, file.size);
+
+                // Read and encode the file
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        // Get the base64 data (remove the data:image/jpeg;base64, prefix)
+                        const base64String = e.target.result.split(',')[1];
+                        this.vehicleForm.image_data = base64String;
+                        console.log('Image successfully processed');
+                    } catch (error) {
+                        console.error('Error processing image:', error);
+                        this.showToast('حدث خطأ أثناء معالجة الصورة', 'error');
+                    }
+                };
+                reader.onerror = (error) => {
+                    console.error('Error reading file:', error);
+                    this.showToast('حدث خطأ أثناء قراءة الملف', 'error');
+                };
+                reader.readAsDataURL(file);
+            },
+
+            editVehicle(vehicle) {
+                this.vehicleForm = { ...vehicle };
+                this.showEditVehicleModal = true;
+            },
+
+            viewVehicle(vehicle) {
+                window.location.href = '{{ url_for("distribution.view_vehicle", vehicle_id=0) }}'.replace('0', vehicle.id);
+            },
+
+            confirmDeleteVehicle(vehicle) {
+                this.vehicleToDelete = vehicle;
+                this.showDeleteModal = true;
+            },
+
+            closeModals() {
+                this.showAddVehicleModal = false;
+                this.showEditVehicleModal = false;
+                this.showDeleteModal = false;
+                this.resetForm();
+            },
+
+            addVehicle() {
+                // Check if we have an image file
+                const fileInput = document.getElementById('vehicle_image');
+                if (fileInput && fileInput.files.length > 0) {
+                    // Use FormData to send the file
+                    const formData = new FormData();
+
+                    // Add all form fields
+                    Object.keys(this.vehicleForm).forEach(key => {
+                        if (key !== 'image_data' && this.vehicleForm[key] !== null) {
+                            formData.append(key, this.vehicleForm[key]);
+                        }
+                    });
+
+                    // Add the file
+                    formData.append('vehicle_image', fileInput.files[0]);
+
+                    fetch('{{ url_for("distribution.create_vehicle") }}', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.loadVehicles();
+                            this.closeModals();
+                            this.showToast('تم إضافة المركبة بنجاح', 'success');
+                        } else {
+                            this.showToast(data.message || 'حدث خطأ أثناء إضافة المركبة', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error adding vehicle:', error);
+                        this.showToast('حدث خطأ أثناء إضافة المركبة', 'error');
+                    });
+                } else {
+                    // No file, use JSON
+                    fetch('{{ url_for("distribution.create_vehicle") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.vehicleForm)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.loadVehicles();
+                            this.closeModals();
+                            this.showToast('تم إضافة المركبة بنجاح', 'success');
+                        } else {
+                            this.showToast(data.message || 'حدث خطأ أثناء إضافة المركبة', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error adding vehicle:', error);
+                        this.showToast('حدث خطأ أثناء إضافة المركبة', 'error');
+                    });
+                }
+            },
+
+            updateVehicle() {
+                // Check if we have an image file
+                const fileInput = document.getElementById('vehicle_image');
+                if (fileInput && fileInput.files.length > 0) {
+                    // Use FormData to send the file
+                    const formData = new FormData();
+
+                    // Add all form fields
+                    Object.keys(this.vehicleForm).forEach(key => {
+                        if (key !== 'image_data' && this.vehicleForm[key] !== null) {
+                            formData.append(key, this.vehicleForm[key]);
+                        }
+                    });
+
+                    // Add the file
+                    formData.append('vehicle_image', fileInput.files[0]);
+
+                    fetch(`{{ url_for("distribution.get_vehicles") }}/${this.vehicleForm.id}`, {
+                        method: 'PUT',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.loadVehicles();
+                            this.closeModals();
+                            this.showToast('تم تحديث المركبة بنجاح', 'success');
+                        } else {
+                            this.showToast(data.message || 'حدث خطأ أثناء تحديث المركبة', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating vehicle:', error);
+                        this.showToast('حدث خطأ أثناء تحديث المركبة', 'error');
+                    });
+                } else {
+                    // No file, use JSON
+                    fetch(`{{ url_for("distribution.get_vehicles") }}/${this.vehicleForm.id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.vehicleForm)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.loadVehicles();
+                            this.closeModals();
+                            this.showToast('تم تحديث المركبة بنجاح', 'success');
+                        } else {
+                            this.showToast(data.message || 'حدث خطأ أثناء تحديث المركبة', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating vehicle:', error);
+                        this.showToast('حدث خطأ أثناء تحديث المركبة', 'error');
+                    });
+                }
+            },
+
+            deleteVehicle() {
+                if (!this.vehicleToDelete) return;
+
+                fetch(`{{ url_for("distribution.get_vehicles") }}/${this.vehicleToDelete.id}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.loadVehicles();
+                        this.closeModals();
+                        this.showToast('تم حذف المركبة بنجاح', 'success');
+                    } else {
+                        this.showToast(data.message || 'حدث خطأ أثناء حذف المركبة', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting vehicle:', error);
+                    this.showToast('حدث خطأ أثناء حذف المركبة', 'error');
+                });
+            },
+
+            showToast(message, type = 'info') {
+                // This assumes you have a toast notification system
+                // You can implement this based on your application's UI
+                if (window.showToast) {
+                    window.showToast(message, type);
+                } else {
+                    alert(message);
+                }
+            }
+        }));
+    });
+</script>
+{% endblock %}

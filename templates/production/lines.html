@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+
+{% block title %}خطوط الإنتاج | نظام قاتيلو{% endblock %}
+
+{% block page_header %}إدارة خطوط الإنتاج{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('production.production_dashboard') }}" class="text-blue-600 hover:text-blue-800">الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">خطوط الإنتاج</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with action buttons -->
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <h1 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-stream text-blue-600 mr-2"></i>
+            خطوط الإنتاج
+        </h1>
+        
+        <div class="flex flex-wrap gap-3">
+            <button type="button" id="create-line-btn" class="btn btn-primary flex items-center">
+                <i class="fas fa-plus mr-2"></i>
+                إضافة خط إنتاج جديد
+            </button>
+        </div>
+    </div>
+    
+    <!-- Production Lines Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for line in lines %}
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 class="text-lg font-medium text-gray-900 flex items-center">
+                    <i class="fas fa-stream text-blue-600 mr-2"></i>
+                    {{ line.name }}
+                </h3>
+                <div class="flex items-center">
+                    {% if line.is_active %}
+                    <span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center">
+                        <span class="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                        نشط
+                    </span>
+                    {% else %}
+                    <span class="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center">
+                        <span class="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
+                        غير نشط
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">الوصف:</span>
+                    <span class="font-medium text-gray-900">{{ line.description or 'لا يوجد وصف' }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">السعة الإنتاجية:</span>
+                    <span class="font-medium text-gray-900">{{ line.capacity_per_hour or 'غير محدد' }} {{ line.capacity_unit or 'وحدة' }}/{{ line.capacity_period or 'يوم' }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">الموقع:</span>
+                    <span class="font-medium text-gray-900">{{ line.location or 'غير محدد' }}</span>
+                </div>
+                
+                {% if line.current_order_id %}
+                <div class="mt-4 p-3 bg-yellow-50 rounded-md border border-yellow-200">
+                    <div class="flex items-center">
+                        <i class="fas fa-cogs text-yellow-600 mr-2"></i>
+                        <span class="text-yellow-800 font-medium">قيد الإنتاج حالياً:</span>
+                    </div>
+                    <div class="mt-2">
+                        <a href="{{ url_for('production.view_production_order', order_id=line.current_order_id) }}" class="text-blue-600 hover:text-blue-800 font-medium">
+                            أمر الإنتاج #{{ line.current_order_id }}
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="pt-4 mt-4 border-t border-gray-200 flex justify-end space-x-2 space-x-reverse">
+                    <button type="button" class="edit-line-btn text-blue-600 hover:text-blue-900 px-3 py-1 rounded-md border border-blue-600 hover:bg-blue-50 transition-colors"
+                            data-id="{{ line.id }}"
+                            data-name="{{ line.name }}"
+                            data-description="{{ line.description or '' }}"
+                            data-capacity="{{ line.capacity_per_hour or '' }}"
+                            data-capacity-unit="{{ line.capacity_unit or '' }}"
+                            data-capacity-period="{{ line.capacity_period or '' }}"
+                            data-location="{{ line.location or '' }}"
+                            data-is-active="{{ 'true' if line.is_active else 'false' }}">
+                        <i class="fas fa-edit mr-1"></i>
+                        تعديل
+                    </button>
+                    
+                    {% if not line.current_order_id %}
+                    <button type="button" class="delete-line-btn text-red-600 hover:text-red-900 px-3 py-1 rounded-md border border-red-600 hover:bg-red-50 transition-colors"
+                            data-id="{{ line.id }}"
+                            data-name="{{ line.name }}">
+                        <i class="fas fa-trash-alt mr-1"></i>
+                        حذف
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not lines %}
+        <div class="col-span-full bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            <div class="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <i class="fas fa-stream text-blue-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">لا توجد خطوط إنتاج</h3>
+            <p class="text-gray-500 mb-6">لم يتم إضافة أي خطوط إنتاج بعد. قم بإضافة خط إنتاج جديد للبدء.</p>
+            <button type="button" id="create-line-empty-btn" class="btn btn-primary">
+                <i class="fas fa-plus mr-2"></i>
+                إضافة خط إنتاج جديد
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Create Production Line Modal -->
+<div id="create-line-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-plus text-blue-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            إضافة خط إنتاج جديد
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                أدخل بيانات خط الإنتاج الجديد.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-5">
+                    <form id="create-line-form" action="{{ url_for('production.create_production_line') }}" method="POST">
+                        <div class="space-y-4">
+                            <div>
+                                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">اسم خط الإنتاج</label>
+                                <input type="text" id="name" name="name" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                            </div>
+                            
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
+                                <textarea id="description" name="description" rows="3" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                            </div>
+                            
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label for="capacity" class="block text-sm font-medium text-gray-700 mb-1">السعة الإنتاجية</label>
+                                    <input type="number" id="capacity" name="capacity" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                
+                                <div>
+                                    <label for="capacity_unit" class="block text-sm font-medium text-gray-700 mb-1">وحدة السعة</label>
+                                    <input type="text" id="capacity_unit" name="capacity_unit" placeholder="وحدة" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                
+                                <div>
+                                    <label for="capacity_period" class="block text-sm font-medium text-gray-700 mb-1">الفترة</label>
+                                    <select id="capacity_period" name="capacity_period" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="ساعة">ساعة</option>
+                                        <option value="يوم" selected>يوم</option>
+                                        <option value="أسبوع">أسبوع</option>
+                                        <option value="شهر">شهر</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="location" class="block text-sm font-medium text-gray-700 mb-1">الموقع</label>
+                                <input type="text" id="location" name="location" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </div>
+                            
+                            <div class="flex items-center">
+                                <input type="checkbox" id="is_active" name="is_active" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                <label for="is_active" class="mr-2 block text-sm text-gray-900">نشط</label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="create-line-form" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    إضافة
+                </button>
+                <button type="button" id="cancel-create-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Production Line Modal -->
+<div id="edit-line-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-edit text-blue-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            تعديل خط الإنتاج
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                قم بتعديل بيانات خط الإنتاج.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-5">
+                    <form id="edit-line-form" action="{{ url_for('production.update_production_line') }}" method="POST">
+                        <input type="hidden" id="edit_line_id" name="line_id">
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label for="edit_name" class="block text-sm font-medium text-gray-700 mb-1">اسم خط الإنتاج</label>
+                                <input type="text" id="edit_name" name="name" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                            </div>
+                            
+                            <div>
+                                <label for="edit_description" class="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
+                                <textarea id="edit_description" name="description" rows="3" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                            </div>
+                            
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label for="edit_capacity" class="block text-sm font-medium text-gray-700 mb-1">السعة الإنتاجية</label>
+                                    <input type="number" id="edit_capacity" name="capacity" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                
+                                <div>
+                                    <label for="edit_capacity_unit" class="block text-sm font-medium text-gray-700 mb-1">وحدة السعة</label>
+                                    <input type="text" id="edit_capacity_unit" name="capacity_unit" placeholder="وحدة" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                
+                                <div>
+                                    <label for="edit_capacity_period" class="block text-sm font-medium text-gray-700 mb-1">الفترة</label>
+                                    <select id="edit_capacity_period" name="capacity_period" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="ساعة">ساعة</option>
+                                        <option value="يوم">يوم</option>
+                                        <option value="أسبوع">أسبوع</option>
+                                        <option value="شهر">شهر</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="edit_location" class="block text-sm font-medium text-gray-700 mb-1">الموقع</label>
+                                <input type="text" id="edit_location" name="location" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </div>
+                            
+                            <div class="flex items-center">
+                                <input type="checkbox" id="edit_is_active" name="is_active" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="edit_is_active" class="mr-2 block text-sm text-gray-900">نشط</label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="edit-line-form" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    حفظ التغييرات
+                </button>
+                <button type="button" id="cancel-edit-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Production Line Modal -->
+<div id="delete-line-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-trash-alt text-red-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            حذف خط الإنتاج
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                هل أنت متأكد من رغبتك في حذف خط الإنتاج <span id="delete-line-name" class="font-medium"></span>؟ لا يمكن التراجع عن هذا الإجراء.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-5">
+                    <form id="delete-line-form" action="{{ url_for('production.delete_production_line') }}" method="POST">
+                        <input type="hidden" id="delete_line_id" name="line_id">
+                    </form>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="delete-line-form" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    حذف
+                </button>
+                <button type="button" id="cancel-delete-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Create Line Modal
+        const createLineModal = document.getElementById('create-line-modal');
+        const createLineBtn = document.getElementById('create-line-btn');
+        const createLineEmptyBtn = document.getElementById('create-line-empty-btn');
+        const cancelCreateBtn = document.getElementById('cancel-create-btn');
+        
+        function openCreateLineModal() {
+            createLineModal.classList.remove('hidden');
+        }
+        
+        function closeCreateLineModal() {
+            createLineModal.classList.add('hidden');
+        }
+        
+        if (createLineBtn) {
+            createLineBtn.addEventListener('click', openCreateLineModal);
+        }
+        
+        if (createLineEmptyBtn) {
+            createLineEmptyBtn.addEventListener('click', openCreateLineModal);
+        }
+        
+        if (cancelCreateBtn) {
+            cancelCreateBtn.addEventListener('click', closeCreateLineModal);
+        }
+        
+        // Edit Line Modal
+        const editLineModal = document.getElementById('edit-line-modal');
+        const editLineBtns = document.querySelectorAll('.edit-line-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        
+        function openEditLineModal(event) {
+            const button = event.currentTarget;
+            const id = button.getAttribute('data-id');
+            const name = button.getAttribute('data-name');
+            const description = button.getAttribute('data-description');
+            const capacity = button.getAttribute('data-capacity');
+            const capacityUnit = button.getAttribute('data-capacity-unit');
+            const capacityPeriod = button.getAttribute('data-capacity-period');
+            const location = button.getAttribute('data-location');
+            const isActive = button.getAttribute('data-is-active') === 'true';
+            
+            document.getElementById('edit_line_id').value = id;
+            document.getElementById('edit_name').value = name;
+            document.getElementById('edit_description').value = description;
+            document.getElementById('edit_capacity').value = capacity;
+            document.getElementById('edit_capacity_unit').value = capacityUnit;
+            document.getElementById('edit_capacity_period').value = capacityPeriod;
+            document.getElementById('edit_location').value = location;
+            document.getElementById('edit_is_active').checked = isActive;
+            
+            editLineModal.classList.remove('hidden');
+        }
+        
+        function closeEditLineModal() {
+            editLineModal.classList.add('hidden');
+        }
+        
+        editLineBtns.forEach(button => {
+            button.addEventListener('click', openEditLineModal);
+        });
+        
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener('click', closeEditLineModal);
+        }
+        
+        // Delete Line Modal
+        const deleteLineModal = document.getElementById('delete-line-modal');
+        const deleteLineBtns = document.querySelectorAll('.delete-line-btn');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        
+        function openDeleteLineModal(event) {
+            const button = event.currentTarget;
+            const id = button.getAttribute('data-id');
+            const name = button.getAttribute('data-name');
+            
+            document.getElementById('delete_line_id').value = id;
+            document.getElementById('delete-line-name').textContent = name;
+            
+            deleteLineModal.classList.remove('hidden');
+        }
+        
+        function closeDeleteLineModal() {
+            deleteLineModal.classList.add('hidden');
+        }
+        
+        deleteLineBtns.forEach(button => {
+            button.addEventListener('click', openDeleteLineModal);
+        });
+        
+        if (cancelDeleteBtn) {
+            cancelDeleteBtn.addEventListener('click', closeDeleteLineModal);
+        }
+        
+        // Close modals when clicking outside
+        window.addEventListener('click', function(event) {
+            if (event.target === createLineModal) {
+                closeCreateLineModal();
+            }
+            if (event.target === editLineModal) {
+                closeEditLineModal();
+            }
+            if (event.target === deleteLineModal) {
+                closeDeleteLineModal();
+            }
+        });
+    });
+</script>
+{% endblock %}

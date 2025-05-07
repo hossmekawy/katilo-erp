@@ -1,0 +1,563 @@
+{% extends "base.html" %}
+
+{% block title %}تقرير مسارات المندوبين | نظام قاتيلو{% endblock %}
+
+{% block page_header %}تقرير مسارات المندوبين{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.sales_dashboard') }}" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('rep_routes.list_representatives') }}" class="text-blue-600 hover:text-blue-800">مندوبي المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('rep_routes.list_routes') }}" class="text-blue-600 hover:text-blue-800">خطط المسارات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">تقرير المسارات</span>
+</li>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .metric-card {
+        transition: all 0.2s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .chart-container {
+        height: 300px;
+    }
+    .status-badge {
+        @apply text-xs font-medium px-2.5 py-0.5 rounded-full;
+    }
+    .status-planned {
+        @apply bg-blue-100 text-blue-800;
+    }
+    .status-in-progress {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .status-completed {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-cancelled {
+        @apply bg-red-100 text-red-800;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="routesReportApp()" class="mb-10">
+    <!-- Header Section -->
+    <div class="mb-6 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">تقرير مسارات المندوبين</h1>
+        <div class="flex space-x-2 rtl:space-x-reverse">
+            <button @click="exportReport('pdf')" class="btn btn-primary flex items-center">
+                <i class="fas fa-file-pdf ml-2"></i>
+                <span>تصدير PDF</span>
+            </button>
+            <button @click="exportReport('excel')" class="btn btn-green flex items-center">
+                <i class="fas fa-file-excel ml-2"></i>
+                <span>تصدير Excel</span>
+            </button>
+            <a href="{{ url_for('rep_routes.list_routes') }}" class="btn btn-secondary flex items-center">
+                <i class="fas fa-arrow-right ml-2"></i>
+                <span>العودة للمسارات</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card p-6 mb-6">
+        <div class="flex flex-wrap items-center gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">المندوب</label>
+                <select x-model="filters.representative" @change="applyFilters()" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+                    <option value="all">جميع المندوبين</option>
+                    {% for rep in representatives %}
+                    <option value="{{ rep.id }}">{{ rep.user.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                <select x-model="filters.status" @change="applyFilters()" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+                    <option value="all">جميع الحالات</option>
+                    <option value="Planned">مخطط</option>
+                    <option value="In Progress">قيد التنفيذ</option>
+                    <option value="Completed">مكتمل</option>
+                    <option value="Cancelled">ملغي</option>
+                </select>
+            </div>
+
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label>
+                <input type="date" x-model="filters.startDate" @change="applyFilters()" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+            </div>
+
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label>
+                <input type="date" x-model="filters.endDate" @change="applyFilters()" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+            </div>
+
+            <div class="flex items-end">
+                <button @click="resetFilters()" class="btn btn-secondary h-[42px]">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Summary -->
+    <div class="card p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-6">ملخص التقرير</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <div class="text-blue-500 mb-2">
+                    <i class="fas fa-route text-3xl"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">إجمالي المسارات</h3>
+                <p class="text-2xl font-bold text-gray-800" x-text="filteredRoutes.length"></p>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <div class="text-green-500 mb-2">
+                    <i class="fas fa-check-circle text-3xl"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">المسارات المكتملة</h3>
+                <p class="text-2xl font-bold text-gray-800" x-text="getCompletedRoutesCount()"></p>
+                <p class="text-sm text-gray-500" x-text="getCompletionRate() + '%'"></p>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <div class="text-purple-500 mb-2">
+                    <i class="fas fa-users text-3xl"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">إجمالي الزيارات</h3>
+                <p class="text-2xl font-bold text-gray-800" x-text="getTotalVisitsCount()"></p>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <div class="text-yellow-500 mb-2">
+                    <i class="fas fa-shopping-cart text-3xl"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">الطلبات المرتبطة</h3>
+                <p class="text-2xl font-bold text-gray-800" x-text="getLinkedOrdersCount()"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="card p-6">
+            <h2 class="text-lg font-semibold mb-4">توزيع حالات المسارات</h2>
+            <div class="chart-container">
+                <canvas id="routeStatusChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <h2 class="text-lg font-semibold mb-4">المسارات حسب المندوب</h2>
+            <div class="chart-container">
+                <canvas id="routesByRepChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Routes Table -->
+    <div class="card p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold">قائمة المسارات</h2>
+            <div class="relative">
+                <input type="text" x-model="searchQuery" placeholder="بحث..." class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 pl-10">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المسار</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المندوب</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التاريخ</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الزيارات</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الطلبات</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="route in paginatedRoutes" :key="route.id">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="route.route_name"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold ml-2" x-text="route.representative.user.username[0].toUpperCase()"></div>
+                                    <div class="text-sm text-gray-900" x-text="route.representative.user.username"></div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="formatDate(route.route_date)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span
+                                    class="status-badge"
+                                    :class="'status-' + route.status.toLowerCase().replace(' ', '-')"
+                                    x-text="getStatusText(route.status)"
+                                ></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="getCompletedVisitsCount(route) + '/' + route.visits.length"></div>
+                                <div class="text-xs text-gray-500" x-text="getVisitCompletionRate(route) + '%'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="getRouteOrdersCount(route)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <a :href="'/sales/representatives/routes/' + route.id" class="text-blue-600 hover:text-blue-900 ml-3">عرض</a>
+                                <a :href="'/sales/representatives/routes/' + route.id + '/report'" class="text-green-600 hover:text-green-900">تقرير</a>
+                            </td>
+                        </tr>
+                    </template>
+
+                    <template x-if="filteredRoutes.length === 0">
+                        <tr>
+                            <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                                لا توجد مسارات تطابق معايير البحث
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between mt-4" x-show="filteredRoutes.length > 0">
+            <div class="flex items-center">
+                <span class="text-sm text-gray-700">
+                    عرض
+                    <span class="font-medium" x-text="(currentPage - 1) * pageSize + 1"></span>
+                    إلى
+                    <span class="font-medium" x-text="Math.min(currentPage * pageSize, filteredRoutes.length)"></span>
+                    من
+                    <span class="font-medium" x-text="filteredRoutes.length"></span>
+                    نتيجة
+                </span>
+            </div>
+
+            <div class="flex space-x-2 rtl:space-x-reverse">
+                <button @click="currentPage--" :disabled="currentPage === 1" class="btn btn-sm btn-secondary" :class="{'opacity-50 cursor-not-allowed': currentPage === 1}">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+
+                <template x-for="page in totalPages" :key="page">
+                    <button
+                        @click="currentPage = page"
+                        class="btn btn-sm"
+                        :class="currentPage === page ? 'btn-blue' : 'btn-secondary'"
+                        x-text="page"
+                    ></button>
+                </template>
+
+                <button @click="currentPage++" :disabled="currentPage === totalPages" class="btn btn-sm btn-secondary" :class="{'opacity-50 cursor-not-allowed': currentPage === totalPages}">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+function routesReportApp() {
+    return {
+        routes: {{ routes|tojson|safe }},
+        representatives: {{ representatives|tojson|safe }},
+        filters: {
+            representative: 'all',
+            status: 'all',
+            startDate: '{{ start_date }}',
+            endDate: '{{ end_date }}'
+        },
+        searchQuery: '',
+        currentPage: 1,
+        pageSize: 10,
+        routeStatusChart: null,
+        routesByRepChart: null,
+
+        init() {
+            this.applyFilters();
+            this.$nextTick(() => {
+                this.initCharts();
+            });
+        },
+
+        get filteredRoutes() {
+            return this.routes.filter(route => {
+                // Filter by representative
+                if (this.filters.representative !== 'all' && route.representative_id != this.filters.representative) {
+                    return false;
+                }
+
+                // Filter by status
+                if (this.filters.status !== 'all' && route.status !== this.filters.status) {
+                    return false;
+                }
+
+                // Filter by date range
+                if (this.filters.startDate && new Date(route.route_date) < new Date(this.filters.startDate)) {
+                    return false;
+                }
+
+                if (this.filters.endDate && new Date(route.route_date) > new Date(this.filters.endDate)) {
+                    return false;
+                }
+
+                // Filter by search query
+                if (this.searchQuery) {
+                    const query = this.searchQuery.toLowerCase();
+                    const matchesName = route.route_name.toLowerCase().includes(query);
+                    const matchesRep = route.representative.user.username.toLowerCase().includes(query);
+
+                    return matchesName || matchesRep;
+                }
+
+                return true;
+            });
+        },
+
+        get paginatedRoutes() {
+            const start = (this.currentPage - 1) * this.pageSize;
+            const end = start + this.pageSize;
+            return this.filteredRoutes.slice(start, end);
+        },
+
+        get totalPages() {
+            return Math.ceil(this.filteredRoutes.length / this.pageSize);
+        },
+
+        applyFilters() {
+            this.currentPage = 1;
+            this.$nextTick(() => {
+                this.updateCharts();
+            });
+        },
+
+        resetFilters() {
+            this.filters = {
+                representative: 'all',
+                status: 'all',
+                startDate: '',
+                endDate: ''
+            };
+            this.searchQuery = '';
+            this.applyFilters();
+        },
+
+        initCharts() {
+            // Route Status Chart
+            const statusCtx = document.getElementById('routeStatusChart').getContext('2d');
+            this.routeStatusChart = new Chart(statusCtx, {
+                type: 'pie',
+                data: this.getRouteStatusChartData(),
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+
+            // Routes by Representative Chart
+            const repCtx = document.getElementById('routesByRepChart').getContext('2d');
+            this.routesByRepChart = new Chart(repCtx, {
+                type: 'bar',
+                data: this.getRoutesByRepChartData(),
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        },
+
+        updateCharts() {
+            if (this.routeStatusChart) {
+                this.routeStatusChart.data = this.getRouteStatusChartData();
+                this.routeStatusChart.update();
+            }
+
+            if (this.routesByRepChart) {
+                this.routesByRepChart.data = this.getRoutesByRepChartData();
+                this.routesByRepChart.update();
+            }
+        },
+
+        getRouteStatusChartData() {
+            // Count routes by status
+            const statusCounts = {
+                'Planned': 0,
+                'In Progress': 0,
+                'Completed': 0,
+                'Cancelled': 0
+            };
+
+            this.filteredRoutes.forEach(route => {
+                statusCounts[route.status]++;
+            });
+
+            return {
+                labels: ['مخطط', 'قيد التنفيذ', 'مكتمل', 'ملغي'],
+                datasets: [{
+                    data: [
+                        statusCounts['Planned'],
+                        statusCounts['In Progress'],
+                        statusCounts['Completed'],
+                        statusCounts['Cancelled']
+                    ],
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.7)',
+                        'rgba(245, 158, 11, 0.7)',
+                        'rgba(16, 185, 129, 0.7)',
+                        'rgba(239, 68, 68, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(59, 130, 246, 1)',
+                        'rgba(245, 158, 11, 1)',
+                        'rgba(16, 185, 129, 1)',
+                        'rgba(239, 68, 68, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            };
+        },
+
+        getRoutesByRepChartData() {
+            // Group routes by representative
+            const repCounts = {};
+            const repNames = {};
+
+            this.filteredRoutes.forEach(route => {
+                const repId = route.representative_id;
+                if (!repCounts[repId]) {
+                    repCounts[repId] = 0;
+                    repNames[repId] = route.representative.user.username;
+                }
+                repCounts[repId]++;
+            });
+
+            // Convert to arrays for chart
+            const repIds = Object.keys(repCounts);
+            const counts = repIds.map(id => repCounts[id]);
+            const names = repIds.map(id => repNames[id]);
+
+            return {
+                labels: names,
+                datasets: [{
+                    label: 'عدد المسارات',
+                    data: counts,
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1
+                }]
+            };
+        },
+
+        getCompletedRoutesCount() {
+            return this.filteredRoutes.filter(route => route.status === 'Completed').length;
+        },
+
+        getCompletionRate() {
+            if (this.filteredRoutes.length === 0) return '0.0';
+            return ((this.getCompletedRoutesCount() / this.filteredRoutes.length) * 100).toFixed(1);
+        },
+
+        getTotalVisitsCount() {
+            return this.filteredRoutes.reduce((total, route) => total + route.visits.length, 0);
+        },
+
+        getLinkedOrdersCount() {
+            return this.filteredRoutes.reduce((total, route) => {
+                return total + route.visits.filter(visit => visit.order_id).length;
+            }, 0);
+        },
+
+        getCompletedVisitsCount(route) {
+            return route.visits.filter(visit => visit.status === 'Completed').length;
+        },
+
+        getVisitCompletionRate(route) {
+            if (route.visits.length === 0) return '0.0';
+            return ((this.getCompletedVisitsCount(route) / route.visits.length) * 100).toFixed(1);
+        },
+
+        getRouteOrdersCount(route) {
+            return route.visits.filter(visit => visit.order_id).length;
+        },
+
+        formatDate(dateString) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString('ar-EG', options);
+        },
+
+        getStatusText(status) {
+            switch (status) {
+                case 'Planned': return 'مخطط';
+                case 'In Progress': return 'قيد التنفيذ';
+                case 'Completed': return 'مكتمل';
+                case 'Cancelled': return 'ملغي';
+                default: return status;
+            }
+        },
+
+        exportReport(format) {
+            // Calculate date range for filename
+            let startDate = this.filters.startDate || 'all';
+            let endDate = this.filters.endDate || 'all';
+
+            // Generate export URL
+            const exportUrl = `/sales/representatives/routes/export?format=${format}&representative=${this.filters.representative}&status=${this.filters.status}&start_date=${startDate}&end_date=${endDate}`;
+
+            // Open in new tab
+            window.open(exportUrl, '_blank');
+        }
+    };
+}
+
+// Helper function to show notifications
+function showNotification(message, type = 'info') {
+    const event = new CustomEvent('show-notification', {
+        detail: { message, type }
+    });
+    window.dispatchEvent(event);
+}
+</script>
+{% endblock %}

@@ -4,9 +4,11 @@ import os
 from flask import Blueprint, current_app, request, jsonify, render_template, send_file
 from flask_login import login_required, current_user
 import pdfkit
-from models import (
-    Category, QualityInspection, QualityInspectionCriteria, db, Supplier, SupplierItem, Item, Inventory, 
-    InventoryTransaction, Warehouse, PurchaseOrder, PurchaseOrderDetail,SupplierLedgerEntry,SupplierPayment,
+# Import directly from models_helper to avoid circular imports
+from models_helper import (
+    Category, db, Supplier, SupplierItem, Item, Inventory,
+    InventoryTransaction, Warehouse, PurchaseOrder, PurchaseOrderDetail, SupplierLedgerEntry, SupplierPayment,
+    QualityInspection, QualityInspectionCriteria, ItemCostHistory
 )
 from datetime import datetime
 
@@ -44,12 +46,12 @@ def supplier_account_details_page(supplier_id):
 def get_purchase_orders():
     """Get all purchase orders"""
     purchase_orders = PurchaseOrder.query.all()
-    
+
     result = []
     for po in purchase_orders:
         supplier = Supplier.query.get(po.supplier_id)
         po_details = PurchaseOrderDetail.query.filter_by(po_id=po.id).all()
-        
+
         result.append({
             'id': po.id,
             'supplier_id': po.supplier_id,
@@ -59,7 +61,7 @@ def get_purchase_orders():
             'total_amount': po.total_amount,
             'items_count': len(po_details)
         })
-    
+
     return jsonify(result)
 
 @purchase_order_bp.route('/api/purchase-orders/<int:id>', methods=['GET'])
@@ -69,7 +71,7 @@ def get_purchase_order(id):
     purchase_order = PurchaseOrder.query.get_or_404(id)
     supplier = Supplier.query.get(purchase_order.supplier_id)
     po_details = PurchaseOrderDetail.query.filter_by(po_id=id).all()
-    
+
     details = []
     for detail in po_details:
         item = Item.query.get(detail.item_id)
@@ -83,7 +85,7 @@ def get_purchase_order(id):
             'unit_price': detail.unit_price,
             'subtotal': detail.quantity_ordered * detail.unit_price
         })
-    
+
     return jsonify({
         'id': purchase_order.id,
         'supplier_id': purchase_order.supplier_id,
@@ -100,29 +102,29 @@ def get_purchase_order(id):
 def create_purchase_order():
     """Create a new purchase order"""
     data = request.get_json()
-    
+
     # Validate required fields
     if not data.get('supplier_id') or not data.get('items') or len(data['items']) == 0:
         return jsonify({'message': 'المورد والعناصر مطلوبة'}), 400
-    
+
     supplier_id = data['supplier_id']
-    
+
     # Verify supplier exists
     supplier = Supplier.query.get(supplier_id)
     if not supplier:
         return jsonify({'message': 'المورد غير موجود'}), 400
-    
+
     # Calculate total amount
     total_amount = 0
     for item in data['items']:
         if 'quantity_ordered' not in item or 'unit_price' not in item:
             return jsonify({'message': 'الكمية والسعر مطلوبان لكل عنصر'}), 400
-        
+
         # Convert values to float before multiplication
         quantity = float(item['quantity_ordered'])
         price = float(item['unit_price'])
         total_amount += quantity * price
-    
+
     # Create purchase order
     purchase_order = PurchaseOrder(
         supplier_id=supplier_id,
@@ -130,10 +132,10 @@ def create_purchase_order():
         status='Pending',
         total_amount=total_amount
     )
-    
+
     db.session.add(purchase_order)
     db.session.flush()  # Get ID without committing
-    
+
     # Create purchase order details
     for item in data['items']:
         po_detail = PurchaseOrderDetail(
@@ -144,7 +146,7 @@ def create_purchase_order():
             quantity_received=0
         )
         db.session.add(po_detail)
-    
+
     # Create ledger entry for this purchase order
     ledger_entry = SupplierLedgerEntry(
         supplier_id=supplier_id,
@@ -155,13 +157,13 @@ def create_purchase_order():
         debit=total_amount  # Debit increases when we order from supplier
     )
     db.session.add(ledger_entry)
-    
+
     try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Database error: {str(e)}'}), 500
-    
+
     return jsonify({
         'id': purchase_order.id,
         'supplier_id': purchase_order.supplier_id,
@@ -177,12 +179,12 @@ def update_purchase_order(id):
     """Update a purchase order's status"""
     purchase_order = PurchaseOrder.query.get_or_404(id)
     data = request.get_json()
-    
+
     if 'status' in data:
         purchase_order.status = data['status']
-    
+
     db.session.commit()
-    
+
     return jsonify({
         'id': purchase_order.id,
         'status': purchase_order.status
@@ -194,13 +196,13 @@ def update_purchase_order(id):
 def cancel_purchase_order(id):
     """Cancel a purchase order"""
     purchase_order = PurchaseOrder.query.get_or_404(id)
-    
+
     if purchase_order.status == 'Received':
         return jsonify({'message': 'لا يمكن إلغاء طلب تم استلامه بالفعل'}), 400
-    
+
     purchase_order.status = 'Cancelled'
     db.session.commit()
-    
+
     return jsonify({
         'id': purchase_order.id,
         'status': purchase_order.status,
@@ -212,15 +214,15 @@ def cancel_purchase_order(id):
 def get_supplier_purchase_orders(supplier_id):
     """Get all purchase orders for a specific supplier"""
     supplier = Supplier.query.get_or_404(supplier_id)
-    
+
     purchase_orders = PurchaseOrder.query.filter_by(supplier_id=supplier_id).all()
-    
+
     result = []
     for po in purchase_orders:
         # Get total items and total amount
         po_details = PurchaseOrderDetail.query.filter_by(po_id=po.id).all()
         total_items = len(po_details)
-        
+
         result.append({
             'id': po.id,
             'order_date': po.order_date.isoformat() if po.order_date else None,
@@ -228,7 +230,7 @@ def get_supplier_purchase_orders(supplier_id):
             'total_amount': po.total_amount,
             'total_items': total_items
         })
-    
+
     return jsonify(result)
 
 @purchase_order_bp.route('/api/purchase-orders/stats', methods=['GET'])
@@ -237,21 +239,21 @@ def get_purchase_order_stats():
     """Get statistics about purchase orders"""
     # Total number of purchase orders
     total_pos = PurchaseOrder.query.count()
-    
+
     # Count by status
     pending_count = PurchaseOrder.query.filter_by(status='Pending').count()
     approved_count = PurchaseOrder.query.filter_by(status='Approved').count()
     received_count = PurchaseOrder.query.filter_by(status='Received').count()
     cancelled_count = PurchaseOrder.query.filter_by(status='Cancelled').count()
-    
+
     # Total amount of all purchase orders
     total_amount_result = db.session.query(db.func.sum(PurchaseOrder.total_amount)).first()
     total_amount = float(total_amount_result[0]) if total_amount_result[0] else 0
-    
+
     # Recent purchase orders (limit to 5)
     recent_pos = PurchaseOrder.query.order_by(PurchaseOrder.order_date.desc()).limit(5).all()
     recent_pos_data = []
-    
+
     for po in recent_pos:
         supplier = Supplier.query.get(po.supplier_id)
         recent_pos_data.append({
@@ -261,7 +263,7 @@ def get_purchase_order_stats():
             'status': po.status,
             'total_amount': po.total_amount
         })
-    
+
     return jsonify({
         'total_purchase_orders': total_pos,
         'status_counts': {
@@ -280,14 +282,14 @@ def search_purchase_orders():
     """Search purchase orders by supplier name or status"""
     query = request.args.get('q', '')
     status = request.args.get('status', '')
-    
+
     # Base query
     purchase_orders_query = PurchaseOrder.query
-    
+
     # Apply status filter if provided
     if status:
         purchase_orders_query = purchase_orders_query.filter_by(status=status)
-    
+
     # Apply search filter if provided
     if query and len(query) >= 2:
         # Join with suppliers to search by supplier name
@@ -295,7 +297,7 @@ def search_purchase_orders():
             Supplier.supplier_name.ilike(f'%{query}%')
         ).all()
         supplier_ids = [s[0] for s in supplier_ids]
-        
+
         if supplier_ids:
             purchase_orders_query = purchase_orders_query.filter(
                 PurchaseOrder.supplier_id.in_(supplier_ids)
@@ -303,15 +305,15 @@ def search_purchase_orders():
         else:
             # No matching suppliers, return empty result
             return jsonify([])
-    
+
     # Execute query and format results
     purchase_orders = purchase_orders_query.all()
     result = []
-    
+
     for po in purchase_orders:
         supplier = Supplier.query.get(po.supplier_id)
         po_details = PurchaseOrderDetail.query.filter_by(po_id=po.id).all()
-        
+
         result.append({
             'id': po.id,
             'supplier_id': po.supplier_id,
@@ -321,7 +323,7 @@ def search_purchase_orders():
             'total_amount': po.total_amount,
             'items_count': len(po_details)
         })
-    
+
     return jsonify(result)
 
 @purchase_order_bp.route('/api/items/<int:item_id>/purchase-history', methods=['GET'])
@@ -329,10 +331,10 @@ def search_purchase_orders():
 def get_item_purchase_history(item_id):
     """Get purchase history for a specific item"""
     item = Item.query.get_or_404(item_id)
-    
+
     # Get all purchase order details for this item
     po_details = PurchaseOrderDetail.query.filter_by(item_id=item_id).all()
-    
+
     result = []
     for detail in po_details:
         po = PurchaseOrder.query.get(detail.po_id)
@@ -349,10 +351,10 @@ def get_item_purchase_history(item_id):
                 'unit_price': detail.unit_price,
                 'subtotal': detail.quantity_ordered * detail.unit_price
             })
-    
+
     # Sort by order date (newest first)
     result.sort(key=lambda x: x['order_date'] if x['order_date'] else '', reverse=True)
-    
+
     return jsonify(result)
 
 @purchase_order_bp.route('/api/purchase-orders/<int:id>/details/<int:detail_id>', methods=['PUT'])
@@ -361,30 +363,30 @@ def update_purchase_order_detail(id, detail_id):
     """Update a specific detail in a purchase order"""
     purchase_order = PurchaseOrder.query.get_or_404(id)
     po_detail = PurchaseOrderDetail.query.get_or_404(detail_id)
-    
+
     # Verify the detail belongs to this purchase order
     if po_detail.po_id != id:
         return jsonify({'message': 'تفاصيل الطلب غير موجودة في هذا الطلب'}), 400
-    
+
     # Only allow updates if the order is still pending
     if purchase_order.status != 'Pending':
         return jsonify({'message': 'لا يمكن تعديل طلب تم الموافقة عليه أو استلامه أو إلغاؤه'}), 400
-    
+
     data = request.get_json()
-    
+
     if 'quantity_ordered' in data:
         po_detail.quantity_ordered = int(data['quantity_ordered'])
-    
+
     if 'unit_price' in data:
         po_detail.unit_price = float(data['unit_price'])
-    
+
     # Recalculate total amount for the purchase order
     po_details = PurchaseOrderDetail.query.filter_by(po_id=id).all()
     total_amount = sum(detail.quantity_ordered * detail.unit_price for detail in po_details)
     purchase_order.total_amount = total_amount
-    
+
     db.session.commit()
-    
+
     return jsonify({
         'id': po_detail.id,
         'quantity_ordered': po_detail.quantity_ordered,
@@ -404,26 +406,26 @@ def add_purchase_order_items(id):
 def add_purchase_order_detail(id):
     """Add a new item to an existing purchase order"""
     purchase_order = PurchaseOrder.query.get_or_404(id)
-    
+
     # Only allow updates if the order is still pending
     if purchase_order.status != 'Pending':
         return jsonify({'message': 'لا يمكن تعديل طلب تم الموافقة عليه أو استلامه أو إلغاؤه'}), 400
-    
+
     data = request.get_json()
-    
+
     # Validate required fields
     if not data.get('item_id') or 'quantity_ordered' not in data or 'unit_price' not in data:
         return jsonify({'message': 'العنصر والكمية والسعر مطلوبة'}), 400
-    
+
     # Check if item already exists in this purchase order
     existing_detail = PurchaseOrderDetail.query.filter_by(
-        po_id=id, 
+        po_id=id,
         item_id=data['item_id']
     ).first()
-    
+
     if existing_detail:
         return jsonify({'message': 'هذا العنصر موجود بالفعل في الطلب'}), 400
-    
+
     # Create new purchase order detail
     po_detail = PurchaseOrderDetail(
         po_id=id,
@@ -432,17 +434,17 @@ def add_purchase_order_detail(id):
         unit_price=float(data['unit_price']),
         quantity_received=0
     )
-    
+
     db.session.add(po_detail)
-    
+
     # Recalculate total amount for the purchase order
     purchase_order.total_amount += int(data['quantity_ordered']) * float(data['unit_price'])
-    
+
     db.session.commit()
-    
+
     # Get item details for response
     item = Item.query.get(data['item_id'])
-    
+
     return jsonify({
         'id': po_detail.id,
         'item_id': po_detail.item_id,
@@ -461,24 +463,24 @@ def delete_purchase_order_detail(id, detail_id):
     """Remove an item from a purchase order"""
     purchase_order = PurchaseOrder.query.get_or_404(id)
     po_detail = PurchaseOrderDetail.query.get_or_404(detail_id)
-    
+
     # Verify the detail belongs to this purchase order
     if po_detail.po_id != id:
         return jsonify({'message': 'تفاصيل الطلب غير موجودة في هذا الطلب'}), 400
-    
+
     # Only allow updates if the order is still pending
     if purchase_order.status != 'Pending':
         return jsonify({'message': 'لا يمكن تعديل طلب تم الموافقة عليه أو استلامه أو إلغاؤه'}), 400
-    
+
     # Subtract this detail's amount from the purchase order total
     purchase_order.total_amount -= po_detail.quantity_ordered * po_detail.unit_price
-    
+
     # Delete the detail
     db.session.delete(po_detail)
-    
+
     # Check if this was the last item in the purchase order
     remaining_details = PurchaseOrderDetail.query.filter_by(po_id=id).count()
-    
+
     if remaining_details == 0:
         # If no items left, delete the entire purchase order
         db.session.delete(purchase_order)
@@ -493,35 +495,35 @@ def delete_purchase_order_detail(id, detail_id):
 def create_bulk_purchase_orders():
     """Create purchase orders for multiple suppliers at once (for low stock items)"""
     data = request.get_json()
-    
+
     # Validate required fields
     if not data.get('orders') or len(data['orders']) == 0:
         return jsonify({'message': 'لا توجد طلبات للإنشاء'}), 400
-    
+
     created_orders = []
-    
+
     for order_data in data['orders']:
         if not order_data.get('supplier_id') or not order_data.get('items') or len(order_data['items']) == 0:
             continue
-        
+
         supplier_id = order_data['supplier_id']
-        
+
         # Verify supplier exists
         supplier = Supplier.query.get(supplier_id)
         if not supplier:
             continue
-        
+
         # Calculate total amount
         total_amount = 0
         for item in order_data['items']:
             if 'quantity_ordered' not in item or 'unit_price' not in item:
                 continue
-            
+
             # Convert values to float before multiplication
             quantity = float(item['quantity_ordered'])
             price = float(item['unit_price'])
             total_amount += quantity * price
-        
+
         # Create purchase order
         purchase_order = PurchaseOrder(
             supplier_id=supplier_id,
@@ -529,15 +531,15 @@ def create_bulk_purchase_orders():
             status='Pending',
             total_amount=total_amount
         )
-        
+
         db.session.add(purchase_order)
         db.session.flush()  # Get ID without committing
-        
+
         # Create purchase order details
         for item in order_data['items']:
             if 'item_id' not in item or 'quantity_ordered' not in item or 'unit_price' not in item:
                 continue
-                
+
             po_detail = PurchaseOrderDetail(
                 po_id=purchase_order.id,
                 item_id=item['item_id'],
@@ -546,20 +548,20 @@ def create_bulk_purchase_orders():
                 quantity_received=0
             )
             db.session.add(po_detail)
-        
+
         created_orders.append({
             'id': purchase_order.id,
             'supplier_id': purchase_order.supplier_id,
             'supplier_name': supplier.supplier_name,
             'total_amount': purchase_order.total_amount
         })
-    
+
     try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Database error: {str(e)}'}), 500
-    
+
     return jsonify({
         'message': f'تم إنشاء {len(created_orders)} طلب شراء بنجاح',
         'created_orders': created_orders
@@ -573,60 +575,62 @@ def receive_purchase_order(id):
     """Mark items in a purchase order as received and update inventory"""
     # Get the purchase order
     purchase_order = PurchaseOrder.query.get_or_404(id)
-    
+
     # Check if the purchase order is in a valid state for receiving
     if purchase_order.status not in ['Pending', 'Approved']:
         return jsonify({'message': 'لا يمكن استلام طلب شراء بحالة ' + purchase_order.status}), 400
-    
+
     data = request.get_json()
     warehouse_id = data.get('warehouse_id')
     items_to_receive = data.get('items', [])
     create_quality_inspection = data.get('create_quality_inspection', False)
-    
+    update_item_costs = data.get('update_item_costs', True)  # Default to True
+
     # Validate required fields
     if not warehouse_id:
         return jsonify({'message': 'يجب تحديد المستودع'}), 400
-    
+
     if not items_to_receive:
         return jsonify({'message': 'يجب تحديد العناصر المستلمة'}), 400
-    
+
     # Check if warehouse exists
     warehouse = Warehouse.query.get(warehouse_id)
     if not warehouse:
         return jsonify({'message': 'المستودع غير موجود'}), 400
-    
+
     try:
         created_inspections = []
-        
+        updated_costs = []
+
         # Process each received item
         for item_data in items_to_receive:
             detail_id = item_data.get('detail_id')
             quantity_received = item_data.get('quantity_received', 0)
-            
+
             if not detail_id or quantity_received <= 0:
                 continue
-            
+
             # Get the purchase order detail
             po_detail = PurchaseOrderDetail.query.get(detail_id)
             if not po_detail or po_detail.po_id != id:
                 return jsonify({'message': 'تفاصيل طلب الشراء غير صحيحة'}), 400
-            
+
             # Check if quantity is valid
             remaining_quantity = po_detail.quantity_ordered - po_detail.quantity_received
             if quantity_received > remaining_quantity:
                 return jsonify({
                     'message': f'الكمية المستلمة للعنصر {po_detail.item_id} تتجاوز الكمية المتبقية'
                 }), 400
-            
+
             # Update received quantity
             po_detail.quantity_received += quantity_received
-            
+
             # Update inventory
             inventory = Inventory.query.filter_by(
                 item_id=po_detail.item_id,
                 warehouse_id=warehouse_id
             ).first()
-            
+
             if inventory:
                 inventory.quantity += quantity_received
             else:
@@ -636,7 +640,7 @@ def receive_purchase_order(id):
                     quantity=quantity_received
                 )
                 db.session.add(inventory)
-            
+
             # Create inventory transaction record
             transaction = InventoryTransaction(
                 item_id=po_detail.item_id,
@@ -646,12 +650,58 @@ def receive_purchase_order(id):
                 reference=f'PO#{purchase_order.id}'
             )
             db.session.add(transaction)
-            
+
+            # Update item cost if requested
+            if update_item_costs:
+                item = Item.query.get(po_detail.item_id)
+                if item:
+                    # Calculate weighted average cost
+                    total_inventory = sum([inv.quantity for inv in Inventory.query.filter_by(item_id=item.id).all()])
+
+                    # If there's no inventory yet, just use the new cost
+                    if total_inventory == 0:
+                        new_cost = po_detail.unit_price
+                    else:
+                        # Calculate weighted average cost
+                        existing_value = item.cost * (total_inventory - quantity_received)
+                        new_value = po_detail.unit_price * quantity_received
+                        new_cost = (existing_value + new_value) / total_inventory
+
+                        # Round to 2 decimal places
+                        new_cost = round(new_cost, 2)
+
+                    # Only update if cost has changed
+                    if item.cost != new_cost:
+                        # Create cost history record
+                        cost_history = ItemCostHistory(
+                            item_id=item.id,
+                            previous_cost=item.cost,
+                            new_cost=new_cost,
+                            source='PurchaseOrder',
+                            reference_id=purchase_order.id,
+                            reference_type='purchase_order',
+                            quantity=quantity_received,
+                            notes=f'تحديث التكلفة من طلب الشراء #{purchase_order.id}',
+                            created_by=current_user.id if current_user else None
+                        )
+                        db.session.add(cost_history)
+
+                        # Update item cost
+                        item.cost = new_cost
+
+                        # Add to list of updated costs
+                        updated_costs.append({
+                            'item_id': item.id,
+                            'item_name': item.name,
+                            'previous_cost': cost_history.previous_cost,
+                            'new_cost': cost_history.new_cost
+                        })
+
             # Create quality inspection if requested
             if create_quality_inspection:
                 # Get the item for inspection criteria
                 item = Item.query.get(po_detail.item_id)
-                
+
                 # Create inspection record
                 inspection = QualityInspection(
                     purchase_order_detail_id=po_detail.id,
@@ -659,26 +709,26 @@ def receive_purchase_order(id):
                     status='Pending',
                     notes=f'تم إنشاء فحص الجودة تلقائياً عند استلام المواد من طلب الشراء #{purchase_order.id}'
                 )
-                
+
                 db.session.add(inspection)
                 db.session.flush()  # Get ID without committing
-                
+
                 # Add default inspection criteria based on item type
                 default_criteria = []
-                
+
                 # Add general criteria for all items
                 default_criteria.append({
                     'name': 'المظهر الخارجي',
                     'expected_value': 'سليم',
                     'importance': 'Major'
                 })
-                
+
                 default_criteria.append({
                     'name': 'التغليف',
                     'expected_value': 'سليم',
                     'importance': 'Minor'
                 })
-                
+
                 # Add specific criteria based on item category if available
                 if item and item.category_id:
                     category = Category.query.get(item.category_id)
@@ -694,7 +744,7 @@ def receive_purchase_order(id):
                                 'expected_value': 'منخفضة',
                                 'importance': 'Major'
                             })
-                
+
                 # Add the criteria to the inspection
                 for criterion in default_criteria:
                     inspection_criterion = QualityInspectionCriteria(
@@ -706,36 +756,41 @@ def receive_purchase_order(id):
                         importance=criterion['importance']
                     )
                     db.session.add(inspection_criterion)
-                
+
                 created_inspections.append({
                     'id': inspection.id,
                     'item_name': item.name if item else f'Item #{po_detail.item_id}'
                 })
-        
+
         # Check if all items are fully received
         all_received = all(
             detail.quantity_ordered == detail.quantity_received
             for detail in purchase_order.details
         )
-        
+
         # Update purchase order status if all items are received
         if all_received:
             purchase_order.status = 'Received'
-        
+
         db.session.commit()
-        
+
         response_data = {
             'message': 'تم استلام العناصر بنجاح',
             'status': purchase_order.status
         }
-        
+
         # Add inspection info to response if any were created
         if created_inspections:
             response_data['quality_inspections'] = created_inspections
             response_data['message'] += ' وتم إنشاء فحوصات الجودة'
-        
+
+        # Add cost update info to response if any costs were updated
+        if updated_costs:
+            response_data['updated_costs'] = updated_costs
+            response_data['message'] += ' وتم تحديث تكاليف العناصر'
+
         return jsonify(response_data)
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'حدث خطأ أثناء استلام العناصر: {str(e)}'}), 500
@@ -745,17 +800,17 @@ def receive_purchase_order(id):
 def add_supplier_payment(supplier_id):
     supplier = Supplier.query.get_or_404(supplier_id)
     data = request.get_json()
-    
+
     # Validate required fields
     if not data.get('amount') or float(data.get('amount', 0)) <= 0:
         return jsonify({'message': 'المبلغ مطلوب ويجب أن يكون أكبر من صفر'}), 400
-    
+
     if not data.get('date'):
         return jsonify({'message': 'تاريخ الدفع مطلوب'}), 400
-    
+
     if not data.get('method'):
         return jsonify({'message': 'طريقة الدفع مطلوبة'}), 400
-    
+
     try:
         # Create payment record
         payment = SupplierPayment(
@@ -768,7 +823,7 @@ def add_supplier_payment(supplier_id):
             created_by=current_user.id
         )
         db.session.add(payment)
-        
+
         # Create ledger entry for this payment
         ledger_entry = SupplierLedgerEntry(
             supplier_id=supplier_id,
@@ -779,9 +834,9 @@ def add_supplier_payment(supplier_id):
             credit=float(data['amount'])  # Credit increases when we pay the supplier
         )
         db.session.add(ledger_entry)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'id': payment.id,
             'amount': payment.amount,
@@ -790,37 +845,37 @@ def add_supplier_payment(supplier_id):
             'reference': payment.reference,
             'message': 'تمت إضافة الدفعة بنجاح'
         }), 201
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'حدث خطأ أثناء إضافة الدفعة: {str(e)}'}), 500
-    
-    
+
+
 @purchase_order_bp.route('/api/supplier-accounts', methods=['GET'])
 @login_required
 def get_supplier_accounts():
     suppliers = Supplier.query.all()
     result = []
-    
+
     for supplier in suppliers:
         # Get all purchase orders for this supplier
         purchase_orders = PurchaseOrder.query.filter_by(supplier_id=supplier.id).all()
-        
+
         # Calculate total ordered amount (excluding cancelled orders)
         total_ordered = sum(po.total_amount for po in purchase_orders if po.status != 'Cancelled')
-        
+
         # Calculate total paid amount from the payments table
         total_paid = db.session.query(db.func.sum(SupplierPayment.amount)).filter_by(supplier_id=supplier.id).scalar() or 0
-        
+
         # Calculate balance
         balance = total_ordered - total_paid
-        
+
         # Count purchase orders by status
         pending_count = PurchaseOrder.query.filter_by(supplier_id=supplier.id, status='Pending').count()
         approved_count = PurchaseOrder.query.filter_by(supplier_id=supplier.id, status='Approved').count()
         received_count = PurchaseOrder.query.filter_by(supplier_id=supplier.id, status='Received').count()
         cancelled_count = PurchaseOrder.query.filter_by(supplier_id=supplier.id, status='Cancelled').count()
-        
+
         result.append({
             'id': supplier.id,
             'name': supplier.supplier_name,
@@ -838,7 +893,7 @@ def get_supplier_accounts():
                 'cancelled': cancelled_count
             }
         })
-    
+
     return jsonify(result)
 
 # API endpoint to get detailed financial information for a specific supplier
@@ -846,10 +901,10 @@ def get_supplier_accounts():
 @login_required
 def get_supplier_account_details(supplier_id):
     supplier = Supplier.query.get_or_404(supplier_id)
-    
+
     # Get all purchase orders for this supplier
     purchase_orders = PurchaseOrder.query.filter_by(supplier_id=supplier.id).all()
-    
+
     po_details = []
     for po in purchase_orders:
         po_details.append({
@@ -859,11 +914,11 @@ def get_supplier_account_details(supplier_id):
             'total_amount': po.total_amount,
             'items_count': PurchaseOrderDetail.query.filter_by(po_id=po.id).count()
         })
-    
+
     # Get payment history from the database
     payments_query = SupplierPayment.query.filter_by(supplier_id=supplier.id).order_by(SupplierPayment.payment_date.desc())
     payments = []
-    
+
     for payment in payments_query:
         payments.append({
             'id': payment.id,
@@ -873,12 +928,12 @@ def get_supplier_account_details(supplier_id):
             'method': payment.payment_method,
             'notes': payment.notes
         })
-    
+
     # Calculate totals
     total_ordered = sum(po.total_amount for po in purchase_orders if po.status != 'Cancelled')
     total_paid = sum(payment.amount for payment in SupplierPayment.query.filter_by(supplier_id=supplier.id).all())
     balance = total_ordered - total_paid
-    
+
     return jsonify({
         'supplier': {
             'id': supplier.id,
@@ -907,18 +962,18 @@ def download_supplier_account_pdf(supplier_id):
     try:
         # Get supplier details
         supplier = Supplier.query.get_or_404(supplier_id)
-        
+
         # Get purchase orders
         purchase_orders = PurchaseOrder.query.filter_by(supplier_id=supplier_id).all()
-        
+
         # Get payments
         payments = SupplierPayment.query.filter_by(supplier_id=supplier_id).all()
-        
+
         # Calculate totals
         total_ordered = sum(po.total_amount for po in purchase_orders if po.status != 'Cancelled')
         total_paid = sum(payment.amount for payment in payments)
         balance = total_ordered - total_paid
-        
+
         # Prepare data for template
         po_data = []
         for po in purchase_orders:
@@ -928,7 +983,7 @@ def download_supplier_account_pdf(supplier_id):
                 'status': po.status,
                 'total_amount': po.total_amount
             })
-        
+
         payment_data = []
         for payment in payments:
             payment_data.append({
@@ -938,26 +993,26 @@ def download_supplier_account_pdf(supplier_id):
                 'method': payment.payment_method,
                 'reference': payment.reference
             })
-        
+
         # Get logo as base64
         import os
         import base64
         from flask import current_app
-        
+
         # Get the correct base directory path
         base_dir = current_app.root_path
         image_path = os.path.join(base_dir, 'static', 'uploads', 'images', 'katilo.png')
-        
+
         if os.path.exists(image_path):
             with open(image_path, 'rb') as img_file:
                 img_data = base64.b64encode(img_file.read()).decode('utf-8')
-            
+
             # Pass the data URI to the template
             logo_src = f"data:image/png;base64,{img_data}"
         else:
             logo_src = ""
             current_app.logger.warning(f"Logo image not found at path: {image_path}")
-        
+
         # Render HTML template with current user information
         html_content = render_template(
             'supplier_account_pdf.html',
@@ -971,7 +1026,7 @@ def download_supplier_account_pdf(supplier_id):
             current_user=current_user,  # Pass the current user from Flask-Login
             generated_date=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         )
-        
+
         # Configure PDF options
         options = {
             'page-size': 'A4',
@@ -983,17 +1038,17 @@ def download_supplier_account_pdf(supplier_id):
             'no-outline': None,
             'enable-local-file-access': None
         }
-        
+
         try:
             # Specify the path to wkhtmltopdf executable
             config = pdfkit.configuration(wkhtmltopdf='pdftool/wkhtmltopdf/bin/wkhtmltopdf.exe')
-            
+
             # Generate PDF
             pdf = pdfkit.from_string(html_content, False, options=options, configuration=config)
-            
+
             # Create response
             response = BytesIO(pdf)
-            
+
             # Return the PDF as a downloadable file
             return send_file(
                 response,
@@ -1005,7 +1060,7 @@ def download_supplier_account_pdf(supplier_id):
             # Log the error for debugging
             current_app.logger.error(f"PDF generation error: {str(e)}")
             return jsonify({"error": f"Failed to generate PDF: {str(e)}"}), 500
-            
+
     except Exception as e:
         # Log the error for debugging
         current_app.logger.error(f"Error in download_supplier_account_pdf: {str(e)}")
@@ -1020,12 +1075,12 @@ def download_supplier_account_excel(supplier_id):
     import pandas as pd
     from io import BytesIO
     from datetime import datetime
-   
+
     supplier = Supplier.query.get_or_404(supplier_id)
-   
+
     # Get supplier account details
     account_details = get_supplier_account_details(supplier_id).json
-   
+
     # Create Excel file with multiple sheets
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -1037,13 +1092,13 @@ def download_supplier_account_excel(supplier_id):
             'الرصيد المتبقي': [account_details['financial_summary']['balance']]
         }
         pd.DataFrame(summary_data).to_excel(writer, sheet_name='ملخص الحساب', index=False)
-       
+
         # Purchase orders sheet
         if account_details['purchase_orders']:
             # First, check the structure of the first purchase order to determine columns
             first_po = account_details['purchase_orders'][0]
             po_columns = list(first_po.keys())
-            
+
             # Create a list of dictionaries for the DataFrame
             po_list = []
             for po in account_details['purchase_orders']:
@@ -1051,9 +1106,9 @@ def download_supplier_account_excel(supplier_id):
                 for key in po_columns:
                     po_dict[key] = po[key]
                 po_list.append(po_dict)
-            
+
             po_data = pd.DataFrame(po_list)
-            
+
             # Map the column names to Arabic
             column_mapping = {
                 'id': 'رقم الطلب',
@@ -1062,19 +1117,19 @@ def download_supplier_account_excel(supplier_id):
                 'total_amount': 'المبلغ الإجمالي',
                 'items_count': 'عدد العناصر'
             }
-            
+
             # Rename columns that exist in the DataFrame
             rename_dict = {col: column_mapping.get(col, col) for col in po_data.columns if col in column_mapping}
             po_data = po_data.rename(columns=rename_dict)
-            
+
             po_data.to_excel(writer, sheet_name='طلبات الشراء', index=False)
-       
+
         # Payments sheet
         if account_details['payments']:
             # First, check the structure of the first payment to determine columns
             first_payment = account_details['payments'][0]
             payment_columns = list(first_payment.keys())
-            
+
             # Create a list of dictionaries for the DataFrame
             payment_list = []
             for payment in account_details['payments']:
@@ -1082,9 +1137,9 @@ def download_supplier_account_excel(supplier_id):
                 for key in payment_columns:
                     payment_dict[key] = payment[key]
                 payment_list.append(payment_dict)
-            
+
             payment_data = pd.DataFrame(payment_list)
-            
+
             # Map the column names to Arabic
             payment_column_mapping = {
                 'id': 'رقم الدفعة',
@@ -1094,16 +1149,16 @@ def download_supplier_account_excel(supplier_id):
                 'method': 'طريقة الدفع',
                 'notes': 'ملاحظات'
             }
-            
+
             # Rename columns that exist in the DataFrame
             payment_rename_dict = {col: payment_column_mapping.get(col, col) for col in payment_data.columns if col in payment_column_mapping}
             payment_data = payment_data.rename(columns=payment_rename_dict)
-            
+
             payment_data.to_excel(writer, sheet_name='المدفوعات', index=False)
-       
+
         # Format the Excel file
         workbook = writer.book
-       
+
         # Add formats
         header_format = workbook.add_format({
             'bold': True,
@@ -1112,14 +1167,14 @@ def download_supplier_account_excel(supplier_id):
             'fg_color': '#D7E4BC',
             'border': 1
         })
-       
+
         # Apply formatting to all sheets
         for sheet in writer.sheets.values():
             sheet.set_column('A:Z', 18)
             sheet.right_to_left()
-   
+
     output.seek(0)
-   
+
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

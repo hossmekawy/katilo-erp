@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: 'Arial', 'Tahoma', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            direction: rtl;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .report-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .report-meta {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .product-info {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-right: 4px solid #3182ce;
+        }
+        .product-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .product-detail {
+            margin-bottom: 5px;
+        }
+        .detail-label {
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: right;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .total-row {
+            font-weight: bold;
+            background-color: #edf2f7;
+        }
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <div class="report-title">{{ title }}</div>
+        <div class="report-meta">تم إنشاؤه في: {{ generated_at }}</div>
+        <div class="report-meta">بواسطة: {{ generated_by }}</div>
+    </div>
+    
+    <div class="product-info">
+        <div class="product-name">{{ product.name }} ({{ product.sku }})</div>
+        <div class="product-detail">
+            <span class="detail-label">وحدة القياس:</span>
+            <span>{{ product.unit_of_measure }}</span>
+        </div>
+        <div class="product-detail">
+            <span class="detail-label">التكلفة:</span>
+            <span>{{ product.cost }}</span>
+        </div>
+        <div class="product-detail">
+            <span class="detail-label">السعر:</span>
+            <span>{{ product.price }}</span>
+        </div>
+        <div class="product-detail">
+            <span class="detail-label">رقم BOM:</span>
+            <span>{{ bom.id }}</span>
+        </div>
+    </div>
+    
+    {% if materials %}
+    <h2>المكونات</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>المادة</th>
+                <th>الرمز</th>
+                <th>الفئة</th>
+                <th>الكمية المطلوبة</th>
+                <th>وحدة القياس</th>
+                <th>تكلفة الوحدة</th>
+                <th>التكلفة الإجمالية</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for material in materials %}
+            <tr>
+                <td>{{ material.material_name }}</td>
+                <td>{{ material.material_sku }}</td>
+                <td>{{ material.category }}</td>
+                <td>{{ material.quantity_required }}</td>
+                <td>{{ material.unit_of_measure }}</td>
+                <td>{{ material.unit_cost }}</td>
+                <td>{{ material.total_cost }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td colspan="6">إجمالي تكلفة المواد</td>
+                <td>{{ total_cost }}</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <div>
+        <strong>إجمالي عدد المكونات:</strong> {{ materials|length }}
+    </div>
+    
+    {% else %}
+    <div class="no-data">لا توجد مكونات لهذا المنتج</div>
+    {% endif %}
+</body>
+</html>
+

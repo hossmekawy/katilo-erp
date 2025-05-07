@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+
+{% block title %}تعيين أعمدة ملف Excel{% endblock %}
+
+{% block page_header %}تعيين أعمدة ملف Excel{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/dashboard" class="text-blue-600 hover:text-blue-800">لوحة التحكم</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/items-management" class="text-blue-600 hover:text-blue-800">إدارة العناصر</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('inventory.import_excel_form') }}" class="text-blue-600 hover:text-blue-800">استيراد من Excel</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">تعيين الأعمدة</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+    <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="bg-blue-100 p-2 rounded-lg">
+                <i class="fas fa-columns text-blue-600 text-lg"></i>
+            </div>
+            <h2 class="text-lg font-bold text-gray-800">تعيين أعمدة ملف Excel</h2>
+        </div>
+    </div>
+
+    <div class="p-6">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-4 rounded-md {{ 'bg-red-50 text-red-700' if category == 'error' else 'bg-green-50 text-green-700' }}">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                {% if category == 'error' %}
+                                    <i class="fas fa-exclamation-circle"></i>
+                                {% else %}
+                                    <i class="fas fa-check-circle"></i>
+                                {% endif %}
+                            </div>
+                            <div class="mr-3">
+                                <p class="text-sm">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-400"></i>
+                </div>
+                <div class="mr-3">
+                    <p class="text-sm text-blue-700">
+                        يرجى اختيار الأعمدة من ملف Excel التي تتوافق مع كل حقل من حقول المنتج. إذا لم يكن هناك عمود مناسب، يمكنك اختيار "لا يوجد".
+                    </p>
+                    {% if sheet_name %}
+                    <p class="mt-2 text-sm font-semibold text-blue-700">
+                        <i class="fas fa-table ml-1"></i> ورقة العمل المحددة: {{ sheet_name }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Excel Preview -->
+        <div class="mb-6">
+            <h3 class="text-md font-semibold text-gray-800 mb-3">معاينة البيانات</h3>
+            <div class="overflow-x-auto bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            {% for column in excel_columns %}
+                            <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ column }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for row in excel_preview %}
+                        <tr>
+                            {% for column in excel_columns %}
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{{ row[column] }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <form action="{{ url_for('inventory.process_mapping') }}" method="POST" class="space-y-6">
+            <!-- Hidden fields to pass data -->
+            <input type="hidden" name="file_path" value="{{ file_path }}">
+            <input type="hidden" name="default_category_id" value="{{ default_category_id }}">
+            {% if sheet_name %}
+            <input type="hidden" name="sheet_name" value="{{ sheet_name }}">
+            {% endif %}
+
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
+                <h3 class="text-md font-semibold text-blue-800 mb-3">تعيين أعمدة ملف Excel</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="name_column" class="block text-sm font-medium text-gray-700 mb-1">
+                            اسم المنتج <span class="text-red-500">*</span>
+                        </label>
+                        <select id="name_column" name="name_column" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="">-- اختر العمود --</option>
+                            {% for column in excel_columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="description_column" class="block text-sm font-medium text-gray-700 mb-1">
+                            الوصف
+                        </label>
+                        <select id="description_column" name="description_column" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="">-- لا يوجد --</option>
+                            {% for column in excel_columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="unit_column" class="block text-sm font-medium text-gray-700 mb-1">
+                            وحدة القياس
+                        </label>
+                        <select id="unit_column" name="unit_column" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="">-- لا يوجد --</option>
+                            {% for column in excel_columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="cost_column" class="block text-sm font-medium text-gray-700 mb-1">
+                            التكلفة
+                        </label>
+                        <select id="cost_column" name="cost_column" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="">-- لا يوجد --</option>
+                            {% for column in excel_columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="price_column" class="block text-sm font-medium text-gray-700 mb-1">
+                            السعر
+                        </label>
+                        <select id="price_column" name="price_column" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="">-- لا يوجد --</option>
+                            {% for column in excel_columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="sku_column" class="block text-sm font-medium text-gray-700 mb-1">
+                            الرمز التعريفي (SKU)
+                        </label>
+                        <select id="sku_column" name="sku_column" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="">-- لا يوجد --</option>
+                            {% for column in excel_columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Default Category Display -->
+            <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div class="flex items-center">
+                    <i class="fas fa-folder text-blue-500 ml-2 text-lg"></i>
+                    <div>
+                        <h3 class="font-medium text-blue-800">التصنيف الافتراضي للعناصر</h3>
+                        <p class="text-blue-600">{{ default_category.name }}</p>
+                    </div>
+                </div>
+                <p class="mt-2 text-sm text-gray-600">سيتم استخدام هذا التصنيف للعناصر التي تم اختيار إضافتها كمنتجات</p>
+            </div>
+
+            <div class="flex justify-end">
+                <a href="{{ url_for('inventory.import_excel_form') }}" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700 ml-2">
+                    <i class="fas fa-arrow-right ml-1"></i> رجوع
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check ml-1"></i> متابعة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

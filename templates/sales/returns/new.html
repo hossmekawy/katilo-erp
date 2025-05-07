@@ -1,0 +1,289 @@
+{% extends 'base.html' %}
+
+{% block title %}إضافة مرتجع جديد{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="returnForm()">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">إضافة مرتجع جديد</h1>
+        <a href="{{ url_for('sales.list_returns') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-right ml-2"></i>
+            العودة إلى المرتجعات
+        </a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+                <label class="block text-gray-700 mb-2">طلب المبيعات <span class="text-red-500">*</span></label>
+                <select x-model="salesReturn.sales_order_id" @change="loadOrderDetails" class="form-select w-full">
+                    <option value="">اختر طلب المبيعات</option>
+                    {% for order in orders %}
+                        <option value="{{ order.id }}">{{ order.id }} - {{ order.customer.customer_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 mb-2">سبب المرتجع</label>
+                <select x-model="salesReturn.return_reason" class="form-select w-full">
+                    <option value="Defective">معيب</option>
+                    <option value="WrongItem">منتج خاطئ</option>
+                    <option value="Damaged">تالف</option>
+                    <option value="Other">أخرى</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 mb-2">طريقة الاسترداد</label>
+                <select x-model="salesReturn.refund_method" class="form-select w-full">
+                    <option value="cash">نقدي</option>
+                    <option value="credit_card">بطاقة ائتمان</option>
+                    <option value="bank_transfer">تحويل بنكي</option>
+                </select>
+            </div>
+
+            <div x-show="salesReturn.refund_method === 'cash'">
+                <label class="block text-gray-700 mb-2">حساب الخزينة</label>
+                <select x-model="salesReturn.cash_account_id" class="form-select w-full">
+                    <option value="">اختر حساب الخزينة</option>
+                    {% for account in cash_accounts %}
+                        <option value="{{ account.id }}">{{ account.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 mb-2">مرجع الاسترداد</label>
+                <input type="text" x-model="salesReturn.refund_reference" class="form-input w-full" placeholder="رقم المعاملة أو المرجع">
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-gray-700 mb-2">ملاحظات</label>
+                <textarea x-model="salesReturn.notes" class="form-textarea w-full" rows="3" placeholder="أي ملاحظات إضافية"></textarea>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold mb-3">العناصر المرتجعة</h3>
+
+            <div x-show="!orderItems.length" class="text-center py-8 text-gray-500">
+                يرجى اختيار طلب المبيعات أولاً لعرض العناصر
+            </div>
+
+            <div x-show="orderItems.length" class="overflow-x-auto">
+                <table class="w-full text-sm text-right">
+                    <thead class="bg-gray-50 text-gray-600 font-medium border-b">
+                        <tr>
+                            <th class="px-4 py-3">المنتج</th>
+                            <th class="px-4 py-3">الكمية المطلوبة</th>
+                            <th class="px-4 py-3">الكمية المرتجعة</th>
+                            <th class="px-4 py-3">سعر الوحدة</th>
+                            <th class="px-4 py-3">الخصم</th>
+                            <th class="px-4 py-3">المبلغ المسترد</th>
+                            <th class="px-4 py-3">إعادة للمخزون</th>
+                            <th class="px-4 py-3">الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        <template x-for="(item, index) in orderItems" :key="index">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3">
+                                    <span x-text="item.name"></span>
+                                    <div class="text-xs text-gray-500 mt-1" x-show="item.quantity_returned > 0">
+                                        <span>تم إرجاع: </span>
+                                        <span x-text="item.quantity_returned"></span>
+                                        <span> من أصل </span>
+                                        <span x-text="item.quantity_ordered"></span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span x-text="item.quantity_ordered"></span>
+                                    <div class="text-xs text-gray-500 mt-1" x-show="item.quantity_returned > 0">
+                                        <span>متبقي: </span>
+                                        <span x-text="item.remaining_quantity"></span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <input type="number" x-model.number="item.return_quantity" @input="calculateRefund(item)"
+                                           class="form-input w-20" min="0" :max="item.remaining_quantity">
+                                    <div class="text-xs text-red-500 mt-1" x-show="item.return_quantity > item.remaining_quantity">
+                                        الكمية تتجاوز المتبقي
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div x-text="item.unit_price.toFixed(2)"></div>
+                                    <div class="text-xs text-gray-500 mt-1" x-show="item.has_discount">
+                                        <span>بعد الخصم: </span>
+                                        <span x-text="item.discounted_unit_price.toFixed(2)"></span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div x-show="item.has_discount">
+                                        <span x-text="item.discount_percentage.toFixed(2)"></span>%
+                                        <div class="text-xs text-gray-500">
+                                            (<span x-text="item.item_discount.toFixed(2)"></span>)
+                                        </div>
+                                    </div>
+                                    <div x-show="!item.has_discount">-</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <input type="number" x-model.number="item.refund_amount" class="form-input w-24"
+                                           min="0" :max="item.discounted_unit_price * item.remaining_quantity">
+                                </td>
+                                <td class="px-4 py-3">
+                                    <input type="checkbox" x-model="item.restocked" class="form-checkbox">
+                                </td>
+                                <td class="px-4 py-3">
+                                    <select x-model="item.condition" class="form-select w-full">
+                                        <option value="Good">جيدة</option>
+                                        <option value="Damaged">تالفة</option>
+                                        <option value="Defective">معيبة</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                    <tfoot class="bg-gray-50 font-medium">
+                        <tr>
+                            <td colspan="5" class="px-4 py-3 text-left">إجمالي المبلغ المسترد:</td>
+                            <td class="px-4 py-3 font-bold" x-text="totalRefundAmount.toFixed(2)"></td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button @click="submitReturn" class="btn btn-primary" :disabled="!isFormValid">
+                <i class="fas fa-save ml-2"></i>
+                حفظ المرتجع
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function returnForm() {
+        return {
+            salesReturn: {
+                sales_order_id: '',
+                return_reason: 'Other',
+                refund_method: 'cash',
+                cash_account_id: '',
+                refund_reference: '',
+                notes: ''
+            },
+            orderItems: [],
+
+            get totalRefundAmount() {
+                return this.orderItems.reduce((total, item) => {
+                    return total + (item.refund_amount || 0);
+                }, 0);
+            },
+
+            get isFormValid() {
+                if (!this.salesReturn.sales_order_id) return false;
+                if (this.orderItems.length === 0) return false;
+
+                // Check if at least one item has a return quantity
+                const hasReturnItems = this.orderItems.some(item => (item.return_quantity || 0) > 0);
+                if (!hasReturnItems) return false;
+
+                // If cash refund, require cash account
+                if (this.salesReturn.refund_method === 'cash' && !this.salesReturn.cash_account_id) return false;
+
+                return true;
+            },
+
+            loadOrderDetails() {
+                if (!this.salesReturn.sales_order_id) {
+                    this.orderItems = [];
+                    return;
+                }
+
+                console.log(`Loading order details for order ID: ${this.salesReturn.sales_order_id}`);
+
+                fetchAPI(`/sales/api/orders/${this.salesReturn.sales_order_id}/items`, 'GET')
+                    .then(response => {
+                        console.log('API response:', response);
+
+                        if (!response || response.length === 0) {
+                            console.log('No items returned from API');
+                            showNotification('لا توجد عناصر في هذا الطلب', 'warning');
+                            this.orderItems = [];
+                            return;
+                        }
+
+                        this.orderItems = response.map(item => ({
+                            ...item,
+                            return_quantity: 0,
+                            refund_amount: 0,
+                            restocked: true,
+                            condition: 'Good',
+                            return_reason: this.salesReturn.return_reason
+                        }));
+
+                        console.log('Processed order items:', this.orderItems);
+                    })
+                    .catch(error => {
+                        console.error('Error loading order details:', error);
+                        showNotification('حدث خطأ أثناء تحميل تفاصيل الطلب', 'error');
+                        this.orderItems = [];
+                    });
+            },
+
+            calculateRefund(item) {
+                // Make sure return quantity doesn't exceed remaining quantity
+                if (item.return_quantity > item.remaining_quantity) {
+                    item.return_quantity = item.remaining_quantity;
+                }
+
+                // Make sure return quantity is not negative
+                if (item.return_quantity < 0) {
+                    item.return_quantity = 0;
+                }
+
+                // Calculate refund amount based on return quantity and use discounted price if available
+                if (item.has_discount) {
+                    item.refund_amount = item.return_quantity * item.discounted_unit_price;
+                } else {
+                    item.refund_amount = item.return_quantity * item.unit_price;
+                }
+            },
+
+            submitReturn() {
+                if (!this.isFormValid) return;
+
+                // Prepare return items
+                const returnItems = this.orderItems
+                    .filter(item => (item.return_quantity || 0) > 0)
+                    .map(item => ({
+                        item_id: item.item_id,
+                        quantity: item.return_quantity,
+                        unit_price: item.unit_price,
+                        refund_amount: item.refund_amount,
+                        return_reason: item.return_reason || this.salesReturn.return_reason,
+                        condition: item.condition,
+                        restocked: item.restocked
+                    }));
+
+                const returnData = {
+                    ...this.salesReturn,
+                    items: returnItems
+                };
+
+                fetchAPI('/sales/returns', 'POST', returnData)
+                    .then(response => {
+                        showNotification('تم إنشاء المرتجع بنجاح', 'success');
+                        window.location.href = `/sales/returns/${response.return_id}`;
+                    })
+                    .catch(error => {
+                        showNotification('حدث خطأ أثناء إنشاء المرتجع', 'error');
+                    });
+            }
+        };
+    }
+</script>
+{% endblock %}

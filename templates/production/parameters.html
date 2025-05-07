@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}مراقبة معايير الإنتاج - نظام قاتيلو{% endblock %}
+
+{% block page_header %}مراقبة معايير الإنتاج{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="flex items-center space-x-reverse space-x-2">
+    <li>
+        <a href="/dashboard" class="text-blue-600 hover:text-blue-800">
+            <i class="fas fa-home"></i>
+        </a>
+    </li>
+    <li class="flex items-center">
+        <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+        <a href="{{ url_for('production.production_orders') }}" class="text-blue-600 hover:text-blue-800">الإنتاج</a>
+    </li>
+    <li class="flex items-center">
+        <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+        <a href="{{ url_for('production.view_production_order', order_id=batch.production_order_id) }}" class="text-blue-600 hover:text-blue-800">أمر الإنتاج #{{ batch.production_order_id }}</a>
+    </li>
+    <li class="flex items-center">
+        <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+        <span class="text-gray-600 font-medium">معايير الإنتاج للدفعة #{{ batch.id }}</span>
+    </li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-sm p-6">
+    <!-- Batch Information Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b">
+        <div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">معايير الإنتاج للدفعة: {{ batch.lot_number }}</h2>
+            <div class="flex flex-wrap gap-3 text-sm">
+                <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+                    <i class="fas fa-cube mr-1"></i> المنتج: {{ batch.item.name }}
+                </span>
+                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full">
+                    <i class="fas fa-hashtag mr-1"></i> الكمية: {{ batch.quantity }} {{ batch.item.unit_of_measure or 'وحدة' }}
+                </span>
+                <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+                    <i class="fas fa-calendar-alt mr-1"></i> تاريخ الإنتاج: {{ batch.production_date.strftime('%Y-%m-%d') }}
+                </span>
+                <span class="bg-{{ 'green' if batch.status == 'QCPassed' else 'yellow' if batch.status == 'InProduction' else 'red' if batch.status == 'QCFailed' else 'gray' }}-100 text-{{ 'green' if batch.status == 'QCPassed' else 'yellow' if batch.status == 'InProduction' else 'red' if batch.status == 'QCFailed' else 'gray' }}-800 px-3 py-1 rounded-full">
+                    <i class="fas fa-info-circle mr-1"></i> الحالة: 
+                    {% if batch.status == 'Created' %}
+                        تم الإنشاء
+                    {% elif batch.status == 'InProduction' %}
+                        قيد الإنتاج
+                    {% elif batch.status == 'QCPending' %}
+                        بانتظار فحص الجودة
+                    {% elif batch.status == 'QCPassed' %}
+                        اجتاز فحص الجودة
+                    {% elif batch.status == 'QCFailed' %}
+                        فشل في فحص الجودة
+                    {% elif batch.status == 'Packaging' %}
+                        قيد التعبئة
+                    {% elif batch.status == 'Packaged' %}
+                        تم التعبئة
+                    {% elif batch.status == 'Stored' %}
+                        تم التخزين
+                    {% elif batch.status == 'Cancelled' %}
+                        ملغي
+                    {% else %}
+                        {{ batch.status }}
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        <div class="mt-4 md:mt-0 flex gap-2">
+            <a href="{{ url_for('production.batch_steps', batch_id=batch.id) }}" class="btn bg-blue-600 hover:bg-blue-700 text-white">
+                <i class="fas fa-tasks mr-1"></i> مراحل الإنتاج
+            </a>
+            <a href="{{ url_for('production.view_production_order', order_id=batch.production_order_id) }}" class="btn bg-gray-600 hover:bg-gray-700 text-white">
+                <i class="fas fa-arrow-right mr-1"></i> العودة لأمر الإنتاج
+            </a>
+        </div>
+    </div>
+
+    <!-- Parameters Recording Form -->
+    <div class="mb-8">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">تسجيل معيار جديد</h3>
+        <form action="{{ url_for('production.monitor_parameters', batch_id=batch.id) }}" method="POST" class="bg-gray-50 p-4 rounded-lg border">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="parameter_name" class="block text-sm font-medium text-gray-700 mb-1">اسم المعيار</label>
+                    <input type="text" id="parameter_name" name="parameter_name" required
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                </div>
+                <div>
+                    <label for="parameter_value" class="block text-sm font-medium text-gray-700 mb-1">قيمة المعيار</label>
+                    <input type="text" id="parameter_value" name="parameter_value" required
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                </div>
+            </div>
+            <div class="mt-4">
+                <button type="submit" class="btn bg-green-600 hover:bg-green-700 text-white">
+                    <i class="fas fa-save mr-1"></i> تسجيل المعيار
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Parameters History Table -->
+    <div>
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">سجل المعايير</h3>
+        
+        {% if parameters %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المعيار
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            القيمة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            وقت التسجيل
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المسجل
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for param in parameters %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {{ param.parameter_name }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ param.parameter_value }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ param.recorded_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ param.recorder.username if param.recorder else 'غير معروف' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="bg-gray-50 p-8 rounded-lg border text-center">
+            <i class="fas fa-clipboard-list text-gray-400 text-4xl mb-3"></i>
+            <p class="text-gray-600">لا توجد معايير مسجلة لهذه الدفعة حتى الآن.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Parameter Charts -->
+    {% if parameters %}
+    <div class="mt-8">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">رسوم بيانية للمعايير</h3>
+        
+        <div class="bg-white p-4 rounded-lg border shadow-sm">
+            <canvas id="parametersChart" height="300"></canvas>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if parameters %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Group parameters by name
+        const parameterGroups = {};
+        
+        {% for param in parameters %}
+        const paramName = "{{ param.parameter_name }}";
+        const paramValue = "{{ param.parameter_value }}";
+        const paramTime = "{{ param.recorded_at.strftime('%H:%M') }}";
+        
+        if (!parameterGroups[paramName]) {
+            parameterGroups[paramName] = {
+                values: [],
+                times: []
+            };
+        }
+        
+        // Try to convert to number if possible
+        const numValue = parseFloat(paramValue);
+        parameterGroups[paramName].values.push(isNaN(numValue) ? 0 : numValue);
+        parameterGroups[paramName].times.push(paramTime);
+        {% endfor %}
+        
+        // Create datasets for chart
+        const datasets = [];
+        const colors = [
+            'rgba(54, 162, 235, 0.7)',
+            'rgba(255, 99, 132, 0.7)',
+            'rgba(75, 192, 192, 0.7)',
+            'rgba(255, 159, 64, 0.7)',
+            'rgba(153, 102, 255, 0.7)'
+        ];
+        
+        let colorIndex = 0;
+        for (const paramName in parameterGroups) {
+            datasets.push({
+                label: paramName,
+                data: parameterGroups[paramName].values,
+                borderColor: colors[colorIndex % colors.length],
+                backgroundColor: colors[colorIndex % colors.length].replace('0.7', '0.1'),
+                borderWidth: 2,
+                tension: 0.3
+            });
+            colorIndex++;
+        }
+        
+        // Get times for x-axis (use times from first parameter)
+        const firstParam = Object.keys(parameterGroups)[0];
+        const times = parameterGroups[firstParam].times;
+        
+        // Create chart
+        const ctx = document.getElementById('parametersChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: times,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'تطور معايير الإنتاج عبر الوقت',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الشحنات{% endblock %}
+
+{% block styles %}
+<style>
+    .shipment-status {
+        @apply px-2 py-1 text-xs font-semibold rounded-full;
+    }
+    .status-pending {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .status-assigned {
+        @apply bg-blue-100 text-blue-800;
+    }
+    .status-in-transit {
+        @apply bg-indigo-100 text-indigo-800;
+    }
+    .status-delivered {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-failed {
+        @apply bg-red-100 text-red-800;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="shipmentsApp()">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">إدارة الشحنات</h1>
+        <div>
+            <a href="{{ url_for('distribution.assign_shipment_page') }}" class="btn btn-primary">
+                <i class="fas fa-plus ml-2"></i>
+                تعيين شحنة جديدة
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div class="flex flex-wrap gap-4">
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">البحث</label>
+                <input type="text" x-model="filters.search" placeholder="البحث برقم الشحنة أو اسم العميل"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                <select x-model="filters.status"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">جميع الحالات</option>
+                    <option value="Pending">قيد الانتظار</option>
+                    <option value="Assigned">تم التعيين</option>
+                    <option value="InTransit">قيد التوصيل</option>
+                    <option value="Delivered">تم التسليم</option>
+                    <option value="Failed">فشل التسليم</option>
+                </select>
+            </div>
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">المركبة</label>
+                <select x-model="filters.vehicle"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">جميع المركبات</option>
+                    <template x-for="vehicle in vehicles" :key="vehicle.id">
+                        <option :value="vehicle.id" x-text="vehicle.name"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">المسار</label>
+                <select x-model="filters.route"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">جميع المسارات</option>
+                    <option value="no-route">بدون مسار</option>
+                    <template x-for="route in routes" :key="route.id">
+                        <option :value="route.id" x-text="route.name"></option>
+                    </template>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shipments Table -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الشحنة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            العميل
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المركبة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المسار
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ التعيين
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ التسليم المتوقع
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="filteredShipments.length === 0">
+                        <tr>
+                            <td colspan="8" class="px-6 py-12 text-center">
+                                <div class="text-gray-400 mb-4">
+                                    <i class="fas fa-shipping-fast text-5xl"></i>
+                                </div>
+                                <h3 class="text-lg font-medium text-gray-900 mb-1">لا توجد شحنات</h3>
+                                <p class="text-gray-500" x-show="!isFiltering()">لم يتم إضافة أي شحنات بعد.</p>
+                                <p class="text-gray-500" x-show="isFiltering()">لا توجد شحنات تطابق معايير البحث.</p>
+                                <a href="{{ url_for('distribution.assign_shipment_page') }}" class="mt-4 inline-block btn btn-primary">
+                                    <i class="fas fa-plus ml-2"></i>
+                                    تعيين شحنة جديدة
+                                </a>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="shipment in filteredShipments" :key="shipment.id">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="shipment.id"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="shipment.customer_name || 'غير معروف'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="shipment.vehicle_name || 'غير معين'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="shipment.route_name || 'بدون مسار'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="shipment-status"
+                                    :class="{
+                                        'status-pending': shipment.status === 'Pending',
+                                        'status-assigned': shipment.status === 'Assigned',
+                                        'status-in-transit': shipment.status === 'InTransit',
+                                        'status-delivered': shipment.status === 'Delivered',
+                                        'status-failed': shipment.status === 'Failed'
+                                    }"
+                                    x-text="getStatusText(shipment.status)"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="formatDate(shipment.assigned_date)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="formatDate(shipment.estimated_delivery_date)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex space-x-2 space-x-reverse">
+                                    <button @click="viewShipment(shipment)" class="text-blue-600 hover:text-blue-900">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button @click="showUpdateStatusModal(shipment)"
+                                        :disabled="shipment.status === 'Delivered'"
+                                        :class="{'text-gray-400 cursor-not-allowed': shipment.status === 'Delivered', 'text-green-600 hover:text-green-900': shipment.status !== 'Delivered'}">
+                                        <i class="fas fa-truck"></i>
+                                    </button>
+                                    <button @click="trackShipment(shipment)" class="text-indigo-600 hover:text-indigo-900">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Update Status Modal -->
+    <div x-show="showStatusModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div @click.outside="showStatusModal = false" class="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">تحديث حالة الشحنة</h2>
+            </div>
+            <div class="p-6">
+                <form @submit.prevent="updateShipmentStatus()">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الشحنة</label>
+                        <div class="text-gray-900 font-medium" x-text="selectedShipment?.id + ' - ' + (selectedShipment?.customer_name || 'غير معروف')"></div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الحالة الحالية</label>
+                        <div class="shipment-status inline-block"
+                            :class="{
+                                'status-pending': selectedShipment?.status === 'Pending',
+                                'status-assigned': selectedShipment?.status === 'Assigned',
+                                'status-in-transit': selectedShipment?.status === 'InTransit',
+                                'status-delivered': selectedShipment?.status === 'Delivered',
+                                'status-failed': selectedShipment?.status === 'Failed'
+                            }"
+                            x-text="getStatusText(selectedShipment?.status)"></div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الحالة الجديدة</label>
+                        <select x-model="statusForm.status" required
+                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">اختر الحالة</option>
+                            <option value="Pending" x-show="selectedShipment?.status !== 'Pending'">قيد الانتظار</option>
+                            <option value="Assigned" x-show="selectedShipment?.status !== 'Assigned'">تم التعيين</option>
+                            <option value="InTransit" x-show="selectedShipment?.status !== 'InTransit'">قيد التوصيل</option>
+                            <option value="Delivered" x-show="selectedShipment?.status !== 'Delivered'">تم التسليم</option>
+                            <option value="Failed" x-show="selectedShipment?.status !== 'Failed'">فشل التسليم</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                        <textarea x-model="statusForm.notes" rows="3"
+                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="أدخل أي ملاحظات حول تحديث الحالة"></textarea>
+                    </div>
+
+                    <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                        <button type="button" @click="showStatusModal = false" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                            إلغاء
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save ml-2"></i>
+                            تحديث الحالة
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function shipmentsApp() {
+        return {
+            shipments: [],
+            filteredShipments: [],
+            vehicles: [],
+            routes: [],
+            filters: {
+                search: '',
+                status: '',
+                vehicle: '',
+                route: ''
+            },
+            showStatusModal: false,
+            selectedShipment: null,
+            statusForm: {
+                status: '',
+                notes: '',
+                update_shipment_status: true
+            },
+
+            init() {
+                this.loadShipments();
+                this.loadVehicles();
+                this.loadRoutes();
+
+                this.$watch('filters', () => {
+                    this.applyFilters();
+                }, { deep: true });
+            },
+
+            loadShipments() {
+                fetch('{{ url_for("distribution.get_shipments") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.shipments = data;
+                        this.filteredShipments = [...data];
+                    })
+                    .catch(error => {
+                        console.error('Error loading shipments:', error);
+                        this.showToast('حدث خطأ أثناء تحميل بيانات الشحنات', 'error');
+                    });
+            },
+
+            loadVehicles() {
+                fetch('{{ url_for("distribution.get_vehicles") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.vehicles = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading vehicles:', error);
+                    });
+            },
+
+            loadRoutes() {
+                fetch('{{ url_for("distribution.get_routes") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.routes = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading routes:', error);
+                    });
+            },
+
+            applyFilters() {
+                this.filteredShipments = this.shipments.filter(shipment => {
+                    // Search filter
+                    const searchMatch = !this.filters.search ||
+                        shipment.id.toString().includes(this.filters.search) ||
+                        (shipment.customer_name && shipment.customer_name.toLowerCase().includes(this.filters.search.toLowerCase()));
+
+                    // Status filter
+                    const statusMatch = !this.filters.status || shipment.status === this.filters.status;
+
+                    // Vehicle filter
+                    const vehicleMatch = !this.filters.vehicle ||
+                        (shipment.vehicle_id && shipment.vehicle_id.toString() === this.filters.vehicle.toString());
+
+                    // Route filter
+                    let routeMatch = true;
+                    if (this.filters.route) {
+                        if (this.filters.route === 'no-route') {
+                            routeMatch = !shipment.route_id;
+                        } else {
+                            routeMatch = shipment.route_id && shipment.route_id.toString() === this.filters.route.toString();
+                        }
+                    }
+
+                    return searchMatch && statusMatch && vehicleMatch && routeMatch;
+                });
+            },
+
+            isFiltering() {
+                return this.filters.search || this.filters.status || this.filters.vehicle || this.filters.route;
+            },
+
+            getStatusText(status) {
+                switch(status) {
+                    case 'Pending': return 'قيد الانتظار';
+                    case 'Assigned': return 'تم التعيين';
+                    case 'InTransit': return 'قيد التوصيل';
+                    case 'Delivered': return 'تم التسليم';
+                    case 'Failed': return 'فشل التسليم';
+                    default: return status;
+                }
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ar-EG');
+            },
+
+            viewShipment(shipment) {
+                // Redirect to shipment details page
+                // This would be implemented based on your application's routing
+                alert('عرض تفاصيل الشحنة: ' + shipment.id);
+            },
+
+            showUpdateStatusModal(shipment) {
+                if (shipment.status === 'Delivered') return;
+
+                this.selectedShipment = shipment;
+                this.statusForm.status = '';
+                this.statusForm.notes = '';
+                this.showStatusModal = true;
+            },
+
+            updateShipmentStatus() {
+                if (!this.selectedShipment || !this.statusForm.status) return;
+
+                fetch('{{ url_for("distribution.update_tracking") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        shipment_order_id: this.selectedShipment.id,
+                        status: this.statusForm.status,
+                        notes: this.statusForm.notes,
+                        update_shipment_status: true
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.loadShipments();
+                        this.showStatusModal = false;
+                        this.showToast('تم تحديث حالة الشحنة بنجاح', 'success');
+                    } else {
+                        this.showToast(data.message || 'حدث خطأ أثناء تحديث حالة الشحنة', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating shipment status:', error);
+                    this.showToast('حدث خطأ أثناء تحديث حالة الشحنة', 'error');
+                });
+            },
+
+            trackShipment(shipment) {
+                // Redirect to tracking page
+                window.location.href = '{{ url_for("distribution.tracking", tracking_number="PLACEHOLDER") }}'.replace('PLACEHOLDER', shipment.shipment.tracking_number);
+            },
+
+            showToast(message, type = 'info') {
+                // This assumes you have a toast notification system
+                // You can implement this based on your application's UI
+                if (window.showToast) {
+                    window.showToast(message, type);
+                } else {
+                    alert(message);
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}

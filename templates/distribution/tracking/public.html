@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تتبع الشحنة - {{ shipment.tracking_number }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+        
+        * {
+            font-family: 'Tajawal', sans-serif;
+        }
+        
+        .tracking-status {
+            @apply px-2 py-1 text-xs font-semibold rounded-full;
+        }
+        .status-pending {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        .status-assigned {
+            @apply bg-blue-100 text-blue-800;
+        }
+        .status-in-transit {
+            @apply bg-indigo-100 text-indigo-800;
+        }
+        .status-delivered {
+            @apply bg-green-100 text-green-800;
+        }
+        .status-failed {
+            @apply bg-red-100 text-red-800;
+        }
+        .tracking-timeline-item {
+            @apply relative pb-8;
+        }
+        .tracking-timeline-item:last-child {
+            @apply pb-0;
+        }
+        .tracking-timeline-item:before {
+            content: '';
+            @apply absolute top-0 left-0 h-full w-px bg-gray-200;
+            right: 11px;
+            left: auto;
+        }
+        .tracking-timeline-item:last-child:before {
+            @apply h-4;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div class="flex items-center">
+                <img src="/static/uploads/images/katilo.png" alt="Katilo Logo" class="h-12 w-12 mr-3">
+                <h1 class="text-2xl font-bold text-gray-800">تتبع الشحنة</h1>
+            </div>
+            <div>
+                <span class="tracking-status 
+                    {% if shipment_order.status == 'Pending' %}status-pending
+                    {% elif shipment_order.status == 'Assigned' %}status-assigned
+                    {% elif shipment_order.status == 'InTransit' %}status-in-transit
+                    {% elif shipment_order.status == 'Delivered' %}status-delivered
+                    {% elif shipment_order.status == 'Failed' %}status-failed{% endif %}">
+                    {% if shipment_order.status == 'Pending' %}قيد الانتظار
+                    {% elif shipment_order.status == 'Assigned' %}تم التعيين
+                    {% elif shipment_order.status == 'InTransit' %}قيد التوصيل
+                    {% elif shipment_order.status == 'Delivered' %}تم التسليم
+                    {% elif shipment_order.status == 'Failed' %}فشل التسليم
+                    {% else %}{{ shipment_order.status }}{% endif %}
+                </span>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Shipment Information -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">معلومات الشحنة</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-sm text-gray-500">رقم التتبع</p>
+                            <p class="font-medium">{{ shipment.tracking_number }}</p>
+                        </div>
+                        
+                        <div>
+                            <p class="text-sm text-gray-500">العميل</p>
+                            <p class="font-medium">{{ shipment.customer.customer_name if shipment.customer else 'غير معروف' }}</p>
+                        </div>
+                        
+                        <div>
+                            <p class="text-sm text-gray-500">تاريخ الشحن</p>
+                            <p class="font-medium">{{ shipment.shipment_date.strftime('%Y-%m-%d') if shipment.shipment_date else '-' }}</p>
+                        </div>
+                        
+                        <div>
+                            <p class="text-sm text-gray-500">تاريخ التسليم المتوقع</p>
+                            <p class="font-medium">{{ shipment.estimated_arrival.strftime('%Y-%m-%d') if shipment.estimated_arrival else '-' }}</p>
+                        </div>
+                        
+                        {% if shipment_order and shipment_order.actual_delivery_date %}
+                        <div>
+                            <p class="text-sm text-gray-500">تاريخ التسليم الفعلي</p>
+                            <p class="font-medium">{{ shipment_order.actual_delivery_date.strftime('%Y-%m-%d') }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        {% if shipment_order and shipment_order.vehicle %}
+                        <div>
+                            <p class="text-sm text-gray-500">المركبة</p>
+                            <p class="font-medium">{{ shipment_order.vehicle.name }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        {% if shipment_order and shipment_order.route %}
+                        <div>
+                            <p class="text-sm text-gray-500">المسار</p>
+                            <p class="font-medium">{{ shipment_order.route.name }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tracking Timeline -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">مسار التتبع</h2>
+                    
+                    <div class="space-y-6">
+                        {% if tracking_updates %}
+                            {% for update in tracking_updates %}
+                            <div class="tracking-timeline-item">
+                                <div class="flex">
+                                    <div class="flex-shrink-0 mr-4 ml-4">
+                                        <div class="h-6 w-6 rounded-full bg-indigo-500 flex items-center justify-center">
+                                            {% if update.status == 'Delivered' %}
+                                                <i class="fas fa-check text-white text-xs"></i>
+                                            {% elif update.status == 'InTransit' %}
+                                                <i class="fas fa-truck text-white text-xs"></i>
+                                            {% elif update.status == 'Assigned' %}
+                                                <i class="fas fa-clipboard-check text-white text-xs"></i>
+                                            {% elif update.status == 'Pending' %}
+                                                <i class="fas fa-clock text-white text-xs"></i>
+                                            {% elif update.status == 'Failed' %}
+                                                <i class="fas fa-times text-white text-xs"></i>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex justify-between">
+                                            <h3 class="text-base font-medium text-gray-900">
+                                                {% if update.status == 'Pending' %}قيد الانتظار
+                                                {% elif update.status == 'Assigned' %}تم التعيين
+                                                {% elif update.status == 'InTransit' %}قيد التوصيل
+                                                {% elif update.status == 'Delivered' %}تم التسليم
+                                                {% elif update.status == 'Failed' %}فشل التسليم
+                                                {% else %}{{ update.status }}{% endif %}
+                                            </h3>
+                                            <p class="text-sm text-gray-500">{{ update.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
+                                        </div>
+                                        <p class="text-sm text-gray-600 mt-1">{{ update.location_name or '-' }}</p>
+                                        <p class="text-sm text-gray-600 mt-1">{{ update.notes or '-' }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-truck text-4xl mb-3 text-gray-300"></i>
+                                <p>لا توجد تحديثات للتتبع بعد</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Map View (if coordinates are available) -->
+                {% set has_coordinates = false %}
+                {% for update in tracking_updates %}
+                    {% if update.latitude and update.longitude %}
+                        {% set has_coordinates = true %}
+                    {% endif %}
+                {% endfor %}
+                
+                {% if has_coordinates %}
+                <div class="bg-white rounded-xl shadow-sm p-6 mt-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">موقع الشحنة</h2>
+                    
+                    <div id="tracking-map" class="h-64 rounded-lg"></div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="mt-8 text-center text-gray-500 text-sm">
+            <p>© {{ now.year }} قاتيلو. جميع الحقوق محفوظة.</p>
+        </div>
+    </div>
+    
+    {% if has_coordinates %}
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap" async defer></script>
+    <script>
+        function initMap() {
+            const map = new google.maps.Map(document.getElementById('tracking-map'), {
+                zoom: 12
+            });
+            
+            const bounds = new google.maps.LatLngBounds();
+            const markers = [];
+            
+            {% for update in tracking_updates %}
+                {% if update.latitude and update.longitude %}
+                const marker{{ loop.index }} = new google.maps.Marker({
+                    position: { lat: {{ update.latitude }}, lng: {{ update.longitude }} },
+                    map: map,
+                    title: '{{ update.status }}',
+                    animation: google.maps.Animation.DROP
+                });
+                
+                const infoWindow{{ loop.index }} = new google.maps.InfoWindow({
+                    content: `
+                        <div dir="rtl" class="p-2">
+                            <h3 class="font-bold">
+                                {% if update.status == 'Pending' %}قيد الانتظار
+                                {% elif update.status == 'Assigned' %}تم التعيين
+                                {% elif update.status == 'InTransit' %}قيد التوصيل
+                                {% elif update.status == 'Delivered' %}تم التسليم
+                                {% elif update.status == 'Failed' %}فشل التسليم
+                                {% else %}{{ update.status }}{% endif %}
+                            </h3>
+                            <p>{{ update.location_name or '' }}</p>
+                            <p>{{ update.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
+                            <p>{{ update.notes or '' }}</p>
+                        </div>
+                    `
+                });
+                
+                marker{{ loop.index }}.addListener('click', () => {
+                    infoWindow{{ loop.index }}.open(map, marker{{ loop.index }});
+                });
+                
+                bounds.extend(marker{{ loop.index }}.getPosition());
+                markers.push(marker{{ loop.index }});
+                {% endif %}
+            {% endfor %}
+            
+            // If there are multiple markers, fit bounds to show all
+            if (markers.length > 1) {
+                map.fitBounds(bounds);
+            } else if (markers.length === 1) {
+                map.setCenter(markers[0].getPosition());
+            }
+        }
+    </script>
+    {% endif %}
+</body>
+</html>

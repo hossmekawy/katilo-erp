@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+
+{% block title %}اختيار ورقة العمل من ملف Excel{% endblock %}
+
+{% block page_header %}اختيار ورقة العمل من ملف Excel{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/dashboard" class="text-blue-600 hover:text-blue-800">لوحة التحكم</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/items-management" class="text-blue-600 hover:text-blue-800">إدارة العناصر</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('inventory.import_excel_form') }}" class="text-blue-600 hover:text-blue-800">استيراد من Excel</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">اختيار ورقة العمل</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+    <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="bg-blue-100 p-2 rounded-lg">
+                <i class="fas fa-table text-blue-600 text-lg"></i>
+            </div>
+            <h2 class="text-lg font-bold text-gray-800">اختيار ورقة العمل من ملف Excel</h2>
+        </div>
+    </div>
+
+    <div class="p-6">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-4 rounded-md {{ 'bg-red-50 text-red-700' if category == 'error' else 'bg-green-50 text-green-700' }}">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                {% if category == 'error' %}
+                                    <i class="fas fa-exclamation-circle"></i>
+                                {% else %}
+                                    <i class="fas fa-check-circle"></i>
+                                {% endif %}
+                            </div>
+                            <div class="mr-3">
+                                <p class="text-sm">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-yellow-400"></i>
+                </div>
+                <div class="mr-3">
+                    <p class="text-sm text-yellow-700">
+                        تم اكتشاف أكثر من ورقة عمل في ملف Excel. يرجى اختيار ورقة العمل التي تحتوي على البيانات المطلوبة.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <form action="{{ url_for('inventory.process_sheet_selection') }}" method="POST" class="space-y-6">
+            <!-- Hidden fields to pass data -->
+            <input type="hidden" name="file_path" value="{{ file_path }}">
+            <input type="hidden" name="default_category_id" value="{{ default_category_id }}">
+            
+            <div class="bg-white p-4 rounded-lg border border-gray-200 mb-4">
+                <h3 class="text-md font-semibold text-gray-800 mb-3">أوراق العمل المتاحة</h3>
+                
+                <div class="space-y-4">
+                    {% for sheet_name in sheet_names %}
+                    <div class="flex items-center">
+                        <input id="sheet_{{ loop.index }}" name="selected_sheet" type="radio" value="{{ sheet_name }}" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300" {% if loop.first %}checked{% endif %}>
+                        <label for="sheet_{{ loop.index }}" class="mr-2 block text-sm font-medium text-gray-700">
+                            {{ sheet_name }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Default Category Display -->
+            <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div class="flex items-center">
+                    <i class="fas fa-folder text-blue-500 ml-2 text-lg"></i>
+                    <div>
+                        <h3 class="font-medium text-blue-800">التصنيف الافتراضي للعناصر</h3>
+                        <p class="text-blue-600">{{ default_category.name }}</p>
+                    </div>
+                </div>
+                <p class="mt-2 text-sm text-gray-600">سيتم استخدام هذا التصنيف للعناصر التي تم اختيار إضافتها كمنتجات</p>
+            </div>
+
+            <div class="flex justify-end">
+                <a href="{{ url_for('inventory.import_excel_form') }}" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700 ml-2">
+                    <i class="fas fa-arrow-right ml-1"></i> رجوع
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check ml-1"></i> متابعة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

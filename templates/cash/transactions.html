@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الخزينة - المعاملات{% endblock %}
+
+{% block page_header %}معاملات الخزينة{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="flex justify-between items-center p-6 border-b">
+            <h2 class="text-lg font-semibold text-gray-800">سجل المعاملات</h2>
+            <a href="{{ url_for('cash.add_transaction') }}" class="btn btn-primary">
+                <i class="fas fa-plus ml-2"></i>
+                إضافة معاملة جديدة
+            </a>
+        </div>
+
+        <!-- Filters -->
+        <div class="p-6 border-b bg-gray-50" x-data="{ showFilters: false }">
+            <button @click="showFilters = !showFilters" class="flex items-center text-gray-600 hover:text-gray-800">
+                <i class="fas fa-filter ml-2"></i>
+                <span>تصفية المعاملات</span>
+                <i class="fas ml-2" :class="showFilters ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </button>
+
+            <div x-show="showFilters" x-cloak class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="account_filter" class="block text-sm font-medium text-gray-700 mb-1">الحساب</label>
+                    <select id="account_filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">جميع الحسابات</option>
+                        {% for account in accounts %}
+                        <option value="{{ account.id }}">{{ account.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="type_filter" class="block text-sm font-medium text-gray-700 mb-1">نوع المعاملة</label>
+                    <select id="type_filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">جميع الأنواع</option>
+                        <option value="deposit">إيداع</option>
+                        <option value="withdrawal">سحب</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="date_filter" class="block text-sm font-medium text-gray-700 mb-1">التاريخ</label>
+                    <select id="date_filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">جميع التواريخ</option>
+                        <option value="today">اليوم</option>
+                        <option value="week">هذا الأسبوع</option>
+                        <option value="month">هذا الشهر</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-right">
+                <thead class="bg-gray-50 text-gray-600 font-medium">
+                    <tr>
+                        <th class="px-6 py-4">التاريخ</th>
+                        <th class="px-6 py-4">الحساب</th>
+                        <th class="px-6 py-4">النوع</th>
+                        <th class="px-6 py-4">المبلغ</th>
+                        <th class="px-6 py-4">الوصف</th>
+                        <th class="px-6 py-4">المرجع</th>
+                        <th class="px-6 py-4">بواسطة</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for transaction in transactions %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">{{ transaction.transaction_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td class="px-6 py-4 font-medium text-gray-800">{{ transaction.account.name }}</td>
+                        <td class="px-6 py-4">
+                            {% if transaction.transaction_type == 'deposit' %}
+                            <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center w-fit">
+                                <i class="fas fa-arrow-down ml-1"></i>
+                                إيداع
+                            </span>
+                            {% elif transaction.transaction_type == 'withdrawal' %}
+                            <span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full flex items-center w-fit">
+                                <i class="fas fa-arrow-up ml-1"></i>
+                                سحب
+                            </span>
+                            {% else %}
+                            <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">
+                                {{ transaction.transaction_type }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 font-medium
+                            {% if transaction.transaction_type == 'deposit' %}text-green-600
+                            {% elif transaction.transaction_type == 'withdrawal' %}text-red-600
+                            {% else %}text-gray-600{% endif %}">
+                            {{ transaction.amount|round(2) }}
+                        </td>
+                        <td class="px-6 py-4">{{ transaction.description or '-' }}</td>
+                        <td class="px-6 py-4">
+                            {% if transaction.reference_type %}
+                            <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                                {% if transaction.reference_type == 'initial_balance' %}
+                                رصيد افتتاحي
+                                {% elif transaction.reference_type == 'transfer_voucher' %}
+                                سند تحويل
+                                {% elif transaction.reference_type == 'reconciliation' %}
+                                جرد خزينة
+                                {% elif transaction.reference_type == 'supplier_payment' %}
+                                دفعة مورد
+                                {% else %}
+                                {{ transaction.reference_type }}
+                                {% endif %}
+                            </span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-600">{{ transaction.creator.username if transaction.creator else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+
+                    {% if transactions|length == 0 %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-exchange-alt text-gray-300 text-4xl mb-3"></i>
+                            <p>لا توجد معاملات مسجلة بعد</p>
+                            <div class="mt-4">
+                                <a href="{{ url_for('cash.add_transaction') }}" class="btn btn-primary">
+                                    <i class="fas fa-plus ml-2"></i>
+                                    إضافة معاملة جديدة
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for filtering -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const accountFilter = document.getElementById('account_filter');
+        const typeFilter = document.getElementById('type_filter');
+        const dateFilter = document.getElementById('date_filter');
+
+        // Apply filters when changed
+        accountFilter.addEventListener('change', applyFilters);
+        typeFilter.addEventListener('change', applyFilters);
+        dateFilter.addEventListener('change', applyFilters);
+
+        function applyFilters() {
+            const accountId = accountFilter.value;
+            const transactionType = typeFilter.value;
+            const dateRange = dateFilter.value;
+
+            // Build query string
+            let queryParams = [];
+            if (accountId) queryParams.push(`account_id=${accountId}`);
+            if (transactionType) queryParams.push(`transaction_type=${transactionType}`);
+            if (dateRange) queryParams.push(`date_range=${dateRange}`);
+
+            // Redirect with filters
+            const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+            window.location.href = `{{ url_for('cash.transactions') }}${queryString}`;
+        }
+
+        // Pre-select filters from URL params
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('account_id')) accountFilter.value = urlParams.get('account_id');
+        if (urlParams.has('transaction_type')) typeFilter.value = urlParams.get('transaction_type');
+        if (urlParams.has('date_range')) dateFilter.value = urlParams.get('date_range');
+    });
+</script>
+{% endblock %}

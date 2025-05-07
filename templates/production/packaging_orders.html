@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+
+{% block title %}أوامر التعبئة والتغليف - نظام قاتيلو{% endblock %}
+
+{% block page_header %}أوامر التعبئة والتغليف{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">أوامر التعبئة والتغليف</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with Actions -->
+    <div class="flex justify-between items-center">
+        <h2 class="text-xl font-bold text-gray-800">
+            <i class="fas fa-box text-blue-600 mr-2"></i>
+            أوامر التعبئة والتغليف
+        </h2>
+        <div class="flex space-x-3 space-x-reverse">
+            <a href="/production/packaging/create" class="btn btn-primary flex items-center">
+                <i class="fas fa-plus ml-2"></i>
+                أمر تعبئة جديد
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+        <div class="flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[200px]">
+                <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">حالة الأمر</label>
+                <select id="status-filter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">جميع الحالات</option>
+                    <option value="Pending">قيد الانتظار</option>
+                    <option value="InProgress">قيد التنفيذ</option>
+                    <option value="Completed">مكتمل</option>
+                    <option value="Cancelled">ملغي</option>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <label for="date-filter" class="block text-sm font-medium text-gray-700 mb-1">تاريخ الإنشاء</label>
+                <input type="date" id="date-filter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">بحث</label>
+                <div class="relative">
+                    <input type="text" id="search" placeholder="بحث عن رقم الدفعة، المنتج..." 
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10">
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <button id="apply-filters" class="btn btn-primary">
+                    <i class="fas fa-filter ml-1"></i>
+                    تطبيق
+                </button>
+            </div>
+            <div>
+                <button id="reset-filters" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                    إعادة ضبط
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Packaging Orders Table -->
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الأمر
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الدفعة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المنتج
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            نوع التعبئة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الكمية
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ الإنشاء
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            خط التعبئة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="orders-table-body">
+                    {% if orders %}
+                        {% for order in orders %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                #{{ order.id }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ order.batch.lot_number }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ order.batch.item.name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ order.packaging_type }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ order.quantity }} {{ order.batch.item.unit_of_measure or 'وحدة' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ order.packaging_line.name if order.packaging_line else 'غير محدد' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if order.status == 'Pending' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    قيد الانتظار
+                                </span>
+                                {% elif order.status == 'InProgress' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    قيد التنفيذ
+                                </span>
+                                {% elif order.status == 'Completed' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    مكتمل
+                                </span>
+                                {% elif order.status == 'Cancelled' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    ملغي
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    {{ order.status }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex items-center space-x-3 space-x-reverse">
+                                    {% if order.status == 'Pending' %}
+                                    <a href="/production/packaging/orders/{{ order.id }}/materials" class="text-blue-600 hover:text-blue-900" title="تسجيل مواد التعبئة">
+                                        <i class="fas fa-clipboard-list"></i>
+                                    </a>
+                                    {% endif %}
+                                    
+                                    {% if order.status == 'InProgress' %}
+                                    <button onclick="completePackaging({{ order.id }})" class="text-green-600 hover:text-green-900" title="إكمال التعبئة">
+                                        <i class="fas fa-check-circle"></i>
+                                    </button>
+                                    {% endif %}
+                                    
+                                    {% if order.status == 'Completed' %}
+                                    <a href="/production/labels/generate/{{ order.batch_id }}" class="text-blue-600 hover:text-blue-900" title="إنشاء ملصقات المنتج">
+                                        <i class="fas fa-tag"></i>
+                                    </a>
+                                    {% endif %}
+                                    
+                                    <a href="/production/packaging/orders/{{ order.id }}/view" class="text-gray-600 hover:text-gray-900" title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    
+                                    {% if order.status == 'Pending' %}
+                                    <button onclick="cancelPackagingOrder({{ order.id }})" class="text-red-600 hover:text-red-900" title="إلغاء أمر التعبئة">
+                                        <i class="fas fa-times-circle"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">
+                                لا توجد أوامر تعبئة مسجلة
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if orders and orders|length > 10 %}
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        عرض
+                        <span class="font-medium">1</span>
+                        إلى
+                        <span class="font-medium">{{ orders|length }}</span>
+                        من
+                        <span class="font-medium">{{ orders|length }}</span>
+                        نتيجة
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">Previous</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        <a href="#" aria-current="page" class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                            1
+                        </a>
+                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">Next</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Cancel Packaging Order Modal -->
+<div id="cancel-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">إلغاء أمر التعبئة</h3>
+        </div>
+        <form id="cancel-form" method="POST" action="">
+            <div class="px-6 py-4">
+                <div class="mb-4">
+                    <label for="cancel_reason" class="block text-sm font-medium text-gray-700 mb-1">سبب الإلغاء</label>
+                    <textarea id="cancel_reason" name="cancel_reason" rows="3" required
+                              class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              placeholder="يرجى ذكر سبب إلغاء أمر التعبئة..."></textarea>
+                </div>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 flex justify-end space-x-3 space-x-reverse rounded-b-lg">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    إلغاء
+                </button>
+                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                    تأكيد الإلغاء
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Complete Packaging Modal -->
+<div id="complete-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">إكمال أمر التعبئة</h3>
+        </div>
+        <form id="complete-form" method="POST" action="">
+            <div class="px-6 py-4">
+                <p class="mb-4 text-gray-700">هل أنت متأكد من إكمال عملية التعبئة والتغليف؟ سيتم إضافة المنتج النهائي إلى المخزون.</p>
+                
+                <div class="mb-4">
+                    <label for="warehouse_id" class="block text-sm font-medium text-gray-700 mb-1">المستودع</label>
+                    <select id="warehouse_id" name="warehouse_id" required
+                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">-- اختر المستودع --</option>
+                        {% for warehouse in warehouses %}
+                        <option value="{{ warehouse.id }}">{{ warehouse.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="completion_notes" class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                    <textarea id="completion_notes" name="completion_notes" rows="2"
+                              class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              placeholder="أي ملاحظات إضافية..."></textarea>
+                </div>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 flex justify-end space-x-3 space-x-reverse rounded-b-lg">
+                <button type="button" onclick="closeCompleteModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    إلغاء
+                </button>
+                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    تأكيد الإكمال
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Filter functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const applyFiltersBtn = document.getElementById('apply-filters');
+        const resetFiltersBtn = document.getElementById('reset-filters');
+        const statusFilter = document.getElementById('status-filter');
+        const dateFilter = document.getElementById('date-filter');
+        const searchInput = document.getElementById('search');
+        
+        if (applyFiltersBtn) {
+            applyFiltersBtn.addEventListener('click', function() {
+                applyFilters();
+            });
+        }
+        
+        if (resetFiltersBtn) {
+            resetFiltersBtn.addEventListener('click', function() {
+                statusFilter.value = '';
+                dateFilter.value = '';
+                searchInput.value = '';
+                applyFilters();
+            });
+        }
+        
+        function applyFilters() {
+            const status = statusFilter.value;
+            const date = dateFilter.value;
+            const search = searchInput.value.toLowerCase();
+            
+            const rows = document.querySelectorAll('#orders-table-body tr');
+            
+            rows.forEach(row => {
+                let showRow = true;
+                
+                // Status filter
+                if (status && row.querySelector('td:nth-child(8) span')) {
+                    const rowStatus = row.querySelector('td:nth-child(8) span').textContent.trim();
+                    if (status === 'Pending' && rowStatus !== 'قيد الانتظار') showRow = false;
+                    if (status === 'InProgress' && rowStatus !== 'قيد التنفيذ') showRow = false;
+                    if (status === 'Completed' && rowStatus !== 'مكتمل') showRow = false;
+                    if (status === 'Cancelled' && rowStatus !== 'ملغي') showRow = false;
+                }
+                
+                // Date filter
+                if (date && showRow) {
+                    const rowDate = row.querySelector('td:nth-child(6)').textContent.trim().split(' ')[0];
+                    if (rowDate !== date) showRow = false;
+                }
+                
+                // Search filter
+                if (search && showRow) {
+                    const batchNumber = row.querySelector('td:nth-child(2)').textContent.trim().toLowerCase();
+                    const productName = row.querySelector('td:nth-child(3)').textContent.trim().toLowerCase();
+                    const packagingType = row.querySelector('td:nth-child(4)').textContent.trim().toLowerCase();
+                    
+                    if (!batchNumber.includes(search) && !productName.includes(search) && !packagingType.includes(search)) {
+                        showRow = false;
+                    }
+                }
+                
+                // Show or hide row
+                row.style.display = showRow ? '' : 'none';
+            });
+            
+            // Show "no results" message if all rows are hidden
+            const visibleRows = document.querySelectorAll('#orders-table-body tr:not([style*="display: none"])');
+            const noResultsRow = document.querySelector('#orders-table-body tr.no-results');
+            
+            if (visibleRows.length === 0) {
+                if (!noResultsRow) {
+                    const tbody = document.getElementById('orders-table-body');
+                    const newRow = document.createElement('tr');
+                    newRow.className = 'no-results';
+                    newRow.innerHTML = `<td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">لا توجد نتائج مطابقة للبحث</td>`;
+                    tbody.appendChild(newRow);
+                } else {
+                    noResultsRow.style.display = '';
+                }
+            } else if (noResultsRow) {
+                noResultsRow.style.display = 'none';
+            }
+        }
+    });
+    
+    // Cancel Packaging Order
+    function cancelPackagingOrder(orderId) {
+        const modal = document.getElementById('cancel-modal');
+        const form = document.getElementById('cancel-form');
+        
+        // Set form action
+        form.action = `/production/packaging/orders/${orderId}/cancel`;
+        
+        // Show modal
+        modal.classList.remove('hidden');
+    }
+    
+    function closeModal() {
+        const modal = document.getElementById('cancel-modal');
+        const form = document.getElementById('cancel-form');
+        
+        // Reset form
+        form.reset();
+        
+        // Hide modal
+        modal.classList.add('hidden');
+    }
+    
+    // Complete Packaging
+    function completePackaging(orderId) {
+        const modal = document.getElementById('complete-modal');
+        const form = document.getElementById('complete-form');
+        
+        // Set form action
+        form.action = `/production/packaging/orders/${orderId}/complete`;
+        
+        // Show modal
+        modal.classList.remove('hidden');
+    }
+    
+    function closeCompleteModal() {
+        const modal = document.getElementById('complete-modal');
+        const form = document.getElementById('complete-form');
+        
+        // Reset form
+        form.reset();
+        
+        // Hide modal
+        modal.classList.add('hidden');
+    }
+    
+    // Close modals when clicking outside
+    document.addEventListener('click', function(event) {
+        const cancelModal = document.getElementById('cancel-modal');
+        const completeModal = document.getElementById('complete-modal');
+        
+        if (cancelModal && !cancelModal.classList.contains('hidden') && event.target === cancelModal) {
+            closeModal();
+        }
+        
+        if (completeModal && !completeModal.classList.contains('hidden') && event.target === completeModal) {
+            closeCompleteModal();
+        }
+    });
+</script>
+{% endblock %}

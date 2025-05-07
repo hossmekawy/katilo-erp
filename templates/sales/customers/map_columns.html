@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}تعيين الأعمدة - استيراد العملاء{% endblock %}
+
+{% block page_header %}تعيين الأعمدة{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales/customers" class="text-blue-600 hover:text-blue-800">العملاء</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.import_customers_form') }}" class="text-blue-600 hover:text-blue-800">استيراد العملاء</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">تعيين الأعمدة</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+    <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="bg-blue-100 p-2 rounded-lg">
+                <i class="fas fa-columns text-blue-600 text-lg"></i>
+            </div>
+            <h2 class="text-lg font-bold text-gray-800">تعيين الأعمدة</h2>
+        </div>
+        <a href="{{ url_for('sales.import_customers_form') }}" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700">
+            <i class="fas fa-arrow-right ml-1"></i> العودة
+        </a>
+    </div>
+    
+    <div class="p-6">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                </div>
+                <div class="mr-3">
+                    <h3 class="text-sm font-medium text-blue-800">تعليمات تعيين الأعمدة</h3>
+                    <div class="mt-2 text-sm text-blue-700">
+                        <p>يرجى تحديد الأعمدة من ملفك التي تتوافق مع حقول بيانات العملاء. حقل اسم العميل مطلوب، بينما الحقول الأخرى اختيارية.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview of Excel data -->
+        <div class="mb-6">
+            <h3 class="text-md font-medium text-gray-900 mb-2">معاينة البيانات:</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 border">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            {% for column in excel_columns %}
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+                                {{ column }}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for row in excel_preview %}
+                        <tr>
+                            {% for column in excel_columns %}
+                            <td class="px-3 py-2 text-sm text-gray-500 border-r">
+                                {{ row[column] if row[column] is not none else '' }}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <form action="{{ url_for('sales.map_customer_columns') }}" method="POST" class="space-y-6">
+            <input type="hidden" name="file_path" value="{{ file_path }}">
+            {% if sheet_name %}
+            <input type="hidden" name="sheet_name" value="{{ sheet_name }}">
+            {% endif %}
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="customer_name" class="block text-sm font-medium text-gray-700 mb-1">
+                        اسم العميل <span class="text-red-500">*</span>
+                    </label>
+                    <select id="customer_name" name="customer_name" required class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="">-- اختر عمود --</option>
+                        {% for column in excel_columns %}
+                        <option value="{{ column }}" {% if 'name' in column|lower or 'customer' in column|lower %}selected{% endif %}>{{ column }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="contact_info" class="block text-sm font-medium text-gray-700 mb-1">
+                        معلومات الاتصال
+                    </label>
+                    <select id="contact_info" name="contact_info" class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="">-- اختر عمود --</option>
+                        {% for column in excel_columns %}
+                        <option value="{{ column }}" {% if 'contact' in column|lower or 'phone' in column|lower or 'email' in column|lower %}selected{% endif %}>{{ column }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="billing_address" class="block text-sm font-medium text-gray-700 mb-1">
+                        عنوان الفواتير
+                    </label>
+                    <select id="billing_address" name="billing_address" class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="">-- اختر عمود --</option>
+                        {% for column in excel_columns %}
+                        <option value="{{ column }}" {% if 'billing' in column|lower or 'bill address' in column|lower %}selected{% endif %}>{{ column }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="shipping_address" class="block text-sm font-medium text-gray-700 mb-1">
+                        عنوان الشحن
+                    </label>
+                    <select id="shipping_address" name="shipping_address" class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="">-- اختر عمود --</option>
+                        {% for column in excel_columns %}
+                        <option value="{{ column }}" {% if 'shipping' in column|lower or 'ship address' in column|lower %}selected{% endif %}>{{ column }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-arrow-left ml-1"></i> متابعة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

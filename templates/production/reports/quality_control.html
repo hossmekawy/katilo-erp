@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: 'Arial', 'Tahoma', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            direction: rtl;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .report-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .report-meta {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .filters {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .filter-item {
+            display: inline-block;
+            margin-left: 15px;
+        }
+        .filter-label {
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        .test-card {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .test-header {
+            padding: 10px 15px;
+            background-color: #f2f2f2;
+            border-bottom: 1px solid #ddd;
+        }
+        .test-title {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .test-meta {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 5px;
+        }
+        .test-meta-item {
+            margin-left: 15px;
+            font-size: 14px;
+        }
+        .test-body {
+            padding: 15px;
+        }
+        .test-status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .status-passed {
+            background-color: #c6f6d5;
+            color: #22543d;
+        }
+        .status-failed {
+            background-color: #fed7d7;
+            color: #822727;
+        }
+        .status-retest {
+            background-color: #feebc8;
+            color: #744210;
+        }
+        .status-pending {
+            background-color: #e2e8f0;
+            color: #2d3748;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .results-table th, .results-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: right;
+        }
+        .results-table th {
+            background-color: #f8f8f8;
+        }
+        .result-passed {
+            color: #38a169;
+            font-weight: bold;
+        }
+        .result-failed {
+            color: #e53e3e;
+            font-weight: bold;
+        }
+        .notes {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 3px;
+        }
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <div class="report-title">{{ title }}</div>
+        <div class="report-meta">تم إنشاؤه في: {{ generated_at }}</div>
+        <div class="report-meta">بواسطة: {{ generated_by }}</div>
+    </div>
+    
+    <div class="filters">
+        {% if date_from %}
+        <div class="filter-item">
+            <span class="filter-label">من تاريخ:</span>
+            <span>{{ date_from.strftime('%Y-%m-%d') }}</span>
+        </div>
+        {% endif %}
+        
+        {% if date_to %}
+        <div class="filter-item">
+            <span class="filter-label">إلى تاريخ:</span>
+            <span>{{ date_to.strftime('%Y-%m-%d') }}</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if tests %}
+    {% for test in tests %}
+    <div class="test-card">
+        <div class="test-header">
+            <div class="test-title">اختبار #{{ test.id }} - {{ test.test_type }}</div>
+            <div class="test-meta">
+                <div class="test-meta-item">
+                    <strong>المنتج:</strong> {{ test.item_name }} ({{ test.sku }})
+                </div>
+                <div class="test-meta-item">
+                    <strong>رقم الدفعة:</strong> {{ test.lot_number }}
+                </div>
+                <div class="test-meta-item">
+                    <strong>تاريخ الاختبار:</strong> {{ test.created_at.strftime('%Y-%m-%d %H:%M') }}
+                </div>
+                {% if test.completed_at %}
+                <div class="test-meta-item">
+                    <strong>تاريخ الإكمال:</strong> {{ test.completed_at.strftime('%Y-%m-%d %H:%M') }}
+                </div>
+                {% endif %}
+                <div class="test-meta-item">
+                    <strong>المفتش:</strong> {{ test.inspector_name }}
+                </div>
+            </div>
+        </div>
+        <div class="test-body">
+            <div class="test-status status-{{ test.status.lower() }}">
+                {{ test.status }}
+            </div>
+            
+            {% if test.results %}
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>المعيار</th>
+                        <th>القيمة المتوقعة</th>
+                        <th>القيمة الفعلية</th>
+                        <th>النتيجة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in test.results %}
+                    <tr>
+                        <td>{{ result.parameter_name }}</td>
+                        <td>{{ result.expected_value }}</td>
+                        <td>{{ result.actual_value }}</td>
+                        <td class="result-{{ 'passed' if result.is_passed else 'failed' }}">
+                            {{ 'نجاح' if result.is_passed else 'فشل' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>لا توجد نتائج مسجلة لهذا الاختبار.</p>
+            {% endif %}
+            
+            {% if test.notes %}
+            <div class="notes">
+                <strong>ملاحظات:</strong> {{ test.notes }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    
+    <div>
+        <strong>إجمالي عدد الاختبارات:</strong> {{ tests|length }}
+    </div>
+    
+    {% else %}
+    <div class="no-data">لا توجد اختبارات جودة مسجلة</div>
+    {% endif %}
+</body>
+</html>

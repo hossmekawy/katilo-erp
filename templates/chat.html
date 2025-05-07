@@ -12,153 +12,410 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto" x-data="chatInterface()">
-    <!-- Chat Container -->
-    <div class="card bg-white shadow-md rounded-xl overflow-hidden">
-        <!-- Chat Header -->
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center">
-                <div class="bg-white/20 w-10 h-10 rounded-full flex items-center justify-center">
-                    <i class="fas fa-robot text-white"></i>
-                </div>
-                <div class="mr-3">
-                    <h3 class="text-white font-bold">Hamla Guys</h3>
-                    <p class="text-blue-100 text-sm">مساعد كاتيلو الذكي</p>
-                </div>
-            </div>
-            <!-- Clear Chat Button -->
-            <button @click="clearChat" class="text-white hover:text-blue-200 transition duration-200 flex items-center">
-                <i class="fas fa-trash-alt mr-1"></i>
-                <span class="text-sm">مسح المحادثة</span>
-            </button>
-        </div>
-        
-        <!-- Chat Messages -->
-        <div class="p-4 h-96 overflow-y-auto" id="chat-messages" x-ref="chatContainer">
-            <!-- Welcome Message -->
-            <div class="flex mb-4">
-                <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
-                    <i class="fas fa-robot text-blue-600"></i>
-                </div>
-                <div class="mr-3 bg-gray-100 rounded-lg py-2 px-4 max-w-3xl relative group">
-                    <p class="text-gray-700">مرحباً! أنا Hamla Guys، مساعد كاتيلو الذكي. كيف يمكنني مساعدتك اليوم؟ يمكنك سؤالي عن المخزون، المنتجات، الموردين، أو أي شيء آخر متعلق بنظام كاتيلو.</p>
-                    <button @click="copyToClipboard('مرحباً! أنا Hamla Guys، مساعد كاتيلو الذكي. كيف يمكنني مساعدتك اليوم؟ يمكنك سؤالي عن المخزون، المنتجات، الموردين، أو أي شيء آخر متعلق بنظام كاتيلو.')" 
-                            class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-gray-500 hover:text-blue-600">
-                        <i class="fas fa-copy"></i>
+<div class="max-w-6xl mx-auto" x-data="chatInterface()">
+    <div class="flex flex-col md:flex-row gap-4">
+        <!-- Chat History Sidebar -->
+        <div class="w-full md:w-1/4 bg-white rounded-xl shadow-md overflow-hidden" style="height: 600px;">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-white font-bold">المحادثات</h3>
+                    <button @click="createNewChat" class="text-white hover:text-blue-200 transition duration-200">
+                        <i class="fas fa-plus"></i>
                     </button>
                 </div>
             </div>
-            
-            <!-- Dynamic Messages -->
-            <template x-for="(message, index) in messages" :key="index">
-                <div class="flex mb-4" :class="{'justify-end': message.sender === 'user'}">
-                    <!-- Bot Message -->
-                    <template x-if="message.sender === 'bot'">
-                        <div class="flex">
-                            <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
-                                <i class="fas fa-robot text-blue-600"></i>
+
+            <div class="p-2 overflow-y-auto" style="height: calc(600px - 50px);">
+                <!-- Loading indicator for chat sessions -->
+                <div x-show="loadingChatSessions" class="flex justify-center py-4">
+                    <div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+
+                <!-- No chats message -->
+                <div x-show="!loadingChatSessions && chatSessions.length === 0" class="text-center py-4 text-gray-500">
+                    <i class="fas fa-comments text-2xl mb-2"></i>
+                    <p>لا توجد محادثات سابقة</p>
+                </div>
+
+                <!-- Chat sessions list -->
+                <template x-for="session in chatSessions" :key="session.chat_id">
+                    <div
+                        @click="loadChatSession(session.chat_id)"
+                        class="p-3 rounded-lg mb-2 cursor-pointer transition duration-200 hover:bg-gray-100"
+                        :class="{'bg-blue-50 border border-blue-200': currentChatId === session.chat_id}"
+                    >
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
+                                    <i class="fas fa-comment-dots text-blue-600"></i>
+                                </div>
+                                <div class="mr-2 truncate">
+                                    <p class="font-medium text-gray-800 truncate" x-text="session.title"></p>
+                                    <p class="text-xs text-gray-500" x-text="formatDate(session.updated_at)"></p>
+                                </div>
                             </div>
-                            <div class="mr-3 bg-gray-100 rounded-lg py-2 px-4 max-w-3xl relative group">
-                                <p class="text-gray-700 whitespace-pre-wrap" x-html="formatMessage(message.text)"></p>
-                                <button @click="copyToClipboard(message.text)" 
-                                        class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-gray-500 hover:text-blue-600">
-                                    <i class="fas fa-copy"></i>
+                            <div class="flex">
+                                <button @click.stop="renameChatSession(session)" class="text-gray-400 hover:text-blue-600 ml-1">
+                                    <i class="fas fa-edit text-xs"></i>
+                                </button>
+                                <button @click.stop="deleteChatSession(session.chat_id)" class="text-gray-400 hover:text-red-600">
+                                    <i class="fas fa-trash-alt text-xs"></i>
                                 </button>
                             </div>
                         </div>
-                    </template>
-                    
-                    <!-- User Message -->
-                    <template x-if="message.sender === 'user'">
-                        <div class="flex">
-                            <div class="ml-3 bg-blue-600 rounded-lg py-2 px-4 max-w-3xl relative group">
-                                <p class="text-white" x-text="message.text"></p>
-                                <template x-if="message.image">
-                                    <div class="mt-2 rounded overflow-hidden">
-                                        <img :src="message.image" class="max-h-40 max-w-full" />
-                                    </div>
-                                </template>
-                                <button @click="copyToClipboard(message.text)" 
-                                        class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-white/70 hover:text-white">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
-                            <div class="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center">
-                                <span class="text-white font-semibold">{{ current_user.username[0].upper() }}</span>
-                            </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="w-full md:w-3/4">
+            <!-- Chat Container -->
+            <div class="card bg-white shadow-md rounded-xl overflow-hidden flex flex-col" style="height: 600px;">
+                <!-- Chat Header -->
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="bg-white/20 w-10 h-10 rounded-full flex items-center justify-center">
+                            <i class="fas fa-robot text-white"></i>
                         </div>
-                    </template>
-                </div>
-            </template>
-            
-            <!-- Loading Indicator -->
-            <div class="flex mb-4" x-show="isLoading">
-                <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
-                    <i class="fas fa-robot text-blue-600"></i>
-                </div>
-                <div class="mr-3 bg-gray-100 rounded-lg py-3 px-4">
-                    <div class="flex space-x-2 space-x-reverse">
-                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                        <div class="mr-3">
+                            <h3 class="text-white font-bold">Hamla Guys</h3>
+                            <p class="text-blue-100 text-sm">مساعد كاتيلو الذكي</p>
+                        </div>
+                    </div>
+                    <div class="flex">
+                        <!-- New Chat Button -->
+                        <button @click="createNewChat" class="text-white hover:text-blue-200 transition duration-200 flex items-center ml-4">
+                            <i class="fas fa-plus mr-1"></i>
+                            <span class="text-sm">محادثة جديدة</span>
+                        </button>
+                        <!-- Clear Chat Button -->
+                        <button @click="clearChat" class="text-white hover:text-blue-200 transition duration-200 flex items-center">
+                            <i class="fas fa-trash-alt mr-1"></i>
+                            <span class="text-sm">مسح المحادثة</span>
+                        </button>
                     </div>
                 </div>
+
+                <!-- Chat Messages - Using flex-grow to take available space -->
+                <div class="p-4 overflow-y-auto flex-grow" id="chat-messages" x-ref="chatContainer">
+                    <!-- Welcome Message or Empty State -->
+                    <template x-if="messages.length === 0">
+                        <div class="flex flex-col items-center justify-center h-full text-center">
+                            <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+                                <i class="fas fa-robot text-blue-600 text-2xl"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">مساعد كاتيلو الذكي</h3>
+                            <p class="text-gray-600 max-w-md">مرحباً! أنا Hamla Guys، مساعد كاتيلو الذكي. كيف يمكنني مساعدتك اليوم؟</p>
+                        </div>
+                    </template>
+
+                    <!-- Dynamic Messages -->
+                    <template x-for="(message, index) in messages" :key="index">
+                        <div class="flex mb-4" :class="{'justify-end': message.sender === 'user'}">
+                            <!-- Bot Message -->
+                            <template x-if="message.sender === 'bot'">
+                                <div class="flex">
+                                    <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
+                                        <i class="fas fa-robot text-blue-600"></i>
+                                    </div>
+                                    <div class="mr-3 bg-gray-100 rounded-lg py-2 px-4 max-w-3xl relative group">
+                                        <p class="text-gray-700 whitespace-pre-wrap" x-html="formatMessage(message.text)"></p>
+                                        <button @click="copyToClipboard(message.text)"
+                                                class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-gray-500 hover:text-blue-600">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- User Message -->
+                            <template x-if="message.sender === 'user'">
+                                <div class="flex">
+                                    <div class="ml-3 bg-blue-600 rounded-lg py-2 px-4 max-w-3xl relative group">
+                                        <p class="text-white" x-text="message.text"></p>
+                                        <template x-if="message.image">
+                                            <div class="mt-2 rounded overflow-hidden">
+                                                <img :src="message.image" class="max-h-40 max-w-full" />
+                                            </div>
+                                        </template>
+                                        <button @click="copyToClipboard(message.text)"
+                                                class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-white/70 hover:text-white">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center">
+                                        <span class="text-white font-semibold">{{ current_user.username[0].upper() }}</span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Loading Indicator -->
+                    <div class="flex mb-4" x-show="isLoading">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center">
+                            <i class="fas fa-robot text-blue-600"></i>
+                        </div>
+                        <div class="mr-3 bg-gray-100 rounded-lg py-3 px-4">
+                            <div class="flex space-x-2 space-x-reverse">
+                                <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                                <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                                <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Preview - Fixed height section -->
+                <div class="px-4 pb-2" x-show="imagePreview">
+                    <div class="relative inline-block">
+                        <img :src="imagePreview" class="h-20 rounded border border-gray-300" />
+                        <button @click="removeImage" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                            <i class="fas fa-times text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chat Input - Fixed at bottom -->
+                <div class="border-t border-gray-200 p-4 bg-white">
+                    <form @submit.prevent="sendMessage" class="flex items-center">
+                        <label for="image-upload" class="cursor-pointer text-gray-500 hover:text-blue-600 ml-2 transition duration-200">
+                            <i class="fas fa-image text-lg"></i>
+                            <input type="file" id="image-upload" class="hidden" accept="image/*" @change="handleImageUpload" />
+                        </label>
+
+                        <input
+                            type="text"
+                            x-model="userInput"
+                            @keydown.enter="sendMessage"
+                            placeholder="اكتب سؤالك هنا..."
+                            class="flex-1 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+
+                        <button type="submit" class="bg-blue-600 text-white rounded-lg p-2 mr-2 hover:bg-blue-700 transition duration-200 flex items-center justify-center w-12 h-12">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
-        </div>
-        
-        <!-- Image Preview -->
-        <div class="px-4 pb-2" x-show="imagePreview">
-            <div class="relative inline-block">
-                <img :src="imagePreview" class="h-20 rounded border border-gray-300" />
-                <button @click="removeImage" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
-                    <i class="fas fa-times text-xs"></i>
-                </button>
+
+            <!-- Suggested Questions -->
+            <div class="mt-4 bg-white rounded-xl shadow-md p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-semibold text-gray-700">أسئلة مقترحة</h3>
+                    <div class="flex space-x-2 space-x-reverse">
+                        <button id="collapseAllBtn" class="text-sm text-blue-600 hover:text-blue-800 transition duration-200">
+                            <i class="fas fa-compress-alt mr-1"></i>
+                            طي الكل
+                        </button>
+                        <button id="expandAllBtn" class="text-sm text-blue-600 hover:text-blue-800 transition duration-200">
+                            <i class="fas fa-expand-alt mr-1"></i>
+                            توسيع الكل
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <!-- المخزون والمنتجات -->
+                    <div class="col-span-2">
+                        <h4 class="text-md font-medium text-gray-600 mb-2 border-b pb-1 flex items-center">
+                            <span class="bg-blue-100 text-blue-800 p-1 rounded-md ml-2 w-6 h-6 flex items-center justify-center">
+                                <i class="fas fa-boxes-stacked text-xs"></i>
+                            </span>
+                            المخزون والمنتجات
+                        </h4>
+                    </div>
+                    <button @click="askSuggestedQuestion('ما هي حالة المخزون الحالية؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-boxes-stacked text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي حالة المخزون الحالية؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي المنتجات التي وصلت لحد إعادة الطلب؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-exclamation-triangle text-yellow-500 ml-2"></i>
+                        <span class="font-medium">ما هي المنتجات التي وصلت لحد إعادة الطلب؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي التصنيفات الموجودة في النظام؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-tags text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي التصنيفات الموجودة في النظام؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي المنتجات الأكثر مبيعاً هذا الشهر؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-chart-line text-green-600 ml-2"></i>
+                        <span class="font-medium">ما هي المنتجات الأكثر مبيعاً هذا الشهر؟</span>
+                    </button>
+
+                    <!-- الموردين والمشتريات -->
+                    <div class="col-span-2 mt-3">
+                        <h4 class="text-md font-medium text-gray-600 mb-2 border-b pb-1 flex items-center">
+                            <span class="bg-green-100 text-green-800 p-1 rounded-md ml-2 w-6 h-6 flex items-center justify-center">
+                                <i class="fas fa-truck text-xs"></i>
+                            </span>
+                            الموردين والمشتريات
+                        </h4>
+                    </div>
+                    <button @click="askSuggestedQuestion('من هم أهم الموردين لدينا؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-truck text-blue-600 ml-2"></i>
+                        <span class="font-medium">من هم أهم الموردين لدينا؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي أحدث طلبات الشراء؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-shopping-cart text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي أحدث طلبات الشراء؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي حالة الدفعات المستحقة للموردين؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-money-bill-wave text-green-600 ml-2"></i>
+                        <span class="font-medium">ما هي حالة الدفعات المستحقة للموردين؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي المواد الخام التي نحتاج لطلبها قريباً؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-industry text-gray-600 ml-2"></i>
+                        <span class="font-medium">ما هي المواد الخام التي نحتاج لطلبها قريباً؟</span>
+                    </button>
+
+                    <!-- الإنتاج والجودة -->
+                    <div class="col-span-2 mt-3">
+                        <h4 class="text-md font-medium text-gray-600 mb-2 border-b pb-1 flex items-center">
+                            <span class="bg-purple-100 text-purple-800 p-1 rounded-md ml-2 w-6 h-6 flex items-center justify-center">
+                                <i class="fas fa-cogs text-xs"></i>
+                            </span>
+                            الإنتاج والجودة
+                        </h4>
+                    </div>
+                    <button @click="askSuggestedQuestion('ما هي أوامر الإنتاج الحالية؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-cogs text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي أوامر الإنتاج الحالية؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي نتائج فحوصات الجودة الأخيرة؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-clipboard-check text-purple-600 ml-2"></i>
+                        <span class="font-medium">ما هي نتائج فحوصات الجودة الأخيرة؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي كفاءة خطوط الإنتاج هذا الأسبوع؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-chart-pie text-orange-500 ml-2"></i>
+                        <span class="font-medium">ما هي كفاءة خطوط الإنتاج هذا الأسبوع؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي قوائم المواد (BOM) المتاحة؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-list-ul text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي قوائم المواد (BOM) المتاحة؟</span>
+                    </button>
+
+                    <!-- المبيعات والعملاء -->
+                    <div class="col-span-2 mt-3">
+                        <h4 class="text-md font-medium text-gray-600 mb-2 border-b pb-1 flex items-center">
+                            <span class="bg-orange-100 text-orange-800 p-1 rounded-md ml-2 w-6 h-6 flex items-center justify-center">
+                                <i class="fas fa-dollar-sign text-xs"></i>
+                            </span>
+                            المبيعات والعملاء
+                        </h4>
+                    </div>
+                    <button @click="askSuggestedQuestion('ما هي إجمالي المبيعات لهذا الشهر؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-dollar-sign text-green-600 ml-2"></i>
+                        <span class="font-medium">ما هي إجمالي المبيعات لهذا الشهر؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('من هم أهم العملاء لدينا؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-users text-blue-600 ml-2"></i>
+                        <span class="font-medium">من هم أهم العملاء لدينا؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي حالة طلبات المبيعات الحالية؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-shipping-fast text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي حالة طلبات المبيعات الحالية؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي مرتجعات المبيعات الأخيرة؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-undo text-red-500 ml-2"></i>
+                        <span class="font-medium">ما هي مرتجعات المبيعات الأخيرة؟</span>
+                    </button>
+
+                    <!-- الإدارة المالية -->
+                    <div class="col-span-2 mt-3">
+                        <h4 class="text-md font-medium text-gray-600 mb-2 border-b pb-1 flex items-center">
+                            <span class="bg-green-100 text-green-800 p-1 rounded-md ml-2 w-6 h-6 flex items-center justify-center">
+                                <i class="fas fa-money-bill-wave text-xs"></i>
+                            </span>
+                            الإدارة المالية
+                        </h4>
+                    </div>
+                    <button @click="askSuggestedQuestion('ما هو رصيد الخزينة الحالي؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-cash-register text-green-600 ml-2"></i>
+                        <span class="font-medium">ما هو رصيد الخزينة الحالي؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي آخر المعاملات المالية؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-exchange-alt text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي آخر المعاملات المالية؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي الفواتير المستحقة الدفع؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-file-invoice-dollar text-red-500 ml-2"></i>
+                        <span class="font-medium">ما هي الفواتير المستحقة الدفع؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي إيرادات ومصروفات الشهر الحالي؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-chart-bar text-purple-600 ml-2"></i>
+                        <span class="font-medium">ما هي إيرادات ومصروفات الشهر الحالي؟</span>
+                    </button>
+
+                    <!-- التوزيع والشحن -->
+                    <div class="col-span-2 mt-3">
+                        <h4 class="text-md font-medium text-gray-600 mb-2 border-b pb-1 flex items-center">
+                            <span class="bg-blue-100 text-blue-800 p-1 rounded-md ml-2 w-6 h-6 flex items-center justify-center">
+                                <i class="fas fa-truck-loading text-xs"></i>
+                            </span>
+                            التوزيع والشحن
+                        </h4>
+                    </div>
+                    <button @click="askSuggestedQuestion('ما هي الشحنات الجارية حالياً؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-truck-loading text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي الشحنات الجارية حالياً؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي مسارات التوزيع المتاحة؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-route text-green-600 ml-2"></i>
+                        <span class="font-medium">ما هي مسارات التوزيع المتاحة؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي حالة المركبات في أسطول التوزيع؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-truck text-orange-500 ml-2"></i>
+                        <span class="font-medium">ما هي حالة المركبات في أسطول التوزيع؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي زيارات مندوبي المبيعات المخططة لهذا الأسبوع؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-calendar-check text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي زيارات مندوبي المبيعات المخططة لهذا الأسبوع؟</span>
+                    </button>
+
+                    <!-- أسئلة عامة -->
+                    <div class="col-span-2 mt-3">
+                        <h4 class="text-md font-medium text-gray-600 mb-2 border-b pb-1 flex items-center">
+                            <span class="bg-gray-100 text-gray-800 p-1 rounded-md ml-2 w-6 h-6 flex items-center justify-center">
+                                <i class="fas fa-question-circle text-xs"></i>
+                            </span>
+                            أسئلة عامة
+                        </h4>
+                    </div>
+                    <button @click="askSuggestedQuestion('ما هي إحصائيات النظام الحالية؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-tachometer-alt text-blue-600 ml-2"></i>
+                        <span class="font-medium">ما هي إحصائيات النظام الحالية؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي تذاكر الدعم المفتوحة حالياً؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-ticket-alt text-red-500 ml-2"></i>
+                        <span class="font-medium">ما هي تذاكر الدعم المفتوحة حالياً؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('ما هي اقتراحات الذكاء الاصطناعي لتحسين الأداء؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-robot text-purple-600 ml-2"></i>
+                        <span class="font-medium">ما هي اقتراحات الذكاء الاصطناعي لتحسين الأداء؟</span>
+                    </button>
+                    <button @click="askSuggestedQuestion('كيف يمكنني استخدام نظام كاتيلو بشكل أفضل؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-blue-50 transition duration-200 hover:shadow-md">
+                        <i class="fas fa-question-circle text-blue-600 ml-2"></i>
+                        <span class="font-medium">كيف يمكنني استخدام نظام كاتيلو بشكل أفضل؟</span>
+                    </button>
+                </div>
             </div>
-        </div>
-        
-        <!-- Chat Input -->
-        <div class="border-t border-gray-200 p-4">
-            <form @submit.prevent="sendMessage" class="flex items-center">
-                <label for="image-upload" class="cursor-pointer text-gray-500 hover:text-blue-600 ml-2 transition duration-200">
-                    <i class="fas fa-image text-lg"></i>
-                    <input type="file" id="image-upload" class="hidden" accept="image/*" @change="handleImageUpload" />
-                </label>
-                
-                <input 
-                    type="text" 
-                    x-model="userInput" 
-                    @keydown.enter="sendMessage"
-                    placeholder="اكتب سؤالك هنا..."
-                    class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                
-                <button type="submit" class="bg-blue-600 text-white rounded-lg p-2 mr-2 hover:bg-blue-700 transition duration-200 flex items-center justify-center w-10 h-10">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </form>
         </div>
     </div>
-    
-    <!-- Suggested Questions -->
-    <div class="mt-6">
-        <h3 class="text-lg font-semibold text-gray-700 mb-3">أسئلة مقترحة</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <button @click="askSuggestedQuestion('ما هي حالة المخزون الحالية؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200 hover:shadow-sm">
-                <i class="fas fa-boxes-stacked text-blue-600 ml-2"></i>
-                ما هي حالة المخزون الحالية؟
-            </button>
-            <button @click="askSuggestedQuestion('من هم أهم الموردين لدينا؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200 hover:shadow-sm">
-                <i class="fas fa-truck text-blue-600 ml-2"></i>
-                من هم أهم الموردين لدينا؟
-            </button>
-            <button @click="askSuggestedQuestion('ما هي أحدث طلبات الشراء؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200 hover:shadow-sm">
-                <i class="fas fa-shopping-cart text-blue-600 ml-2"></i>
-                ما هي أحدث طلبات الشراء؟
-            </button>
-            <button @click="askSuggestedQuestion('ما هي التصنيفات الموجودة في النظام؟')" class="text-right bg-white border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition duration-200 hover:shadow-sm">
-                <i class="fas fa-tags text-blue-600 ml-2"></i>
-                ما هي التصنيفات الموجودة في النظام؟
-            </button>
+
+    <!-- Rename Chat Modal -->
+    <div x-show="showRenameModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-transition>
+        <div class="bg-white rounded-lg p-6 w-full max-w-md" @click.outside="showRenameModal = false">
+            <h3 class="text-lg font-bold mb-4">تغيير عنوان المحادثة</h3>
+            <input
+                type="text"
+                x-model="newChatTitle"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="أدخل عنوان المحادثة الجديد"
+            />
+            <div class="flex justify-end">
+                <button @click="showRenameModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800 ml-2">إلغاء</button>
+                <button @click="saveChatTitle" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">حفظ</button>
+            </div>
         </div>
     </div>
 </div>
@@ -173,62 +430,259 @@
             isLoading: false,
             imagePreview: null,
             imageData: null,
-            
+            chatSessions: [],
+            loadingChatSessions: true,
+            currentChatId: null,
+            showRenameModal: false,
+            newChatTitle: '',
+            chatToRename: null,
+
             init() {
                 // Scroll to bottom whenever messages change
                 this.$watch('messages', () => {
                     this.scrollToBottom();
                 });
+
+                // Load chat sessions
+                this.loadChatSessions();
             },
-            
+
+            async loadChatSessions() {
+                this.loadingChatSessions = true;
+                try {
+                    const response = await fetch('/api/chatbot/sessions');
+                    if (response.ok) {
+                        this.chatSessions = await response.json();
+
+                        // If there are sessions, load the most recent one
+                        if (this.chatSessions.length > 0) {
+                            this.loadChatSession(this.chatSessions[0].chat_id);
+                        }
+                    } else {
+                        showNotification('فشل في تحميل المحادثات السابقة', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error loading chat sessions:', error);
+                    showNotification('حدث خطأ أثناء تحميل المحادثات', 'error');
+                } finally {
+                    this.loadingChatSessions = false;
+                }
+            },
+
+            async loadChatSession(chatId) {
+                this.isLoading = true;
+                this.messages = [];
+
+                try {
+                    const response = await fetch(`/api/chatbot/sessions/${chatId}`);
+                    if (response.ok) {
+                        const session = await response.json();
+                        this.currentChatId = chatId;
+
+                        // Convert session messages to our format
+                        this.messages = session.messages.map(msg => ({
+                            text: msg.text,
+                            sender: msg.sender
+                        }));
+
+                        this.scrollToBottom();
+                    } else {
+                        showNotification('فشل في تحميل المحادثة', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error loading chat session:', error);
+                    showNotification('حدث خطأ أثناء تحميل المحادثة', 'error');
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            async createNewChat() {
+                this.isLoading = true;
+
+                try {
+                    const response = await fetch('/api/chatbot/sessions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            title: 'محادثة جديدة'
+                        })
+                    });
+
+                    if (response.ok) {
+                        const newSession = await response.json();
+
+                        // Add to the beginning of the list
+                        this.chatSessions.unshift({
+                            chat_id: newSession.chat_id,
+                            title: newSession.title,
+                            created_at: newSession.created_at,
+                            updated_at: newSession.updated_at,
+                            message_count: newSession.messages.length
+                        });
+
+                        // Load the new chat
+                        this.loadChatSession(newSession.chat_id);
+                        showNotification('تم إنشاء محادثة جديدة', 'success');
+                    } else {
+                        showNotification('فشل في إنشاء محادثة جديدة', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error creating new chat:', error);
+                    showNotification('حدث خطأ أثناء إنشاء محادثة جديدة', 'error');
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            async deleteChatSession(chatId) {
+                if (!confirm('هل أنت متأكد من رغبتك في حذف هذه المحادثة؟')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/chatbot/sessions/${chatId}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        // Remove from the list
+                        this.chatSessions = this.chatSessions.filter(session => session.chat_id !== chatId);
+
+                        // If this was the current chat, load another one or clear
+                        if (this.currentChatId === chatId) {
+                            if (this.chatSessions.length > 0) {
+                                this.loadChatSession(this.chatSessions[0].chat_id);
+                            } else {
+                                this.currentChatId = null;
+                                this.messages = [];
+                            }
+                        }
+
+                        showNotification('تم حذف المحادثة بنجاح', 'success');
+                    } else {
+                        showNotification('فشل في حذف المحادثة', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting chat session:', error);
+                    showNotification('حدث خطأ أثناء حذف المحادثة', 'error');
+                }
+            },
+
+            renameChatSession(session) {
+                this.chatToRename = session;
+                this.newChatTitle = session.title;
+                this.showRenameModal = true;
+            },
+
+            async saveChatTitle() {
+                if (!this.newChatTitle.trim()) {
+                    showNotification('يرجى إدخال عنوان للمحادثة', 'warning');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/chatbot/sessions/${this.chatToRename.chat_id}/title`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            title: this.newChatTitle
+                        })
+                    });
+
+                    if (response.ok) {
+                        // Update the title in the list
+                        const index = this.chatSessions.findIndex(s => s.chat_id === this.chatToRename.chat_id);
+                        if (index !== -1) {
+                            this.chatSessions[index].title = this.newChatTitle;
+                        }
+
+                        this.showRenameModal = false;
+                        showNotification('تم تغيير عنوان المحادثة بنجاح', 'success');
+                    } else {
+                        showNotification('فشل في تغيير عنوان المحادثة', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error renaming chat session:', error);
+                    showNotification('حدث خطأ أثناء تغيير عنوان المحادثة', 'error');
+                }
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return '';
+
+                const date = new Date(dateString);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMins / 60);
+                const diffDays = Math.floor(diffHours / 24);
+
+                if (diffMins < 1) {
+                    return 'الآن';
+                } else if (diffMins < 60) {
+                    return `منذ ${diffMins} دقيقة`;
+                } else if (diffHours < 24) {
+                    return `منذ ${diffHours} ساعة`;
+                } else if (diffDays < 7) {
+                    return `منذ ${diffDays} يوم`;
+                } else {
+                    return date.toLocaleDateString('ar-EG');
+                }
+            },
+
             scrollToBottom() {
                 setTimeout(() => {
                     const container = this.$refs.chatContainer;
                     container.scrollTop = container.scrollHeight;
                 }, 100);
             },
-            
+
             formatMessage(text) {
                 // First convert asterisk bullet points to proper HTML formatting
                 let formattedText = text;
-                
+
                 // Replace patterns like "**Title:** Content" with bold titles
                 formattedText = formattedText.replace(/\*\*(.*?):\*\*/g, '<strong>$1:</strong>');
-                
+
                 // Replace lines starting with asterisks (like "* Item: value") with list items
                 formattedText = formattedText.replace(/^\s*\*\s*(.*?)$/gm, '<li>$1</li>');
-                
+
                 // Wrap consecutive list items in ul tags
                 if (formattedText.includes('<li>')) {
                     formattedText = formattedText.replace(
-                        /(<li>.*?<\/li>(\s*\n*\s*)?)+/g, 
+                        /(<li>.*?<\/li>(\s*\n*\s*)?)+/g,
                         match => `<ul class="list-disc list-inside my-2">${match}</ul>`
                     );
                 }
-                
+
                 // Convert URLs to clickable links
                 const urlRegex = /(https?:\/\/[^\s]+)/g;
                 formattedText = formattedText.replace(urlRegex, url => `<a href="${url}" target="_blank" class="text-blue-600 underline">${url}</a>`);
-                
+
                 return formattedText;
             },
-            
+
             handleImageUpload(event) {
                 const file = event.target.files[0];
                 if (!file) return;
-                
+
                 // Check file type
                 if (!file.type.match('image.*')) {
                     showNotification('يرجى اختيار ملف صورة صالح', 'error');
                     return;
                 }
-                
+
                 // Check file size (max 5MB)
                 if (file.size > 5 * 1024 * 1024) {
                     showNotification('حجم الصورة كبير جدًا. الحد الأقصى هو 5 ميجابايت', 'error');
                     return;
                 }
-                
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     this.imagePreview = e.target.result;
@@ -236,31 +690,36 @@
                 };
                 reader.readAsDataURL(file);
             },
-            
+
             removeImage() {
                 this.imagePreview = null;
                 this.imageData = null;
                 document.getElementById('image-upload').value = '';
             },
-            
+
             askSuggestedQuestion(question) {
                 this.userInput = question;
                 this.sendMessage();
             },
-            
+
             clearChat() {
                 if (confirm('هل أنت متأكد من رغبتك في مسح المحادثة؟')) {
-                    this.messages = [];
+                    // If we have a current chat, create a new one
+                    if (this.currentChatId) {
+                        this.createNewChat();
+                    } else {
+                        this.messages = [];
+                    }
                     showNotification('تم مسح المحادثة بنجاح', 'success');
                 }
             },
-            
+
             copyToClipboard(text) {
                 // Create a temporary element to handle HTML content properly
                 const tempElement = document.createElement('div');
                 tempElement.innerHTML = text;
                 const cleanText = tempElement.textContent || tempElement.innerText || text;
-                
+
                 // Use the Clipboard API with fallback
                 if (navigator.clipboard && window.isSecureContext) {
                     navigator.clipboard.writeText(cleanText)
@@ -276,12 +735,12 @@
                     this.fallbackCopyTextToClipboard(cleanText);
                 }
             },
-            
+
             fallbackCopyTextToClipboard(text) {
                 // Fallback method using textarea
                 const textArea = document.createElement("textarea");
                 textArea.value = text;
-                
+
                 // Make the textarea out of viewport
                 textArea.style.position = "fixed";
                 textArea.style.left = "-999999px";
@@ -289,7 +748,7 @@
                 document.body.appendChild(textArea);
                 textArea.focus();
                 textArea.select();
-                
+
                 try {
                     const successful = document.execCommand('copy');
                     if (successful) {
@@ -301,27 +760,29 @@
                     console.error('فشل في نسخ النص: ', err);
                     showNotification('فشل في نسخ النص', 'error');
                 }
-                
+
                 document.body.removeChild(textArea);
             },
-            
+
             async sendMessage() {
                 if (!this.userInput.trim() && !this.imageData) return;
-                
+
                 const userMessage = this.userInput.trim();
+
+                // Add message to UI immediately
                 this.messages.push({
                     text: userMessage,
                     sender: 'user',
                     image: this.imagePreview
                 });
-                
+
                 this.isLoading = true;
                 this.userInput = '';
                 const imageDataToSend = this.imageData;
                 this.imagePreview = null;
                 this.imageData = null;
                 document.getElementById('image-upload').value = '';
-                
+
                 try {
                     const response = await fetch('/api/chatbot/ask', {
                         method: 'POST',
@@ -330,17 +791,25 @@
                         },
                         body: JSON.stringify({
                             query: userMessage,
-                            image_data: imageDataToSend
+                            image_data: imageDataToSend,
+                            chat_id: this.currentChatId
                         })
                     });
-                    
+
                     const data = await response.json();
-                    
+
                     if (response.ok) {
+                        // Add bot response to UI
                         this.messages.push({
                             text: data.response,
                             sender: 'bot'
                         });
+
+                        // If this is a new chat, update the current chat ID and refresh sessions
+                        if (!this.currentChatId && data.chat_id) {
+                            this.currentChatId = data.chat_id;
+                            this.loadChatSessions(); // Refresh the list to show the new chat
+                        }
                     } else {
                         this.messages.push({
                             text: data.error || 'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.',
@@ -367,39 +836,122 @@
     function showNotification(message, type = 'info') {
         const notification = document.createElement('div');
         notification.className = `fixed bottom-4 left-4 px-6 py-3 rounded-lg shadow-lg text-white flex items-center transition-all duration-300 transform translate-y-0 opacity-100 z-50 ${
-            type === 'success' ? 'bg-green-600' : 
-            type === 'error' ? 'bg-red-600' : 
+            type === 'success' ? 'bg-green-600' :
+            type === 'error' ? 'bg-red-600' :
             type === 'warning' ? 'bg-yellow-600' : 'bg-blue-600'
         }`;
-        
+
         // Icon based on notification type
-        const iconClass = type === 'success' ? 'fa-check-circle' : 
-                          type === 'error' ? 'fa-exclamation-circle' : 
+        const iconClass = type === 'success' ? 'fa-check-circle' :
+                          type === 'error' ? 'fa-exclamation-circle' :
                           type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
-        
+
         notification.innerHTML = `
             <i class="fas ${iconClass} mr-2"></i>
             <span>${message}</span>
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         // Animate in
         setTimeout(() => {
             notification.style.opacity = '1';
             notification.style.transform = 'translateY(0)';
         }, 10);
-        
+
         // Animate out and remove
         setTimeout(() => {
             notification.style.opacity = '0';
             notification.style.transform = 'translateY(20px)';
-            
+
             setTimeout(() => {
                 document.body.removeChild(notification);
             }, 300);
         }, 3000);
     }
+</script>
+
+<!-- Suggested Questions Controls -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get all category headers
+        const categoryHeaders = document.querySelectorAll('.col-span-2 h4');
+
+        // Make headers collapsible
+        categoryHeaders.forEach(header => {
+            // Add collapse/expand icon
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-chevron-down mr-2 transition-transform duration-200';
+            icon.style.float = 'left';
+            header.prepend(icon);
+
+            // Add click event
+            header.style.cursor = 'pointer';
+            header.addEventListener('click', function() {
+                // Get the next elements until the next header
+                let currentElement = header.parentElement.nextElementSibling;
+                let elements = [];
+
+                while (currentElement && !currentElement.querySelector('h4')) {
+                    elements.push(currentElement);
+                    currentElement = currentElement.nextElementSibling;
+                }
+
+                // Toggle visibility
+                const isCollapsed = elements[0].style.display === 'none';
+                elements.forEach(el => {
+                    el.style.display = isCollapsed ? 'block' : 'none';
+                });
+
+                // Rotate icon
+                icon.style.transform = isCollapsed ? 'rotate(0deg)' : 'rotate(-90deg)';
+            });
+        });
+
+        // Collapse All button
+        document.getElementById('collapseAllBtn').addEventListener('click', function() {
+            categoryHeaders.forEach(header => {
+                // Get the next elements until the next header
+                let currentElement = header.parentElement.nextElementSibling;
+                let elements = [];
+
+                while (currentElement && !currentElement.querySelector('h4')) {
+                    elements.push(currentElement);
+                    currentElement = currentElement.nextElementSibling;
+                }
+
+                // Hide all elements
+                elements.forEach(el => {
+                    el.style.display = 'none';
+                });
+
+                // Rotate icon
+                header.querySelector('i').style.transform = 'rotate(-90deg)';
+            });
+        });
+
+        // Expand All button
+        document.getElementById('expandAllBtn').addEventListener('click', function() {
+            categoryHeaders.forEach(header => {
+                // Get the next elements until the next header
+                let currentElement = header.parentElement.nextElementSibling;
+                let elements = [];
+
+                while (currentElement && !currentElement.querySelector('h4')) {
+                    elements.push(currentElement);
+                    currentElement = currentElement.nextElementSibling;
+                }
+
+                // Show all elements
+                elements.forEach(el => {
+                    el.style.display = 'block';
+                });
+
+                // Rotate icon
+                header.querySelector('i').style.transform = 'rotate(0deg)';
+            });
+        });
+    });
 </script>
 {% endblock %}
 

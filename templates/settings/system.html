@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}إعدادات النظام{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="systemSettingsApp">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">إعدادات النظام</h1>
+            <a href="{{ url_for('settings.settings_index') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">
+                <i class="fas fa-arrow-right ml-1"></i> العودة
+            </a>
+        </div>
+        
+        <form @submit.prevent="saveSettings" class="space-y-6">
+            <!-- System Title -->
+            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
+                <h2 class="text-lg font-semibold text-blue-700 dark:text-blue-300 mb-4">معلومات النظام</h2>
+                
+                <div class="mb-4">
+                    <label for="system_title" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">عنوان النظام</label>
+                    <input type="text" id="system_title" x-model="settings.system_title" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            
+            <!-- Theme Settings -->
+            <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-100 dark:border-purple-800">
+                <h2 class="text-lg font-semibold text-purple-700 dark:text-purple-300 mb-4">إعدادات المظهر</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Theme Color -->
+                    <div>
+                        <label for="theme_color" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">لون السمة</label>
+                        <select id="theme_color" x-model="settings.theme_color" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                            <option value="blue">أزرق</option>
+                            <option value="green">أخضر</option>
+                            <option value="purple">بنفسجي</option>
+                            <option value="red">أحمر</option>
+                            <option value="orange">برتقالي</option>
+                            <option value="gray">رمادي</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Background Color -->
+                    <div>
+                        <label for="background_color" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">لون الخلفية</label>
+                        <select id="background_color" x-model="settings.background_color" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                            <option value="blue">أزرق</option>
+                            <option value="green">أخضر</option>
+                            <option value="purple">بنفسجي</option>
+                            <option value="red">أحمر</option>
+                            <option value="orange">برتقالي</option>
+                            <option value="gray">رمادي</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Sidebar Color -->
+                    <div>
+                        <label for="sidebar_color" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">لون الشريط الجانبي</label>
+                        <select id="sidebar_color" x-model="settings.sidebar_color" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                            <option value="blue">أزرق</option>
+                            <option value="green">أخضر</option>
+                            <option value="purple">بنفسجي</option>
+                            <option value="red">أحمر</option>
+                            <option value="orange">برتقالي</option>
+                            <option value="gray">رمادي</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Font Size -->
+                    <div>
+                        <label for="font_size" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">حجم الخط</label>
+                        <select id="font_size" x-model="settings.font_size" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                            <option value="small">صغير</option>
+                            <option value="medium">متوسط</option>
+                            <option value="large">كبير</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- RTL Enabled -->
+                <div class="mt-4">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="rtl_enabled" x-model="settings.rtl_enabled" 
+                               class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
+                        <label for="rtl_enabled" class="mr-2 block text-sm text-gray-700 dark:text-gray-300">
+                            تمكين اتجاه من اليمين إلى اليسار (RTL)
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Custom Colors -->
+            <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-100 dark:border-green-800">
+                <h2 class="text-lg font-semibold text-green-700 dark:text-green-300 mb-4">ألوان مخصصة</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <template x-for="(color, name) in settings.custom_colors" :key="name">
+                        <div>
+                            <label :for="'color_' + name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" 
+                                   x-text="getColorLabel(name)"></label>
+                            <div class="flex">
+                                <input :id="'color_' + name" type="color" x-model="settings.custom_colors[name]" 
+                                       class="h-10 w-10 border border-gray-300 rounded-md shadow-sm">
+                                <input type="text" x-model="settings.custom_colors[name]" 
+                                       class="w-full mr-2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            
+            <!-- Submit Button -->
+            <div class="flex justify-end">
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        :disabled="isSaving">
+                    <span x-show="!isSaving">حفظ الإعدادات</span>
+                    <span x-show="isSaving" class="flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        جاري الحفظ...
+                    </span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('systemSettingsApp', () => ({
+            settings: {
+                system_title: "{{ settings.system_title }}",
+                theme_color: "{{ settings.theme_color }}",
+                background_color: "{{ settings.background_color }}",
+                sidebar_color: "{{ settings.sidebar_color }}",
+                font_size: "{{ settings.font_size }}",
+                rtl_enabled: {{ 'true' if settings.rtl_enabled else 'false' }},
+                custom_colors: {{ settings.custom_colors|tojson }}
+            },
+            isSaving: false,
+            
+            getColorLabel(name) {
+                const labels = {
+                    'primary': 'اللون الأساسي',
+                    'secondary': 'اللون الثانوي',
+                    'accent': 'لون التمييز',
+                    'success': 'لون النجاح',
+                    'warning': 'لون التحذير',
+                    'error': 'لون الخطأ',
+                    'info': 'لون المعلومات'
+                };
+                
+                return labels[name] || name;
+            },
+            
+            async saveSettings() {
+                this.isSaving = true;
+                
+                try {
+                    const response = await fetch('/settings/api/system-settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.settings)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Show success message
+                        alert('تم حفظ الإعدادات بنجاح');
+                        
+                        // Reload the page to apply changes
+                        window.location.reload();
+                    } else {
+                        // Show error message
+                        alert('حدث خطأ أثناء حفظ الإعدادات: ' + data.error);
+                    }
+                } catch (error) {
+                    console.error('Error saving settings:', error);
+                    alert('حدث خطأ أثناء حفظ الإعدادات');
+                } finally {
+                    this.isSaving = false;
+                }
+            }
+        }));
+    });
+</script>
+{% endblock %}

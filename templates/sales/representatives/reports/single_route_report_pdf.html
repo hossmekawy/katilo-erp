@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقرير المسار {{ route.id }}</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            direction: rtl;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .logo {
+            max-width: 150px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 24px;
+        }
+        .report-date {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .route-info {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3498db;
+        }
+        .route-info h2 {
+            margin-top: 0;
+            color: #3498db;
+            font-size: 18px;
+        }
+        .info-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .info-label {
+            font-weight: bold;
+            width: 150px;
+            color: #7f8c8d;
+        }
+        .info-value {
+            flex: 1;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            text-align: right;
+            padding: 10px;
+        }
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-completed {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .status-pending {
+            background-color: #f39c12;
+            color: white;
+        }
+        .status-missed {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #7f8c8d;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+        .summary-box {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .summary-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .summary-label {
+            color: #7f8c8d;
+        }
+        .summary-value {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="{{ url_for('static', filename='uploads/images/katilo.png', _external=True) }}" alt="Katilo Logo" class="logo">
+        <h1>تقرير المسار</h1>
+        <div class="report-date">تاريخ التقرير: {{ route.route_date.strftime('%Y-%m-%d') }}</div>
+    </div>
+
+    <div class="route-info">
+        <h2>معلومات المسار</h2>
+        <div class="info-row">
+            <div class="info-label">رقم المسار:</div>
+            <div class="info-value">{{ route.id }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">اسم المسار:</div>
+            <div class="info-value">{{ route.route_name }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">مندوب المبيعات:</div>
+            <div class="info-value">{{ route.representative.user.username if route.representative and route.representative.user else 'غير معروف' }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">تاريخ المسار:</div>
+            <div class="info-value">{{ route.route_date.strftime('%Y-%m-%d') }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">الحالة:</div>
+            <div class="info-value">
+                {% if route.status == 'Planned' %}
+                    مخطط
+                {% elif route.status == 'In Progress' %}
+                    قيد التنفيذ
+                {% elif route.status == 'Completed' %}
+                    مكتمل
+                {% elif route.status == 'Cancelled' %}
+                    ملغي
+                {% else %}
+                    {{ route.status }}
+                {% endif %}
+            </div>
+        </div>
+        {% if route.notes %}
+        <div class="info-row">
+            <div class="info-label">ملاحظات:</div>
+            <div class="info-value">{{ route.notes }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <h2>الزيارات</h2>
+    {% if route.visits %}
+    <table>
+        <thead>
+            <tr>
+                <th>رقم الزيارة</th>
+                <th>العميل</th>
+                <th>الوقت المجدول</th>
+                <th>وقت الزيارة الفعلي</th>
+                <th>الحالة</th>
+                <th>النتيجة</th>
+                <th>رقم الطلب</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for visit in route.visits %}
+            <tr>
+                <td>{{ visit.id }}</td>
+                <td>{{ visit.customer.customer_name if visit.customer else 'غير معروف' }}</td>
+                <td>{{ visit.scheduled_time.strftime('%H:%M') if visit.scheduled_time else '-' }}</td>
+                <td>{{ visit.actual_visit_time.strftime('%H:%M') if visit.actual_visit_time else '-' }}</td>
+                <td>
+                    {% if visit.status == 'Pending' or visit.status == 'قيد الانتظار' %}
+                        <span class="status status-pending">قيد الانتظار</span>
+                    {% elif visit.status == 'Completed' or visit.status == 'تم بنجاح' %}
+                        <span class="status status-completed">تم بنجاح</span>
+                    {% elif visit.status == 'Missed' %}
+                        <span class="status status-missed">فائتة</span>
+                    {% else %}
+                        {{ visit.status }}
+                    {% endif %}
+                </td>
+                <td>{{ visit.visit_outcome or '-' }}</td>
+                <td>{{ visit.order_id or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>لا توجد زيارات مسجلة لهذا المسار.</p>
+    {% endif %}
+
+    <div class="summary-box">
+        <div class="summary-title">ملخص المسار</div>
+        <div class="summary-row">
+            <div class="summary-label">إجمالي الزيارات:</div>
+            <div class="summary-value">{{ route.visits|length }}</div>
+        </div>
+        <div class="summary-row">
+            <div class="summary-label">الزيارات المكتملة:</div>
+            <div class="summary-value">{{ route.visits|selectattr('status', 'equalto', 'تم بنجاح')|list|length + route.visits|selectattr('status', 'equalto', 'Completed')|list|length }}</div>
+        </div>
+        <div class="summary-row">
+            <div class="summary-label">الزيارات المعلقة:</div>
+            <div class="summary-value">{{ route.visits|selectattr('status', 'equalto', 'قيد الانتظار')|list|length + route.visits|selectattr('status', 'equalto', 'Pending')|list|length }}</div>
+        </div>
+        <div class="summary-row">
+            <div class="summary-label">الطلبات:</div>
+            <div class="summary-value">{{ route.visits|selectattr('order_id')|list|length }}</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>تم إنشاء هذا التقرير بواسطة نظام كاتيلو للمبيعات</p>
+        <p>© {{ current_year }} كاتيلو. جميع الحقوق محفوظة.</p>
+    </div>
+</body>
+</html>

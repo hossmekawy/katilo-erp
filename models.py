@@ -13,12 +13,14 @@ db = SQLAlchemy()
 category_type_enum = SAEnum('FinalProduct', 'Packaging', 'RawMaterial', 'IntermediateProduct', name='category_type_enum')
 transaction_type_enum = SAEnum('IN', 'OUT', 'TRANSFER', name='transaction_type_enum')
 purchase_order_status_enum = SAEnum('Pending', 'Approved', 'Received', 'Cancelled', name='purchase_order_status_enum')
-sales_order_status_enum = SAEnum('Pending', 'Shipped', 'Delivered', 'Cancelled', name='sales_order_status_enum')
+sales_order_status_enum = SAEnum('Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', name='sales_order_status_enum')
+cost_update_source_enum = SAEnum('PurchaseOrder', 'SupplierUpdate', 'ManualUpdate', 'BOMCalculation', name='cost_update_source_enum')
+
 qc_status_enum = SAEnum('Passed', 'Failed', 'Retest', name='qc_status_enum')
 production_run_status_enum = SAEnum('Planned', 'In Progress', 'Completed', name='production_run_status_enum')
 document_category_enum = SAEnum('Recipe', 'Certification', 'Manual', 'Other', name='document_category_enum')
 report_type_enum = SAEnum(
-    'Inventory', 'Transactions', 'Suppliers', 'SupplierAccounts', 
+    'Inventory', 'Transactions', 'Suppliers', 'SupplierAccounts',
     'Production', 'QualityControl', 'Warehouses', 'Items',
     'Categories', 'PurchaseOrders', 'BOM', 'Custom',
     name='report_type_enum'
@@ -58,7 +60,7 @@ class Category(db.Model):
     description = db.Column('Description', db.String(255))
     category_type = db.Column(category_type_enum, default='RawMaterial')
     items = db.relationship('Item', backref='category', lazy=True)
-    
+
     def __repr__(self):
         return f'<Category {self.name}>'
 
@@ -75,7 +77,11 @@ class Item(db.Model):
     reorder_level = db.Column('ReorderLevel', db.Integer, nullable=False)
     created_at = db.Column('CreatedAt', db.DateTime, default=datetime.utcnow)
     updated_at = db.Column('UpdatedAt', db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
+    # Define weight and volume as properties
+    _weight = 0
+    _volume = 0
+
     inventories = db.relationship('Inventory', backref='item', lazy=True)
     bom_final = db.relationship('BOM', backref='final_product', lazy=True,
                                 foreign_keys='BOM.final_product_id')
@@ -83,6 +89,46 @@ class Item(db.Model):
                                      foreign_keys='BOMDetail.component_item_id')
     transactions = db.relationship('InventoryTransaction', backref='item', lazy=True)
     slots = db.relationship('WarehouseSlot', backref='item_ref', lazy=True)
+    cost_history = db.relationship('ItemCostHistory', backref='item', lazy=True)
+
+    # Weight property
+    @property
+    def weight(self):
+        try:
+            # Try to get the weight from the item_weights table
+            from app import db
+            result = db.session.execute(
+                "SELECT weight FROM item_weights WHERE item_id = :item_id",
+                {"item_id": self.id}
+            ).fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            print(f"Error getting weight for item {self.id}: {str(e)}")
+            return 0
+
+    # Volume property
+    @property
+    def volume(self):
+        try:
+            # Try to get the volume from the item_weights table
+            from app import db
+            result = db.session.execute(
+                "SELECT volume FROM item_weights WHERE item_id = :item_id",
+                {"item_id": self.id}
+            ).fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            print(f"Error getting volume for item {self.id}: {str(e)}")
+            return 0
+
+    # For backward compatibility
+    @property
+    def get_weight(self):
+        return self.weight
+
+    @property
+    def get_volume(self):
+        return self.volume
 
     def __repr__(self):
         return f'<Item {self.name}>'
@@ -95,11 +141,11 @@ class Warehouse(db.Model):
     capacity = db.Column('Capacity', db.Integer)
     contact_info = db.Column('ContactInfo', db.String(255))
     item_location = db.Column('ItemLocation', db.String(100))  # Example custom field
-    
+
     inventories = db.relationship('Inventory', backref='warehouse', lazy=True)
     transactions = db.relationship('InventoryTransaction', backref='warehouse', lazy=True)
     sections = db.relationship('WarehouseSection', backref='warehouse', lazy=True)
-    
+
     def __repr__(self):
         return f'<Warehouse {self.name}>'
 
@@ -150,7 +196,7 @@ class Inventory(db.Model):
     warehouse_id = db.Column('WarehouseID', db.Integer, db.ForeignKey('warehouses.WarehouseID'), index=True, nullable=False)
     quantity = db.Column('Quantity', db.Integer, nullable=False)
     last_updated = db.Column('LastUpdated', db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     __table_args__ = (
         CheckConstraint('Quantity >= 0', name='chk_inventory_qty_nonnegative'),
     )
@@ -179,21 +225,51 @@ class InventoryTransaction(db.Model):
 #########################################################################################
 #################  #  Returns & Refunds Management  ####################################
 #########################################################################################
-class ProductReturn(db.Model):
-    __tablename__ = 'product_returns'
+class SalesReturn(db.Model):
+    __tablename__ = 'sales_returns'
     id = db.Column(db.Integer, primary_key=True)
     sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.SalesOrderID'), nullable=False)
-    item_id = db.Column(db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
+    invoice_id = db.Column(db.Integer, db.ForeignKey('sales_invoices.id'))
+    return_date = db.Column(db.DateTime, default=datetime.utcnow)
     return_reason = db.Column(return_reason_enum, default='Other')
     return_status = db.Column(return_status_enum, default='Pending')
-    refund_amount = db.Column(db.Float, default=0.0)
-    return_date = db.Column(db.DateTime, default=datetime.utcnow)
+    total_refund_amount = db.Column(db.Float, default=0.0)
+    cash_account_id = db.Column(db.Integer, db.ForeignKey('cash_accounts.id'))
+    refund_method = db.Column(db.String(50), default='cash')  # cash, credit_card, bank_transfer, etc.
+    refund_reference = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    approved_at = db.Column(db.DateTime)
 
-    sales_order = db.relationship('SalesOrder', backref='product_returns', lazy=True)
-    item = db.relationship('Item', backref='product_returns', lazy=True)
+    # Relationships
+    sales_order = db.relationship('SalesOrder', backref='returns', lazy=True)
+    invoice = db.relationship('SalesInvoice', backref='returns', lazy=True)
+    cash_account = db.relationship('CashAccount', backref='sales_returns', lazy=True)
+    creator = db.relationship('User', foreign_keys=[created_by], backref='created_returns', lazy=True)
+    approver = db.relationship('User', foreign_keys=[approved_by], backref='approved_returns', lazy=True)
+    items = db.relationship('SalesReturnItem', backref='sales_return', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
-        return f"<ProductReturn {self.id} SO {self.sales_order_id} Item {self.item_id}>"
+        return f"<SalesReturn {self.id} SO {self.sales_order_id} Amount {self.total_refund_amount}>"
+
+class SalesReturnItem(db.Model):
+    __tablename__ = 'sales_return_items'
+    id = db.Column(db.Integer, primary_key=True)
+    return_id = db.Column(db.Integer, db.ForeignKey('sales_returns.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Float, nullable=False)
+    refund_amount = db.Column(db.Float, nullable=False)
+    return_reason = db.Column(return_reason_enum, default='Other')
+    condition = db.Column(db.String(50), default='Good')  # Good, Damaged, Defective, etc.
+    restocked = db.Column(db.Boolean, default=True)
+
+    # Relationships
+    item = db.relationship('Item', backref='return_items', lazy=True)
+
+    def __repr__(self):
+        return f"<SalesReturnItem {self.id} Item {self.item_id} Qty {self.quantity}>"
 
 
 
@@ -214,9 +290,9 @@ class BOM(db.Model):
     description = db.Column('Description', db.Text)
     created_at = db.Column('CreatedAt', db.DateTime, default=datetime.utcnow)
     updated_at = db.Column('UpdatedAt', db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     details = db.relationship('BOMDetail', backref='bom', lazy=True)
-    
+
     def __repr__(self):
         return f'<BOM for Final Product {self.final_product_id}>'
 
@@ -227,7 +303,7 @@ class BOMDetail(db.Model):
     component_item_id = db.Column('ComponentItemID', db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
     quantity_required = db.Column('QuantityRequired', db.Float, nullable=False)
     unit_of_measure = db.Column('UnitOfMeasure', db.String(20))
-    
+
     def __repr__(self):
         return f'<BOMDetail for BOM {self.bom_id} Component {self.component_item_id}>'
 
@@ -281,14 +357,14 @@ class SupplierPayment(db.Model):
     notes = db.Column('Notes', db.Text)
     created_by = db.Column('CreatedBy', db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column('CreatedAt', db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     supplier = db.relationship('Supplier', backref='payments', lazy=True)
     created_by_user = db.relationship('User', backref='supplier_payments_created', lazy=True)
-    
+
     def __repr__(self):
         return f"<SupplierPayment {self.id} Supplier {self.supplier_id} Amount {self.amount}>"
-    
+
 class SupplierLedgerEntry(db.Model):
     __tablename__ = 'supplier_ledger'
     id = db.Column('EntryID', db.Integer, primary_key=True)
@@ -299,10 +375,10 @@ class SupplierLedgerEntry(db.Model):
     reference_id = db.Column('ReferenceID', db.Integer)
     debit = db.Column('Debit', db.Float, default=0)  # Amount owed to supplier
     credit = db.Column('Credit', db.Float, default=0)  # Amount paid to supplier
-    
+
     # Relationships
     supplier = db.relationship('Supplier', backref='ledger_entries', lazy=True)
-    
+
     def __repr__(self):
         return f"<SupplierLedgerEntry {self.id} Supplier {self.supplier_id} Debit {self.debit} Credit {self.credit}>"
 
@@ -337,6 +413,27 @@ class SupplierItem(db.Model):
         return f"<SupplierItem Supplier {self.supplier_id}, Item {self.item_id}>"
 
 
+class ItemCostHistory(db.Model):
+    __tablename__ = 'item_cost_history'
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
+    previous_cost = db.Column(db.Float, nullable=False)
+    new_cost = db.Column(db.Float, nullable=False)
+    change_date = db.Column(db.DateTime, default=datetime.utcnow)
+    source = db.Column(cost_update_source_enum, default='ManualUpdate')
+    reference_id = db.Column(db.Integer)  # ID of PO, supplier, etc.
+    reference_type = db.Column(db.String(50))  # 'purchase_order', 'supplier_item', etc.
+    quantity = db.Column(db.Integer)  # For weighted average calculation
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Relationships
+    user = db.relationship('User', backref='cost_updates', lazy=True)
+
+    def __repr__(self):
+        return f"<ItemCostHistory Item {self.item_id} from {self.previous_cost} to {self.new_cost}>"
+
+
 
 ##############################################################################
 # SALES ORDERS AND CUSTOMER MANAGEMENT
@@ -351,6 +448,9 @@ class Customer(db.Model):
     shipping_address = db.Column('ShippingAddress', db.Text)
 
     sales_orders = db.relationship('SalesOrder', backref='customer', lazy=True)
+    interactions = db.relationship('CustomerInteraction', backref='related_customer', lazy=True)
+
+
 
     def __repr__(self):
         return f"<Customer {self.customer_name}>"
@@ -362,8 +462,16 @@ class SalesOrder(db.Model):
     order_date = db.Column('OrderDate', db.DateTime, default=datetime.utcnow)
     status = db.Column(sales_order_status_enum, default='Pending')
     total_amount = db.Column('TotalAmount', db.Float)
+    sales_rep_id = db.Column(db.Integer, db.ForeignKey('sales_representatives.id'), nullable=True)
+
+    # Make these columns nullable to avoid errors if they don't exist in the database
+    payment_method = db.Column(db.String(50), nullable=True)
+    cash_account_id = db.Column(db.Integer, db.ForeignKey('cash_accounts.id'), nullable=True)
+    payment_status = db.Column(db.String(20), nullable=True)
+    payment_reference = db.Column(db.String(100), nullable=True)
 
     details = db.relationship('SalesOrderDetail', backref='sales_order', lazy=True)
+    cash_account = db.relationship('CashAccount', backref='sales_orders', lazy=True, foreign_keys=[cash_account_id])
 
     def __repr__(self):
         return f"<SalesOrder {self.id} Customer {self.customer_id}>"
@@ -372,7 +480,8 @@ class SalesOrderDetail(db.Model):
     __tablename__ = 'sales_order_details'
     id = db.Column('SODetailID', db.Integer, primary_key=True)
     sales_order_id = db.Column('SalesOrderID', db.Integer, db.ForeignKey('sales_orders.SalesOrderID'), nullable=False)
-    item_id = db.Column('ItemID', db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
+    item_id = db.Column('ItemID', db.Integer, db.ForeignKey('items.ItemID'))
+    item = db.relationship('Item', backref='order_details')
     quantity_ordered = db.Column('QuantityOrdered', db.Integer, nullable=False)
     unit_price = db.Column('UnitPrice', db.Float, nullable=False)
     quantity_shipped = db.Column('QuantityShipped', db.Integer, default=0)
@@ -385,9 +494,181 @@ class SalesOrderDetail(db.Model):
     def __repr__(self):
         return f"<SODetail {self.id} SO {self.sales_order_id} Item {self.item_id}>"
 
+
+class SalesRepresentative(db.Model):
+    __tablename__ = 'sales_representatives'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    territory = db.Column(db.String(100))
+    commission_rate = db.Column(db.Float, default=0.0)
+    is_active = db.Column(db.Boolean, default=True)
+
+    # Relationships
+    user = db.relationship('User', backref='sales_rep_profile', lazy=True)
+    # sales_orders = db.relationship('SalesOrder', backref='representative', lazy=True)
+
+    def __repr__(self):
+        return f"<SalesRepresentative {self.id} User {self.user_id}>"
+
+# Sales Representative Route Planning Models
+class RepresentativeRoute(db.Model):
+    __tablename__ = 'representative_routes'
+    id = db.Column(db.Integer, primary_key=True)
+    representative_id = db.Column(db.Integer, db.ForeignKey('sales_representatives.id'), nullable=False)
+    route_name = db.Column(db.String(100), nullable=False)
+    route_date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(50), default='Planned')  # Planned, In Progress, Completed, Cancelled
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    representative = db.relationship('SalesRepresentative', backref='routes', lazy=True)
+    visits = db.relationship('CustomerVisit', backref='route', lazy=True, cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<RepresentativeRoute {self.id} for Rep {self.representative_id}>"
+
+class CustomerVisit(db.Model):
+    __tablename__ = 'customer_visits'
+    id = db.Column(db.Integer, primary_key=True)
+    route_id = db.Column(db.Integer, db.ForeignKey('representative_routes.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.SalesOrderID'))
+    scheduled_time = db.Column(db.DateTime)
+    actual_visit_time = db.Column(db.DateTime)
+    status = db.Column(db.String(50), default='Pending')  # Pending, Completed, Missed, Rescheduled
+    visit_notes = db.Column(db.Text)
+    visit_outcome = db.Column(db.String(50))  # Sale, No Sale, Follow-up Required
+    follow_up_date = db.Column(db.Date)
+    location_latitude = db.Column(db.Float)
+    location_longitude = db.Column(db.Float)
+
+    # Relationships
+    customer = db.relationship('Customer', backref='visits', lazy=True)
+    order = db.relationship('SalesOrder', backref='related_visit', lazy=True)
+    photos = db.relationship('VisitPhoto', backref='visit', lazy=True, cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<CustomerVisit {self.id} for Customer {self.customer_id}>"
+
+class VisitPhoto(db.Model):
+    __tablename__ = 'visit_photos'
+    id = db.Column(db.Integer, primary_key=True)
+    visit_id = db.Column(db.Integer, db.ForeignKey('customer_visits.id'), nullable=False)
+    photo_path = db.Column(db.String(255), nullable=False)
+    upload_time = db.Column(db.DateTime, default=datetime.utcnow)
+    description = db.Column(db.Text)
+
+    def __repr__(self):
+        return f"<VisitPhoto {self.id} for Visit {self.visit_id}>"
+
+class AISuggestion(db.Model):
+    __tablename__ = 'ai_suggestions'
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.ItemID'), nullable=True)
+    category_id = db.Column(db.Integer, db.ForeignKey('categories.CategoryID'), nullable=True)
+    suggestion_type = db.Column(db.String(50), nullable=False)  # NameImprovement, CategoryMismatch, ReorderLevelAdjustment, InventoryAnomaly
+    suggestion_text = db.Column(db.Text, nullable=False)
+    suggested_value = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(20), default='Pending')  # Pending, Applied, Dismissed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    item = db.relationship('Item', backref='ai_suggestions')
+    category = db.relationship('Category', backref='ai_suggestions')
+
+    def __repr__(self):
+        return f'<AISuggestion {self.id}: {self.suggestion_type}>'
+
+class RepresentativePerformance(db.Model):
+    __tablename__ = 'representative_performance'
+    id = db.Column(db.Integer, primary_key=True)
+    representative_id = db.Column(db.Integer, db.ForeignKey('sales_representatives.id'), nullable=False)
+    period_start = db.Column(db.Date, nullable=False)
+    period_end = db.Column(db.Date, nullable=False)
+    total_visits = db.Column(db.Integer, default=0)
+    completed_visits = db.Column(db.Integer, default=0)
+    total_sales = db.Column(db.Float, default=0.0)
+    total_orders = db.Column(db.Integer, default=0)
+    conversion_rate = db.Column(db.Float, default=0.0)  # Percentage of visits resulting in sales
+    average_order_value = db.Column(db.Float, default=0.0)
+    evaluation_score = db.Column(db.Float, default=0.0)  # 0-100 score
+    evaluation_notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    representative = db.relationship('SalesRepresentative', backref='performance_records', lazy=True)
+
+    def __repr__(self):
+        return f"<RepresentativePerformance {self.id} for Rep {self.representative_id}>"
+
+
+class SalesInvoice(db.Model):
+    __tablename__ = 'sales_invoices'
+    id = db.Column(db.Integer, primary_key=True)
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.SalesOrderID'), nullable=False)
+    invoice_number = db.Column(db.String(50), unique=True, nullable=False)
+    invoice_date = db.Column(db.DateTime, default=datetime.utcnow)
+    due_date = db.Column(db.DateTime)
+    subtotal = db.Column(db.Float, nullable=False)
+    tax_amount = db.Column(db.Float, default=0.0)
+    discount_amount = db.Column(db.Float, default=0.0)
+    total_amount = db.Column(db.Float, nullable=False)
+    notes = db.Column(db.Text)
+    status = db.Column(db.String(20), default='Unpaid')  # Unpaid, Partially Paid, Paid
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Relationships
+    sales_order = db.relationship('SalesOrder', backref='invoices', lazy=True)
+    creator = db.relationship('User', backref='created_invoices', lazy=True)
+    payments = db.relationship('SalesPayment', backref='invoice', lazy=True)
+
+    def __repr__(self):
+        return f"<SalesInvoice {self.id} Invoice# {self.invoice_number}>"
+
+class SalesPayment(db.Model):
+    __tablename__ = 'sales_payments'
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer, db.ForeignKey('sales_invoices.id'), nullable=False)
+    payment_date = db.Column(db.DateTime, default=datetime.utcnow)
+    amount = db.Column(db.Float, nullable=False)
+    payment_method = db.Column(db.String(50), nullable=False)  # Cash, Credit Card, Bank Transfer
+    cash_account_id = db.Column(db.Integer, db.ForeignKey('cash_accounts.id'))
+    reference_number = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    recorded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Relationships
+    recorder = db.relationship('User', backref='recorded_payments', lazy=True)
+    cash_account = db.relationship('CashAccount', backref='sales_payments', lazy=True)
+
+    def __repr__(self):
+        return f"<SalesPayment {self.id} Invoice {self.invoice_id} Amount {self.amount}>"
+
+class SalesActivityLog(db.Model):
+    __tablename__ = 'sales_activity_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.SalesOrderID'))
+    invoice_id = db.Column(db.Integer, db.ForeignKey('sales_invoices.id'))
+    activity_type = db.Column(db.String(50), nullable=False)  # Created, Updated, Deleted, Payment, etc.
+    description = db.Column(db.Text, nullable=False)
+    performed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    sales_order = db.relationship('SalesOrder', backref='activity_logs', lazy=True)
+    invoice = db.relationship('SalesInvoice', backref='activity_logs', lazy=True)
+    user = db.relationship('User', backref='sales_activities', lazy=True)
+
+    def __repr__(self):
+        return f"<SalesActivityLog {self.id} Type {self.activity_type}>"
 ##############################################################################
 # LOT/BATCH TRACKING AND EXPIRY MANAGEMENT
 ##############################################################################
+
+# Update the Batch model to include production order relationship
 
 class Batch(db.Model):
     __tablename__ = 'batches'
@@ -397,11 +678,29 @@ class Batch(db.Model):
     production_date = db.Column('ProductionDate', db.DateTime)
     expiry_date = db.Column('ExpiryDate', db.DateTime)
     quantity = db.Column('Quantity', db.Integer, nullable=False)
-    production_run_id = db.Column('ProductionRunID', db.Integer, 
+
+    # Keep this relationship to ProductionRun
+    production_run_id = db.Column('ProductionRunID', db.Integer,
                                  db.ForeignKey('production_runs.ProductionRunID', name='fk_batch_production_run'))
 
+    # Add a new column for ProductionOrder relationship
+    production_order_id = db.Column('production_order_id', db.Integer,
+                                   db.ForeignKey('production_orders.id', name='fk_batch_production_order'))
+
+    status = db.Column(db.String(50), default='Created')  # Created, InProduction, QCPending, QCPassed, Packaged, Stored
+
+    # Relationships
     item = db.relationship('Item', backref='batches', lazy=True)
-    production_run = db.relationship('ProductionRun', backref='batches', lazy=True)
+
+    # Explicitly define the relationship to ProductionRun with foreign_keys
+    production_run = db.relationship('ProductionRun',
+                                    foreign_keys=[production_run_id],
+                                    backref='batches',
+                                    lazy=True)
+
+    # Don't define the relationship to ProductionOrder here
+    # Let it be defined in the ProductionOrder model
+
     batch_slots = db.relationship('BatchSlot', backref='batch', lazy=True)
 
     __table_args__ = (
@@ -410,7 +709,6 @@ class Batch(db.Model):
 
     def __repr__(self):
         return f"<Batch {self.id} Item {self.item_id} Lot {self.lot_number}>"
-
 
 class BatchSlot(db.Model):
     __tablename__ = 'batch_slots'
@@ -544,6 +842,10 @@ class RolePermission(db.Model):
     role_id = db.Column('RoleID', db.Integer, db.ForeignKey('roles.id'), primary_key=True)
     permission_id = db.Column('PermissionID', db.Integer, db.ForeignKey('permissions.PermissionID'), primary_key=True)
 
+    # Relationships
+    role = db.relationship('Role', backref=db.backref('role_permissions', lazy=True, cascade='all, delete-orphan'))
+    permission = db.relationship('Permission', backref=db.backref('role_permissions', lazy=True))
+
 ##############################################################################
 # DOCUMENT MANAGEMENT
 ##############################################################################
@@ -572,29 +874,29 @@ class ReportRequest(db.Model):
     requested_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(report_status_enum, default='Pending')
     format = db.Column(report_format_enum, default='PDF')
-    
+
     # Filters stored as JSON
     filters = db.Column(db.JSON, default={})
-    
+
     # Date range for report
     date_from = db.Column(db.DateTime)
     date_to = db.Column(db.DateTime)
-    
+
     # For admin processing
     processed_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     processed_at = db.Column(db.DateTime)
     admin_notes = db.Column(db.Text)
-    
+
     # Generated report file path
     report_file_path = db.Column(db.String(255))
-    
+
     # Relationships
     requester = db.relationship('User', foreign_keys=[requested_by], backref='requested_reports')
     processor = db.relationship('User', foreign_keys=[processed_by], backref='processed_reports')
-    
+
     def __repr__(self):
         return f"<ReportRequest {self.id}: {self.report_name} ({self.status})>"
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -624,10 +926,10 @@ class ReportTemplate(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_default = db.Column(db.Boolean, default=False)
-    
+
     # Relationship
     creator = db.relationship('User', backref='created_templates')
-    
+
     def __repr__(self):
         return f"<ReportTemplate {self.id}: {self.name}>"
 
@@ -666,11 +968,11 @@ class ProductionRunDetail(db.Model):
 
     def __repr__(self):
         return f"<ProductionRunDetail {self.id} Run {self.production_run_id} Item {self.item_id}>"
-    
-    
+
+
 class ProductionProcess(db.Model):
     __tablename__ = 'production_processes'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)  # Changed from 'batches.id' to 'batches.BatchID'
     process_type = db.Column(db.String(50), nullable=False)  # pasteurization, curdling, draining, etc.
@@ -682,14 +984,14 @@ class ProductionProcess(db.Model):
     notes = db.Column(db.Text)
     operator_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     batch = db.relationship('Batch', backref=db.backref('processes', lazy=True))
     operator = db.relationship('User', backref=db.backref('production_processes', lazy=True))
 
 class AgingRecord(db.Model):
     __tablename__ = 'aging_records'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)  # Changed from 'batches.id' to 'batches.BatchID'
     aging_room = db.Column(db.String(50), nullable=False)
@@ -701,14 +1003,14 @@ class AgingRecord(db.Model):
     notes = db.Column(db.Text)
     inspector_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     batch = db.relationship('Batch', backref=db.backref('aging_records', lazy=True))
     inspector = db.relationship('User', backref=db.backref('inspected_aging_records', lazy=True))
 
 class WorkerProductivity(db.Model):
     __tablename__ = 'worker_productivity'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     production_run_id = db.Column(db.Integer, db.ForeignKey('production_runs.ProductionRunID'), nullable=False)  # Changed from 'production_runs.id' to 'production_runs.ProductionRunID'
@@ -719,7 +1021,7 @@ class WorkerProductivity(db.Model):
     notes = db.Column(db.Text)
     recorded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('productivity_records', lazy=True))
     production_run = db.relationship('ProductionRun', backref=db.backref('productivity_records', lazy=True))
@@ -734,13 +1036,13 @@ class ProductPackaging(db.Model):
     status = db.Column(packaging_status_enum, default='Pending')
     packaged_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     notes = db.Column(db.Text)
-    
+
     # Relationships
     production_run = db.relationship('ProductionRun', backref='packaging_records', lazy=True)
     batch = db.relationship('Batch', backref='packaging_records', lazy=True)
     packager = db.relationship('User', backref='packaging_records', lazy=True)
     packaging_materials = db.relationship('PackagingMaterial', backref='packaging', lazy=True, cascade='all, delete-orphan')
-    
+
     def __repr__(self):
         return f"<ProductPackaging {self.id} for Batch {self.batch_id}>"
 
@@ -750,12 +1052,247 @@ class PackagingMaterial(db.Model):
     packaging_id = db.Column(db.Integer, db.ForeignKey('product_packaging.id'), nullable=False)
     item_id = db.Column(db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
     quantity_used = db.Column(db.Integer, nullable=False)
-    
+
     # Relationship
     item = db.relationship('Item', backref='used_in_packaging', lazy=True)
-    
+
     def __repr__(self):
         return f"<PackagingMaterial {self.id} Item {self.item_id} Qty {self.quantity_used}>"
+
+# Production Line Management
+class ProductionLine(db.Model):
+    __tablename__ = 'production_lines'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    capacity_per_hour = db.Column(db.Float)
+    # Add these three fields:
+    capacity_unit = db.Column(db.String(50))
+    capacity_period = db.Column(db.String(50))
+    location = db.Column(db.String(200))
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    production_orders = db.relationship('ProductionOrder', backref='production_line', lazy=True)
+
+    def __repr__(self):
+        return f"<ProductionLine {self.name}>"
+
+# Production Order Status Enum
+production_order_status_enum = SAEnum(
+    'Planned', 'InProgress', 'Completed', 'Cancelled', 'OnHold',
+    name='production_order_status_enum'
+)
+
+# Production Order
+class ProductionOrder(db.Model):
+    __tablename__ = 'production_orders'
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    status = db.Column(production_order_status_enum, default='Planned')
+    production_line_id = db.Column(db.Integer, db.ForeignKey('production_lines.id'))
+    production_run_id = db.Column(db.Integer, db.ForeignKey('production_runs.ProductionRunID'))
+    scheduled_start = db.Column(db.DateTime)
+    scheduled_end = db.Column(db.DateTime)
+    actual_start = db.Column(db.DateTime)
+    actual_end = db.Column(db.DateTime)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    product = db.relationship('Item', backref='production_orders', lazy=True)
+    production_run = db.relationship('ProductionRun', backref='production_orders', lazy=True)
+    creator = db.relationship('User', backref='created_production_orders', lazy=True)
+    batches = db.relationship('Batch',
+                             foreign_keys='Batch.production_order_id',
+                             backref=db.backref('production_order', lazy=True),
+                             lazy=True)
+    def __repr__(self):
+        return f"<ProductionOrder {self.id} for Product {self.product_id}>"
+
+# Production Step
+class ProductionStep(db.Model):
+    __tablename__ = 'production_steps'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    standard_duration = db.Column(db.Integer)  # in minutes
+    sequence_number = db.Column(db.Integer, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)  # Add this line
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)  # Add this if you want to track creation time
+
+    # Relationships
+    step_records = db.relationship('ProductionStepRecord', backref='step', lazy=True)
+
+    def __repr__(self):
+        return f"<ProductionStep {self.name}>"
+
+
+# Production Step Record
+class ProductionStepRecord(db.Model):
+    __tablename__ = 'production_step_records'
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)
+    step_id = db.Column(db.Integer, db.ForeignKey('production_steps.id'), nullable=False)
+    start_time = db.Column(db.DateTime)
+    end_time = db.Column(db.DateTime)
+    operator_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    notes = db.Column(db.Text)
+    parameters = db.Column(db.JSON)  # Store step-specific parameters
+
+    # Relationships
+    batch = db.relationship('Batch', backref='step_records', lazy=True)
+    operator = db.relationship('User', backref='operated_steps', lazy=True)
+
+    def __repr__(self):
+        return f"<ProductionStepRecord {self.id} for Batch {self.batch_id}, Step {self.step_id}>"
+
+# Production Parameter
+class ProductionParameter(db.Model):
+    __tablename__ = 'production_parameters'
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)
+    parameter_name = db.Column(db.String(100), nullable=False)
+    parameter_value = db.Column(db.String(100))
+    recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    recorded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Relationships
+    batch = db.relationship('Batch', backref='parameters', lazy=True)
+    recorder = db.relationship('User', backref='recorded_parameters', lazy=True)
+
+    def __repr__(self):
+        return f"<ProductionParameter {self.parameter_name}={self.parameter_value} for Batch {self.batch_id}>"
+
+# QC Test Type Enum
+qc_test_type_enum = SAEnum(
+    'Visual', 'Chemical', 'Physical', 'Microbiological', 'Sensory', 'Other','Comprehensive',
+    name='qc_test_type_enum'
+)
+
+# QC Test Status Enum
+qc_test_status_enum = SAEnum(
+    'Pending', 'InProgress', 'Passed', 'Failed', 'Retest',
+    name='qc_test_status_enum'
+)
+
+# QC Test
+class QCTest(db.Model):
+    __tablename__ = 'qc_tests'
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)
+    test_type = db.Column(qc_test_type_enum, default='Visual')
+    status = db.Column(qc_test_status_enum, default='Pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+    inspector_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    notes = db.Column(db.Text)
+
+    # Relationships
+    batch = db.relationship('Batch', backref='qc_tests', lazy=True)
+    inspector = db.relationship('User', backref='conducted_tests', lazy=True)
+    results = db.relationship('QCTestResult', backref='test', lazy=True, cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<QCTest {self.id} for Batch {self.batch_id}, Type {self.test_type}>"
+
+# QC Test Result
+class QCTestResult(db.Model):
+    __tablename__ = 'qc_test_results'
+    id = db.Column(db.Integer, primary_key=True)
+    test_id = db.Column(db.Integer, db.ForeignKey('qc_tests.id'), nullable=False)
+    parameter_id = db.Column(db.Integer, db.ForeignKey('qc_parameters.QCParamID'))
+    parameter_name = db.Column(db.String(100), nullable=False)
+    expected_value = db.Column(db.String(100))
+    actual_value = db.Column(db.String(100))
+    is_passed = db.Column(db.Boolean)
+    notes = db.Column(db.Text)
+
+    # Relationships
+    parameter = db.relationship('QCParameter', backref='test_results', lazy=True)
+
+    def __repr__(self):
+        return f"<QCTestResult {self.id} for Test {self.test_id}, Parameter {self.parameter_name}>"
+
+# Packaging Order Status Enum
+packaging_order_status_enum = SAEnum(
+    'Pending', 'InProgress', 'Completed', 'Cancelled',
+    name='packaging_order_status_enum'
+)
+
+# Packaging Order
+class PackagingOrder(db.Model):
+    __tablename__ = 'packaging_orders'
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)
+    packaging_type = db.Column(db.String(100), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    status = db.Column(packaging_order_status_enum, default='Pending')
+    packaging_line_id = db.Column(db.Integer, db.ForeignKey('packaging_lines.id'))
+    scheduled_date = db.Column(db.DateTime)
+    completed_date = db.Column(db.DateTime)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    batch = db.relationship('Batch', backref='packaging_orders', lazy=True)
+    packaging_line = db.relationship('PackagingLine', backref='packaging_orders', lazy=True)
+    creator = db.relationship('User', backref='created_packaging_orders', lazy=True)
+    materials = db.relationship('PackagingMaterialUsage', backref='packaging_order', lazy=True, cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<PackagingOrder {self.id} for Batch {self.batch_id}>"
+
+# Packaging Line
+class PackagingLine(db.Model):
+    __tablename__ = 'packaging_lines'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    capacity_per_hour = db.Column(db.Float)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<PackagingLine {self.name}>"
+
+# Packaging Material Usage
+class PackagingMaterialUsage(db.Model):
+    __tablename__ = 'packaging_material_usage'
+    id = db.Column(db.Integer, primary_key=True)
+    packaging_order_id = db.Column(db.Integer, db.ForeignKey('packaging_orders.id'), nullable=False)
+    material_id = db.Column(db.Integer, db.ForeignKey('items.ItemID'), nullable=False)
+    quantity_used = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    material = db.relationship('Item', backref='packaging_usages', lazy=True)
+
+    def __repr__(self):
+        return f"<PackagingMaterialUsage {self.id} Material {self.material_id} Qty {self.quantity_used}>"
+
+# Product Label
+class ProductLabel(db.Model):
+    __tablename__ = 'product_labels'
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('batches.BatchID'), nullable=False)
+    label_template = db.Column(db.String(100))
+    quantity = db.Column(db.Integer, nullable=False)
+    generated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    generated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    label_data = db.Column(db.JSON)  # Store label-specific data
+
+    # Relationships
+    batch = db.relationship('Batch', backref='labels', lazy=True)
+    generator = db.relationship('User', backref='generated_labels', lazy=True)
+
+    def __repr__(self):
+        return f"<ProductLabel {self.id} for Batch {self.batch_id}>"
 
 
 ##############################################################################
@@ -766,14 +1303,42 @@ class SystemSettings(db.Model):
     __tablename__ = 'system_settings'
     id = db.Column(db.Integer, primary_key=True)
     system_title = db.Column(db.String(100), default="EL7amla")
+
+    # Theme settings
+    theme_mode = db.Column(db.String(20), default="light")  # light, dark, auto
     theme_color = db.Column(db.String(50), default="blue")
     background_color = db.Column(db.String(50), default="blue")
+    sidebar_color = db.Column(db.String(50), default="blue")
+
+    # UI settings
+    font_family = db.Column(db.String(50), default="Tajawal")
+    font_size = db.Column(db.String(20), default="medium")
+    border_radius = db.Column(db.String(20), default="medium")  # small, medium, large
+    animation_speed = db.Column(db.String(20), default="normal")  # slow, normal, fast, none
+
+    # Layout settings
+    layout_density = db.Column(db.String(20), default="comfortable")  # compact, comfortable, spacious
+    sidebar_collapsed = db.Column(db.Boolean, default=False)
+    rtl_enabled = db.Column(db.Boolean, default=True)
+
+    # Image settings
     login_bg_image = db.Column(db.String(255), default="/static/uploads/20250227_154020_el7amlaDesktop_Wallpaper.png")
     logo_image = db.Column(db.String(255), default="/static/uploads/20250227_153609_png")
-    sidebar_color = db.Column(db.String(50), default="blue")
-    font_size = db.Column(db.String(20), default="medium")
-    rtl_enabled = db.Column(db.Boolean, default=True)
-    
+    favicon_image = db.Column(db.String(255), default="/static/favicon.ico")
+
+    # Company information
+    company_name = db.Column(db.String(100), default="شركة قاتيلو")
+    company_address = db.Column(db.String(255), default="123 شارع الأعمال")
+    company_city = db.Column(db.String(100), default="المدينة، المنطقة، الرمز البريدي")
+    company_email = db.Column(db.String(100), default="info@katilo.com")
+    company_phone = db.Column(db.String(50), default="+20 123 456 7890")
+    company_website = db.Column(db.String(100), default="www.katilo.com")
+    company_tax_id = db.Column(db.String(50), default="")
+
+    # Invoice settings
+    payment_terms_days = db.Column(db.Integer, default=30)
+    payment_terms_text = db.Column(db.String(255), default="يستحق الدفع خلال {days} يوم من تاريخ الفاتورة.")
+
     visible_widgets = db.Column(db.JSON, default={
         "users_card": True,
         "revenue_card": True,
@@ -785,7 +1350,7 @@ class SystemSettings(db.Model):
         "recent_orders": True,
         "top_products": True
     })
-    
+
     dashboard_layout = db.Column(db.JSON, default={
         "layout_type": "grid",
         "columns": 4,
@@ -807,7 +1372,7 @@ class SystemSettings(db.Model):
             "activities": "medium"
         }
     })
-    
+
     custom_colors = db.Column(db.JSON, default={
         "primary": "#4F46E5",
         "secondary": "#6B7280",
@@ -846,16 +1411,46 @@ class SystemSettings(db.Model):
         return {
             'id': self.id,
             'system_title': self.system_title,
+
+            # Theme settings
+            'theme_mode': self.theme_mode,
             'theme_color': self.theme_color,
             'background_color': self.background_color,
             'sidebar_color': self.sidebar_color,
+
+            # UI settings
+            'font_family': self.font_family,
             'font_size': self.font_size,
+            'border_radius': self.border_radius,
+            'animation_speed': self.animation_speed,
+
+            # Layout settings
+            'layout_density': self.layout_density,
+            'sidebar_collapsed': self.sidebar_collapsed,
             'rtl_enabled': self.rtl_enabled,
+
+            # Image settings
+            'logo_image': self.logo_image,
+            'login_bg_image': self.login_bg_image,
+            'favicon_image': self.favicon_image,
+
+            # Company information
+            'company_name': self.company_name,
+            'company_address': self.company_address,
+            'company_city': self.company_city,
+            'company_email': self.company_email,
+            'company_phone': self.company_phone,
+            'company_website': self.company_website,
+            'company_tax_id': self.company_tax_id,
+
+            # Invoice settings
+            'payment_terms_days': self.payment_terms_days,
+            'payment_terms_text': self.payment_terms_text,
+
+            # Other settings
             'visible_widgets': self.visible_widgets,
             'dashboard_layout': self.dashboard_layout,
-            'custom_colors': self.custom_colors,
-            'logo_image': self.logo_image,
-            'login_bg_image': self.login_bg_image
+            'custom_colors': self.custom_colors
         }
 
 class Role(db.Model):
@@ -864,7 +1459,7 @@ class Role(db.Model):
     name = db.Column(db.String(80), unique=True)
 
     users = db.relationship('User', backref='role', lazy=True)
-    
+
     def __repr__(self):
         return f'<Role {self.name}>'
 
@@ -901,12 +1496,29 @@ class User(db.Model, UserMixin):
         return check_password_hash(self.password_hash, password)
 
     def has_permission(self, permission_name):
+        """Check if the user has a specific permission.
+
+        Args:
+            permission_name (str): The name of the permission to check
+
+        Returns:
+            bool: True if the user has the permission, False otherwise
+        """
+        # Admin role has all permissions
+        if self.role and self.role.name == 'admin':
+            return True
+
         if not self.role:
             return False
-        role_perms = RolePermission.query.filter_by(role_id=self.role.id).all()
-        perm_ids = [rp.permission_id for rp in role_perms]
-        perms = Permission.query.filter(Permission.id.in_(perm_ids)).all()
-        return any(p.permission_name == permission_name for p in perms)
+
+        # Use the relationship instead of querying
+        role_perms = self.role.role_permissions
+
+        # Get permissions directly through the relationship
+        permissions = [rp.permission for rp in role_perms]
+
+        # Check if any permission matches the requested permission name
+        return any(p.permission_name == permission_name for p in permissions)
 
     def update_profile(self, data):
         if data.get('phone'):
@@ -929,7 +1541,7 @@ class User(db.Model, UserMixin):
                 self.birthdate = datetime.strptime(data['birthdate'], '%Y-%m-%d').date()
             except ValueError:
                 pass
-    
+
         if data.get('hire_date'):
             try:
                 self.hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
@@ -1123,13 +1735,21 @@ class ProductionEfficiency(db.Model):
 
 class CustomerInteraction(db.Model):
     __tablename__ = 'customer_interactions'
-    id = db.Column(db.Integer, primary_key=True)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
-    interaction_type = db.Column(interaction_type_enum, default='Other')
-    notes = db.Column(db.Text)
-    follow_up_date = db.Column(db.DateTime)
 
-    customer = db.relationship('Customer', backref='interactions', lazy=True)
+    id = db.Column(db.Integer, primary_key=True)
+    # Change this line to reference the correct column name
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
+    interaction_type = db.Column(db.String(50), nullable=False)
+    notes = db.Column(db.Text, nullable=False)
+    follow_up_date = db.Column(db.Date, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Relationships
+    user = db.relationship('User')
+
+
+
 
     def __repr__(self):
         return f"<CustomerInteraction {self.id} Customer {self.customer_id}>"
@@ -1232,11 +1852,11 @@ class SupportTicket(db.Model):
     priority = db.Column(db.String(50), default='medium')  # low, medium, high, urgent
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Relationships
     user = db.relationship('User', backref='support_tickets', lazy=True)
     responses = db.relationship('TicketResponse', backref='ticket', lazy=True, cascade="all, delete-orphan")
-    
+
     def __repr__(self):
         return f"<SupportTicket {self.id}: {self.subject}>"
 
@@ -1248,10 +1868,10 @@ class TicketResponse(db.Model):
     message = db.Column(db.Text, nullable=False)
     is_staff_response = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     user = db.relationship('User', backref='ticket_responses', lazy=True)
-    
+
     def __repr__(self):
         return f"<TicketResponse {self.id} for Ticket {self.ticket_id}>"
 
@@ -1264,7 +1884,7 @@ class QualityInspection(db.Model):
     inspector_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     status = db.Column(db.String(20))  # Passed, Failed, Partially Passed
     notes = db.Column(db.Text)
-    
+
     # Relationships
     purchase_order_detail = db.relationship('PurchaseOrderDetail', backref='quality_inspections')
     inspector = db.relationship('User')
@@ -1280,3 +1900,258 @@ class QualityInspectionCriteria(db.Model):
     passed = db.Column(db.Boolean)
     importance = db.Column(db.String(20))  # Critical, Major, Minor
 
+
+# Cash Management Models
+class CashAccount(db.Model):
+    __tablename__ = 'cash_accounts'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    account_type = db.Column(db.String(50), default='cash')  # cash, bank, etc.
+    currency = db.Column(db.String(3), default='EGP')
+    initial_balance = db.Column(db.Float, default=0.0)
+    current_balance = db.Column(db.Float, default=0.0)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Relationships
+    creator = db.relationship('User', backref='created_cash_accounts', lazy=True)
+    transactions = db.relationship('CashTransaction', backref='account', lazy=True)
+
+    def __repr__(self):
+        return f"<CashAccount {self.name} Balance: {self.current_balance}>"
+
+class CashTransaction(db.Model):
+    __tablename__ = 'cash_transactions'
+    id = db.Column(db.Integer, primary_key=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('cash_accounts.id'), nullable=False)
+    transaction_type = db.Column(db.String(20), nullable=False)  # deposit, withdrawal, transfer
+    amount = db.Column(db.Float, nullable=False)
+    reference_type = db.Column(db.String(50))  # supplier_payment, sales_receipt, expense, etc.
+    reference_id = db.Column(db.Integer)
+    description = db.Column(db.Text)
+    transaction_date = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    creator = db.relationship('User', backref='cash_transactions', lazy=True)
+
+    def __repr__(self):
+        return f"<CashTransaction {self.id} Type: {self.transaction_type} Amount: {self.amount}>"
+
+class CashTransferVoucher(db.Model):
+    __tablename__ = 'cash_transfer_vouchers'
+    id = db.Column(db.Integer, primary_key=True)
+    voucher_number = db.Column(db.String(50), unique=True, nullable=False)
+    from_account_id = db.Column(db.Integer, db.ForeignKey('cash_accounts.id'), nullable=False)
+    to_account_id = db.Column(db.Integer, db.ForeignKey('cash_accounts.id'))
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.SupplierID'))
+    amount = db.Column(db.Float, nullable=False)
+    transfer_date = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='pending')  # pending, completed, cancelled
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    from_account = db.relationship('CashAccount', foreign_keys=[from_account_id])
+    to_account = db.relationship('CashAccount', foreign_keys=[to_account_id])
+    supplier = db.relationship('Supplier', backref='cash_transfers', lazy=True)
+    creator = db.relationship('User', backref='created_vouchers', lazy=True)
+
+    def __repr__(self):
+        return f"<CashTransferVoucher {self.voucher_number} Amount: {self.amount}>"
+
+class CashReconciliation(db.Model):
+    __tablename__ = 'cash_reconciliations'
+    id = db.Column(db.Integer, primary_key=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('cash_accounts.id'), nullable=False)
+    reconciliation_date = db.Column(db.DateTime, default=datetime.utcnow)
+    system_balance = db.Column(db.Float, nullable=False)
+    counted_balance = db.Column(db.Float, nullable=False)
+    difference = db.Column(db.Float, default=0.0)
+    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    notes = db.Column(db.Text)
+    performed_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    account = db.relationship('CashAccount', backref='reconciliations', lazy=True)
+    performer = db.relationship('User', foreign_keys=[performed_by], backref='performed_reconciliations', lazy=True)
+    approver = db.relationship('User', foreign_keys=[approved_by], backref='approved_reconciliations', lazy=True)
+
+    def __repr__(self):
+        return f"<CashReconciliation {self.id} Account: {self.account_id} Difference: {self.difference}>"
+
+##############################################################################
+# DISTRIBUTION MANAGEMENT
+##############################################################################
+
+# Enumerations for Distribution Management
+vehicle_status_enum = SAEnum('Active', 'Maintenance', 'Inactive', name='vehicle_status_enum')
+shipment_status_enum = SAEnum('Pending', 'Assigned', 'InTransit', 'Delivered', 'Failed', name='shipment_status_enum')
+route_status_enum = SAEnum('Planned', 'InProgress', 'Completed', 'Cancelled', name='route_status_enum')
+
+class Vehicle(db.Model):
+    __tablename__ = 'vehicles'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    vehicle_type = db.Column(db.String(50), nullable=False)
+    plate_number = db.Column(db.String(20), unique=True, nullable=False)
+    model = db.Column(db.String(100))
+    year = db.Column(db.Integer)
+    status = db.Column(vehicle_status_enum, default='Active')
+
+    # Capacity details
+    max_weight = db.Column(db.Float, comment='Maximum weight capacity in kg')
+    max_volume = db.Column(db.Float, comment='Maximum volume capacity in cubic meters')
+    max_length = db.Column(db.Float, comment='Maximum load length in mm')
+    max_height = db.Column(db.Float, comment='Maximum load height in mm')
+
+    # Tracking and maintenance
+    last_maintenance_date = db.Column(db.DateTime)
+    next_maintenance_date = db.Column(db.DateTime)
+    notes = db.Column(db.Text)
+
+    # Image of the vehicle
+    image_path = db.Column(db.String(255))
+    image_data = db.Column(db.Text, nullable=True, comment='Base64 encoded image data')
+
+    # Relationships
+    storage = db.relationship('VehicleStorage', backref='vehicle', uselist=False, cascade='all, delete-orphan')
+    shipments = db.relationship('ShipmentOrder', backref='vehicle', lazy=True)
+    routes = db.relationship('DeliveryRoute', backref='vehicle', lazy=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Vehicle {self.name} ({self.plate_number})>"
+
+class VehicleStorage(db.Model):
+    __tablename__ = 'vehicle_storage'
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False, unique=True)
+
+    # Current usage
+    current_weight = db.Column(db.Float, default=0, comment='Current weight in kg')
+    current_volume = db.Column(db.Float, default=0, comment='Current volume in cubic meters')
+
+    # Percentage of capacity used
+    weight_utilization = db.Column(db.Float, default=0, comment='Percentage of weight capacity used')
+    volume_utilization = db.Column(db.Float, default=0, comment='Percentage of volume capacity used')
+
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<VehicleStorage for Vehicle {self.vehicle_id}>"
+
+class ShipmentOrder(db.Model):
+    __tablename__ = 'shipment_orders'
+    id = db.Column(db.Integer, primary_key=True)
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.SalesOrderID'), nullable=False)
+    shipment_id = db.Column(db.Integer, db.ForeignKey('shipments.ShipmentID'), nullable=False)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=True)
+
+    status = db.Column(shipment_status_enum, default='Pending')
+    assigned_date = db.Column(db.DateTime)
+    estimated_delivery_date = db.Column(db.DateTime)
+    actual_delivery_date = db.Column(db.DateTime)
+
+    # Relationships
+    sales_order = db.relationship('SalesOrder', backref='shipment_orders')
+    shipment = db.relationship('Shipment', backref='shipment_orders')
+
+    # Route information
+    route_id = db.Column(db.Integer, db.ForeignKey('delivery_routes.id'), nullable=True)
+    route_position = db.Column(db.Integer, comment='Position in the delivery route')
+
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<ShipmentOrder {self.id} for Order {self.sales_order_id}>"
+
+class DeliveryRoute(db.Model):
+    __tablename__ = 'delivery_routes'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False)
+
+    status = db.Column(route_status_enum, default='Planned')
+    planned_date = db.Column(db.DateTime, nullable=False)
+    start_time = db.Column(db.DateTime)
+    end_time = db.Column(db.DateTime)
+
+    # Route details
+    total_distance = db.Column(db.Float, comment='Total distance in km')
+    estimated_duration = db.Column(db.Integer, comment='Estimated duration in minutes')
+    actual_duration = db.Column(db.Integer, comment='Actual duration in minutes')
+
+    # Relationships
+    stops = db.relationship('RouteStop', backref='route', lazy=True, cascade='all, delete-orphan')
+    shipments = db.relationship('ShipmentOrder', backref='route', lazy=True)
+
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<DeliveryRoute {self.name} on {self.planned_date}>"
+
+class RouteStop(db.Model):
+    __tablename__ = 'route_stops'
+    id = db.Column(db.Integer, primary_key=True)
+    route_id = db.Column(db.Integer, db.ForeignKey('delivery_routes.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.CustomerID'), nullable=False)
+    shipment_order_id = db.Column(db.Integer, db.ForeignKey('shipment_orders.id'), nullable=True)
+
+    stop_number = db.Column(db.Integer, nullable=False, comment='Order of stop in the route')
+    planned_arrival_time = db.Column(db.DateTime)
+    actual_arrival_time = db.Column(db.DateTime)
+
+    # Location details
+    address = db.Column(db.Text)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+
+    # Status
+    status = db.Column(db.String(50), default='Pending')  # Pending, Completed, Skipped
+
+    # Relationships
+    customer = db.relationship('Customer', backref='route_stops')
+    shipment_order = db.relationship('ShipmentOrder', backref='route_stop')
+
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<RouteStop {self.stop_number} for Route {self.route_id}>"
+
+class ShipmentTracking(db.Model):
+    __tablename__ = 'shipment_tracking'
+    id = db.Column(db.Integer, primary_key=True)
+    shipment_order_id = db.Column(db.Integer, db.ForeignKey('shipment_orders.id'), nullable=False)
+
+    status = db.Column(db.String(50), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Location details
+    location_name = db.Column(db.String(255))
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+
+    # Additional details
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Relationships
+    shipment_order = db.relationship('ShipmentOrder', backref='tracking_updates')
+
+    def __repr__(self):
+        return f"<ShipmentTracking {self.id} for ShipmentOrder {self.shipment_order_id}>"

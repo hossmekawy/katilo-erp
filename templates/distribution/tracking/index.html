@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+
+{% block title %}تتبع الشحنات{% endblock %}
+
+{% block styles %}
+<style>
+    .tracking-card {
+        @apply bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden;
+    }
+    .tracking-status {
+        @apply px-2 py-1 text-xs font-semibold rounded-full;
+    }
+    .status-pending {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .status-assigned {
+        @apply bg-blue-100 text-blue-800;
+    }
+    .status-in-transit {
+        @apply bg-indigo-100 text-indigo-800;
+    }
+    .status-delivered {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-failed {
+        @apply bg-red-100 text-red-800;
+    }
+    .tracking-timeline-item {
+        @apply relative pb-8;
+    }
+    .tracking-timeline-item:last-child {
+        @apply pb-0;
+    }
+    .tracking-timeline-item:before {
+        content: '';
+        @apply absolute top-0 left-0 h-full w-px bg-gray-200;
+        right: 11px;
+        left: auto;
+    }
+    .tracking-timeline-item:last-child:before {
+        @apply h-4;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="trackingApp()">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">تتبع الشحنات</h1>
+    </div>
+
+    <!-- Tracking Search -->
+    <div class="tracking-card p-6 mb-8">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">البحث عن شحنة</h2>
+        <form @submit.prevent="searchTracking()">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">رقم التتبع</label>
+                    <input type="text" x-model="trackingNumber" placeholder="أدخل رقم التتبع" required
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="btn btn-primary h-10">
+                        <i class="fas fa-search ml-2"></i>
+                        بحث
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tracking Results -->
+    <div x-show="trackingData && trackingData.shipment" x-cloak>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Shipment Information -->
+            <div class="lg:col-span-1">
+                <div class="tracking-card p-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">معلومات الشحنة</h2>
+
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-sm text-gray-500">رقم التتبع</p>
+                            <p class="font-medium" x-text="trackingData.shipment?.tracking_number || '-'"></p>
+                        </div>
+
+                        <div>
+                            <p class="text-sm text-gray-500">الحالة</p>
+                            <span class="tracking-status"
+                                :class="{
+                                    'status-pending': trackingData.shipment_order?.status === 'Pending',
+                                    'status-assigned': trackingData.shipment_order?.status === 'Assigned',
+                                    'status-in-transit': trackingData.shipment_order?.status === 'InTransit',
+                                    'status-delivered': trackingData.shipment_order?.status === 'Delivered',
+                                    'status-failed': trackingData.shipment_order?.status === 'Failed'
+                                }"
+                                x-text="getStatusText(trackingData.shipment_order?.status || '')"></span>
+                        </div>
+
+                        <div>
+                            <p class="text-sm text-gray-500">العميل</p>
+                            <p class="font-medium" x-text="trackingData.shipment?.customer_name || 'غير معروف'"></p>
+                        </div>
+
+                        <div>
+                            <p class="text-sm text-gray-500">تاريخ الشحن</p>
+                            <p class="font-medium" x-text="formatDate(trackingData.shipment?.shipment_date)"></p>
+                        </div>
+
+                        <div>
+                            <p class="text-sm text-gray-500">تاريخ التسليم المتوقع</p>
+                            <p class="font-medium" x-text="formatDate(trackingData.shipment?.estimated_arrival)"></p>
+                        </div>
+
+                        <div x-show="trackingData.shipment_order && trackingData.shipment_order.actual_delivery_date">
+                            <p class="text-sm text-gray-500">تاريخ التسليم الفعلي</p>
+                            <p class="font-medium" x-text="formatDate(trackingData.shipment_order?.actual_delivery_date)"></p>
+                        </div>
+
+                        <div x-show="trackingData.shipment_order && trackingData.shipment_order.vehicle_name">
+                            <p class="text-sm text-gray-500">المركبة</p>
+                            <p class="font-medium" x-text="trackingData.shipment_order?.vehicle_name || '-'"></p>
+                        </div>
+
+                        <div x-show="trackingData.shipment_order && trackingData.shipment_order.route_name">
+                            <p class="text-sm text-gray-500">المسار</p>
+                            <p class="font-medium" x-text="trackingData.shipment_order?.route_name || '-'"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tracking Timeline -->
+            <div class="lg:col-span-2">
+                <div class="tracking-card p-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">مسار التتبع</h2>
+
+                    <div class="space-y-6">
+                        <template x-if="!trackingData.tracking_updates || trackingData.tracking_updates.length === 0">
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-truck text-4xl mb-3 text-gray-300"></i>
+                                <p>لا توجد تحديثات للتتبع بعد</p>
+                            </div>
+                        </template>
+
+                        <template x-for="(update, index) in trackingData.tracking_updates || []" :key="update?.id || index">
+                            <div class="tracking-timeline-item">
+                                <div class="flex">
+                                    <div class="flex-shrink-0 mr-4 ml-4">
+                                        <div class="h-6 w-6 rounded-full bg-indigo-500 flex items-center justify-center">
+                                            <template x-if="update?.status === 'Delivered'">
+                                                <i class="fas fa-check text-white text-xs"></i>
+                                            </template>
+                                            <template x-if="update?.status === 'InTransit'">
+                                                <i class="fas fa-truck text-white text-xs"></i>
+                                            </template>
+                                            <template x-if="update?.status === 'Assigned'">
+                                                <i class="fas fa-clipboard-check text-white text-xs"></i>
+                                            </template>
+                                            <template x-if="update?.status === 'Pending'">
+                                                <i class="fas fa-clock text-white text-xs"></i>
+                                            </template>
+                                            <template x-if="update?.status === 'Failed'">
+                                                <i class="fas fa-times text-white text-xs"></i>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex justify-between">
+                                            <h3 class="text-base font-medium text-gray-900" x-text="getStatusText(update?.status || '')"></h3>
+                                            <p class="text-sm text-gray-500" x-text="formatDateTime(update?.timestamp)"></p>
+                                        </div>
+                                        <p class="text-sm text-gray-600 mt-1" x-text="update?.location_name || '-'"></p>
+                                        <p class="text-sm text-gray-600 mt-1" x-text="update?.notes || '-'"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Map View (if coordinates are available) -->
+                <div x-show="hasCoordinates()" class="tracking-card p-6 mt-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">موقع الشحنة</h2>
+
+                    <div id="tracking-map" class="h-64 rounded-lg"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Results -->
+    <div x-show="searchPerformed && (!trackingData || !trackingData.shipment)" class="tracking-card p-8 text-center" x-cloak>
+        <div class="text-gray-400 mb-4">
+            <i class="fas fa-search text-6xl"></i>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-1">لم يتم العثور على الشحنة</h3>
+        <p class="text-gray-500">لم نتمكن من العثور على شحنة برقم التتبع المدخل. يرجى التحقق من الرقم والمحاولة مرة أخرى.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let map;
+    let markers = [];
+    let googleMapsLoaded = false;
+
+    // Function to load Google Maps API
+    function loadGoogleMapsAPI() {
+        return new Promise((resolve, reject) => {
+            // Check if Google Maps API is already loaded
+            if (window.google && window.google.maps) {
+                googleMapsLoaded = true;
+                resolve();
+                return;
+            }
+
+            // Create script element
+            const script = document.createElement('script');
+            script.src = "https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places,geometry,marker&callback=googleMapsCallback";
+            script.async = true;
+            script.defer = true;
+
+            // Define callback function
+            window.googleMapsCallback = function() {
+                googleMapsLoaded = true;
+                resolve();
+            };
+
+            // Handle errors
+            script.onerror = function() {
+                reject(new Error('Google Maps failed to load'));
+            };
+
+            // Add script to document
+            document.head.appendChild(script);
+        });
+    }
+
+    function initMap() {
+        // Map will be initialized when needed
+        console.log('initMap called');
+    }
+
+    function trackingApp() {
+        return {
+            trackingNumber: '{{ tracking_number|default("") }}',
+            trackingData: {
+                shipment: {% if shipment %}{{ shipment|tojson }}{% else %}null{% endif %},
+                shipment_order: {% if shipment_order %}{{ shipment_order|tojson }}{% else %}null{% endif %},
+                tracking_updates: {% if tracking_updates %}{{ tracking_updates|tojson }}{% else %}[]{% endif %}
+            },
+            searchPerformed: {% if tracking_number %}true{% else %}false{% endif %},
+            mapInitialized: false,
+
+            init() {
+                console.log('Tracking app initialized');
+                console.log('Initial tracking number:', this.trackingNumber);
+                console.log('Initial tracking data:', this.trackingData);
+
+                // If we have a tracking number from the URL, load the map if needed
+                if (this.trackingNumber && this.hasCoordinates()) {
+                    loadGoogleMapsAPI()
+                        .then(() => {
+                            this.$nextTick(() => {
+                                this.initializeMap();
+                                this.mapInitialized = true;
+                            });
+                        })
+                        .catch(error => {
+                            console.error('Failed to load Google Maps:', error);
+                        });
+                }
+            },
+
+            searchTracking() {
+                if (!this.trackingNumber) return;
+
+                console.log('Searching for tracking number:', this.trackingNumber);
+
+                // Reset tracking data with default structure
+                this.trackingData = {
+                    shipment: null,
+                    shipment_order: null,
+                    tracking_updates: []
+                };
+
+                // Update URL to reflect the tracking number without reloading the page
+                const newUrl = '{{ url_for("distribution.tracking", tracking_number="PLACEHOLDER") }}'.replace('PLACEHOLDER', this.trackingNumber);
+                window.history.pushState({ trackingNumber: this.trackingNumber }, '', newUrl);
+
+                fetch('{{ url_for("distribution.get_tracking", tracking_number="PLACEHOLDER") }}'.replace('PLACEHOLDER', this.trackingNumber))
+                    .then(response => {
+                        if (!response.ok) {
+                            console.error('Server returned error:', response.status, response.statusText);
+                            throw new Error('Shipment not found');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Received tracking data:', data);
+
+                        // Ensure data has the expected structure
+                        this.trackingData = {
+                            shipment: data.shipment || null,
+                            shipment_order: data.shipment_order || null,
+                            tracking_updates: data.tracking_updates || []
+                        };
+                        this.searchPerformed = true;
+
+                        // Initialize map if coordinates are available
+                        if (this.hasCoordinates()) {
+                            loadGoogleMapsAPI()
+                                .then(() => {
+                                    this.$nextTick(() => {
+                                        this.initializeMap();
+                                        this.mapInitialized = true;
+                                    });
+                                })
+                                .catch(error => {
+                                    console.error('Failed to load Google Maps:', error);
+                                });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching tracking data:', error);
+                        this.trackingData = {
+                            shipment: null,
+                            shipment_order: null,
+                            tracking_updates: []
+                        };
+                        this.searchPerformed = true;
+                    });
+            },
+
+            getStatusText(status) {
+                switch(status) {
+                    case 'Pending': return 'قيد الانتظار';
+                    case 'Assigned': return 'تم التعيين';
+                    case 'InTransit': return 'قيد التوصيل';
+                    case 'Delivered': return 'تم التسليم';
+                    case 'Failed': return 'فشل التسليم';
+                    default: return status;
+                }
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ar-EG');
+            },
+
+            formatDateTime(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ar-EG') + ' ' + date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+            },
+
+            hasCoordinates() {
+                if (!this.trackingData || !Array.isArray(this.trackingData.tracking_updates)) return false;
+
+                return this.trackingData.tracking_updates.some(update =>
+                    update && update.latitude && update.longitude
+                );
+            },
+
+            initializeMap() {
+                try {
+                    console.log('Initializing map');
+
+                    // Check if Google Maps is loaded
+                    if (!googleMapsLoaded || typeof google === 'undefined' || typeof google.maps === 'undefined') {
+                        console.error('Google Maps API not loaded yet');
+                        setTimeout(() => this.initializeMap(), 500); // Try again in 500ms
+                        return;
+                    }
+
+                    // Clear existing markers
+                    if (markers && Array.isArray(markers)) {
+                        markers.forEach(marker => {
+                            if (marker) {
+                                try {
+                                    if (marker instanceof google.maps.marker.AdvancedMarkerElement) {
+                                        marker.map = null;
+                                    } else if (marker.setMap) {
+                                        marker.setMap(null);
+                                    }
+                                } catch (e) {
+                                    console.error('Error clearing marker:', e);
+                                }
+                            }
+                        });
+                    }
+                    markers = [];
+
+                    // Safety check
+                    if (!this.trackingData || !Array.isArray(this.trackingData.tracking_updates)) {
+                        console.error('Invalid tracking data structure');
+                        return;
+                    }
+
+                    console.log('Tracking updates:', this.trackingData.tracking_updates);
+
+                    // Get updates with coordinates
+                    const updatesWithCoordinates = this.trackingData.tracking_updates.filter(
+                        update => update && update.latitude && update.longitude
+                    );
+
+                    console.log('Updates with coordinates:', updatesWithCoordinates);
+
+                    if (updatesWithCoordinates.length === 0) {
+                        console.warn('No updates with coordinates found');
+                        return;
+                    }
+
+                    // Get the most recent update with coordinates
+                    const latestUpdate = updatesWithCoordinates[0];
+                    console.log('Latest update with coordinates:', latestUpdate);
+
+                    // Initialize map
+                    const mapElement = document.getElementById('tracking-map');
+                    if (!mapElement) {
+                        console.error('Map element not found');
+                        return;
+                    }
+
+                    // Parse coordinates to ensure they're numbers
+                    const lat = parseFloat(latestUpdate.latitude);
+                    const lng = parseFloat(latestUpdate.longitude);
+
+                    if (isNaN(lat) || isNaN(lng)) {
+                        console.error('Invalid coordinates:', latestUpdate.latitude, latestUpdate.longitude);
+                        return;
+                    }
+
+                    console.log('Creating map with center:', { lat, lng });
+
+                    map = new google.maps.Map(mapElement, {
+                        center: { lat, lng },
+                        zoom: 12
+                    });
+
+                    // Add markers for all updates with coordinates
+                    updatesWithCoordinates.forEach(update => {
+                        if (!update || !update.latitude || !update.longitude) return;
+
+                        try {
+                            // Parse coordinates to ensure they're numbers
+                            const updateLat = parseFloat(update.latitude);
+                            const updateLng = parseFloat(update.longitude);
+
+                            if (isNaN(updateLat) || isNaN(updateLng)) {
+                                console.error('Invalid coordinates for update:', update);
+                                return;
+                            }
+
+                            console.log('Adding marker at:', { lat: updateLat, lng: updateLng });
+
+                            const marker = new google.maps.Marker({
+                                position: { lat: updateLat, lng: updateLng },
+                                map: map,
+                                title: this.getStatusText(update.status || ''),
+                                animation: google.maps.Animation.DROP
+                            });
+
+                            const infoWindow = new google.maps.InfoWindow({
+                                content: `
+                                    <div dir="rtl" class="p-2">
+                                        <h3 class="font-bold">${this.getStatusText(update.status || '')}</h3>
+                                        <p>${update.location_name || ''}</p>
+                                        <p>${this.formatDateTime(update.timestamp)}</p>
+                                        <p>${update.notes || ''}</p>
+                                    </div>
+                                `
+                            });
+
+                            marker.addListener('click', () => {
+                                infoWindow.open(map, marker);
+                            });
+
+                            markers.push(marker);
+                        } catch (markerError) {
+                            console.error('Error creating marker:', markerError, update);
+                        }
+                    });
+
+                    // If there are multiple markers, fit bounds to show all
+                    if (markers.length > 1) {
+                        try {
+                            const bounds = new google.maps.LatLngBounds();
+                            markers.forEach(marker => {
+                                if (marker && marker.getPosition) {
+                                    bounds.extend(marker.getPosition());
+                                }
+                            });
+                            map.fitBounds(bounds);
+                        } catch (boundsError) {
+                            console.error('Error setting map bounds:', boundsError);
+                        }
+                    }
+
+                    console.log('Map initialized successfully with', markers.length, 'markers');
+                } catch (error) {
+                    console.error('Error initializing map:', error);
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}

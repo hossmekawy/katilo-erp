@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الخزينة - إضافة دفعة لمورد{% endblock %}
+
+{% block page_header %}إضافة دفعة جديدة لمورد{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="p-6 border-b">
+            <h2 class="text-lg font-semibold text-gray-800">بيانات الدفعة الجديدة</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('cash.add_supplier_payment') }}" class="p-6">
+            <div class="space-y-6">
+                <div>
+                    <label for="supplier_id" class="block text-sm font-medium text-gray-700 mb-1">المورد</label>
+                    <select id="supplier_id" name="supplier_id" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">اختر المورد</option>
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}">{{ supplier.supplier_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="account_id" class="block text-sm font-medium text-gray-700 mb-1">الحساب</label>
+                    <select id="account_id" name="account_id" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">اختر الحساب</option>
+                        {% for account in accounts %}
+                        <option value="{{ account.id }}" data-balance="{{ account.current_balance }}" data-currency="{{ account.currency }}">
+                            {{ account.name }} ({{ account.current_balance|round(2) }} {{ account.currency }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <p id="balance-info" class="mt-1 text-xs text-gray-500"></p>
+                </div>
+
+                <div>
+                    <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">المبلغ</label>
+                    <div class="relative">
+                        <input type="number" id="amount" name="amount" step="0.01" min="0.01" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span id="currency-symbol" class="text-gray-500"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="payment_date" class="block text-sm font-medium text-gray-700 mb-1">تاريخ الدفع</label>
+                    <input type="date" id="payment_date" name="payment_date" value="{{ ''|now }}" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label for="payment_method" class="block text-sm font-medium text-gray-700 mb-1">طريقة الدفع</label>
+                    <select id="payment_method" name="payment_method" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="cash">نقدي</option>
+                        <option value="bank_transfer">تحويل بنكي</option>
+                        <option value="check">شيك</option>
+                        <option value="other">أخرى</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="reference" class="block text-sm font-medium text-gray-700 mb-1">رقم المرجع</label>
+                    <input type="text" id="reference" name="reference"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="رقم الشيك أو التحويل (اختياري)">
+                </div>
+
+                <div>
+                    <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                    <textarea id="notes" name="notes" rows="3"
+                              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="أي ملاحظات إضافية عن الدفعة"></textarea>
+                </div>
+
+                <div class="pt-4 border-t">
+                    <div class="flex justify-end space-x-3 space-x-reverse">
+                        <a href="{{ url_for('cash.supplier_payments') }}" class="btn bg-gray-200 hover:bg-gray-300 text-gray-800">
+                            إلغاء
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save ml-1"></i>
+                            حفظ الدفعة
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const accountSelect = document.getElementById('account_id');
+        const amountInput = document.getElementById('amount');
+        const balanceInfo = document.getElementById('balance-info');
+        const currencySymbol = document.getElementById('currency-symbol');
+
+        // Update balance info and currency when account changes
+        accountSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const balance = selectedOption.dataset.balance || 0;
+            const currency = selectedOption.dataset.currency || '';
+
+            balanceInfo.textContent = `الرصيد المتاح: ${parseFloat(balance).toFixed(2)} ${currency}`;
+            currencySymbol.textContent = currency;
+
+            // Validate amount against balance
+            validateAmount();
+        });
+
+        // Validate amount against account balance
+        amountInput.addEventListener('input', validateAmount);
+
+        function validateAmount() {
+            const selectedOption = accountSelect.options[accountSelect.selectedIndex];
+            if (!selectedOption.value) return;
+
+            const balance = parseFloat(selectedOption.dataset.balance) || 0;
+            const amount = parseFloat(amountInput.value) || 0;
+
+            if (amount > balance) {
+                amountInput.setCustomValidity('المبلغ أكبر من الرصيد المتاح');
+                balanceInfo.textContent = 'تحذير: المبلغ أكبر من الرصيد المتاح!';
+                balanceInfo.className = 'mt-1 text-xs text-red-600';
+            } else {
+                amountInput.setCustomValidity('');
+                const currency = selectedOption.dataset.currency || '';
+                balanceInfo.textContent = `الرصيد المتاح: ${balance.toFixed(2)} ${currency}`;
+                balanceInfo.className = 'mt-1 text-xs text-gray-500';
+            }
+        }
+
+        // Form validation
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(event) {
+            const accountId = accountSelect.value;
+            const amount = parseFloat(amountInput.value);
+
+            if (!accountId) {
+                event.preventDefault();
+                alert('الرجاء اختيار الحساب');
+                return;
+            }
+
+            if (isNaN(amount) || amount <= 0) {
+                event.preventDefault();
+                alert('الرجاء إدخال مبلغ صحيح');
+                return;
+            }
+
+            const selectedOption = accountSelect.options[accountSelect.selectedIndex];
+            const balance = parseFloat(selectedOption.dataset.balance) || 0;
+
+            if (amount > balance) {
+                event.preventDefault();
+                alert('المبلغ أكبر من الرصيد المتاح');
+                return;
+            }
+        });
+    });
+</script>
+{% endblock %}

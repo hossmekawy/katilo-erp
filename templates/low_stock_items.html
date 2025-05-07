@@ -1,0 +1,703 @@
+{% extends "base.html" %}
+
+{% block title %}العناصر منخفضة المخزون - كاتيلو{% endblock %}
+
+{% block page_header %}العناصر منخفضة المخزون{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/inventory-management" class="text-blue-600 hover:text-blue-800">إدارة المخزون</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600">العناصر منخفضة المخزون</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="lowStockItemsManager()" class="space-y-6">
+    <!-- Header with actions -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">العناصر منخفضة المخزون</h1>
+        <div class="flex space-x-2 space-x-reverse">
+            <a href="/inventory-management" class="btn bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center">
+                <i class="fas fa-arrow-right mr-2"></i> العودة للمخزون
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white p-4 rounded-lg shadow">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">الفئة</label>
+                <select x-model="filters.categoryType" @change="currentPage = 1" class="w-full border rounded-lg px-3 py-2">
+                    <option value="">جميع الفئات</option>
+                    <option value="RawMaterial">المواد الخام</option>
+                    <option value="IntermediateProduct">المنتجات الوسيطة</option>
+                    <option value="FinalProduct">المنتجات النهائية</option>
+                    <option value="PackagingMaterial">مواد التعبئة</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">البحث</label>
+                <input type="text" x-model="filters.search" @input="currentPage = 1" placeholder="بحث بالاسم..." class="w-full border rounded-lg px-3 py-2">
+            </div>
+
+            <div class="flex items-end">
+                <button @click="createProductionOrders()" class="btn btn-primary" :disabled="selectedItems.length === 0">
+                    <i class="fas fa-industry mr-2"></i> إنشاء أوامر إنتاج للمحدد
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Low Stock Items Table -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="w-12 px-6 py-3">
+                        <input type="checkbox" x-model="selectAll" @click="toggleSelectAll()">
+                    </th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">العنصر</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الفئة</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المخزون الحالي</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">حد إعادة الطلب</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <template x-if="loading">
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center">
+                            <div class="flex justify-center">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                            </div>
+                        </td>
+                    </tr>
+                </template>
+
+                <template x-if="!loading && filteredItems.length === 0">
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            لم يتم العثور على عناصر منخفضة المخزون
+                        </td>
+                    </tr>
+                </template>
+
+                <template x-for="item in paginatedItems" :key="item.id">
+                    <tr :class="{'bg-amber-50': item.quantity === 0}">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <input type="checkbox"
+                                   x-model="selectedItems"
+                                   :value="item.id"
+                                   :disabled="!canCreateProductionOrder(item)">
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900" x-text="item.name"></div>
+                            <div class="text-xs text-gray-500" x-text="'SKU: ' + (item.sku || item.SKU || '-')"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                  :class="{
+                                      'bg-blue-100 text-blue-800': item.category_type === 'RawMaterial',
+                                      'bg-purple-100 text-purple-800': item.category_type === 'IntermediateProduct',
+                                      'bg-green-100 text-green-800': item.category_type === 'FinalProduct',
+                                      'bg-yellow-100 text-yellow-800': item.category_type === 'PackagingMaterial'
+                                  }"
+                                  x-text="getCategoryTypeLabel(item.category_type)"></span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium" :class="item.quantity === 0 ? 'text-red-600' : 'text-amber-600'" x-text="item.quantity"></div>
+                            <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                <div class="h-2 rounded-full"
+                                     :class="item.quantity === 0 ? 'bg-red-600' : 'bg-amber-600'"
+                                     :style="'width: ' + Math.min(100, Math.round((item.quantity / item.reorder_level) * 100)) + '%'"></div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900" x-text="item.reorder_level"></div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex space-x-2 space-x-reverse">
+                                <a :href="'/items/' + item.id" class="text-blue-600 hover:text-blue-900">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button @click="createProductionOrder(item.id)"
+                                        class="text-green-600 hover:text-green-900"
+                                        :disabled="!canCreateProductionOrder(item)"
+                                        :class="{'opacity-50 cursor-not-allowed': !canCreateProductionOrder(item)}">
+                                    <i class="fas fa-industry"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+
+        <!-- Pagination Controls -->
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        عرض
+                        <span class="font-medium" x-text="(currentPage - 1) * itemsPerPage + 1"></span>
+                        إلى
+                        <span class="font-medium" x-text="Math.min(currentPage * itemsPerPage, filteredItems.length)"></span>
+                        من
+                        <span class="font-medium" x-text="filteredItems.length"></span>
+                        نتيجة
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <!-- Previous Page Button -->
+                        <button @click="prevPage()" :disabled="currentPage === 1"
+                                class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium"
+                                :class="currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'">
+                            <span class="sr-only">السابق</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+
+                        <!-- Page Numbers -->
+                        <template x-for="(page, index) in pageNumbers" :key="index">
+                            <template x-if="page === '...'">
+                                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                    ...
+                                </span>
+                            </template>
+
+                            <template x-if="page !== '...'">
+                                <button @click="goToPage(page)"
+                                        class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium"
+                                        :class="page === currentPage ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'bg-white text-gray-500 hover:bg-gray-50'"
+                                        x-text="page"></button>
+                            </template>
+                        </template>
+
+                        <!-- Next Page Button -->
+                        <button @click="nextPage()" :disabled="currentPage === totalPages"
+                                class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium"
+                                :class="currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'">
+                            <span class="sr-only">التالي</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Mobile Pagination -->
+            <div class="flex items-center justify-between sm:hidden">
+                <button @click="prevPage()" :disabled="currentPage === 1"
+                        class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md"
+                        :class="currentPage === 1 ? 'text-gray-300 bg-gray-50 cursor-not-allowed' : 'text-gray-700 bg-white hover:bg-gray-50'">
+                    السابق
+                </button>
+                <div class="text-sm text-gray-700">
+                    <span x-text="currentPage"></span> / <span x-text="totalPages"></span>
+                </div>
+                <button @click="nextPage()" :disabled="currentPage === totalPages"
+                        class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md"
+                        :class="currentPage === totalPages ? 'text-gray-300 bg-gray-50 cursor-not-allowed' : 'text-gray-700 bg-white hover:bg-gray-50'">
+                    التالي
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Order Modal -->
+    <div x-show="showProductionModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                                إنشاء أوامر إنتاج <span x-text="selectedItems.length > 1 ? `(${selectedItems.length} عناصر)` : ''"></span>
+                            </h3>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="production_item" class="block text-sm font-medium text-gray-700">العناصر</label>
+                                    <div class="mt-1 text-gray-900 font-medium">
+                                        <template x-if="selectedItems.length === 1">
+                                            <span x-text="productionOrderItem?.name || 'غير محدد'"></span>
+                                        </template>
+                                        <template x-if="selectedItems.length > 1">
+                                            <span x-text="`تم اختيار ${selectedItems.length} عناصر`"></span>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="production_quantity" class="block text-sm font-medium text-gray-700">
+                                        الكمية
+                                        <template x-if="selectedItems.length > 1">
+                                            <span class="text-xs text-gray-500">(سيتم حساب الكمية المناسبة لكل عنصر تلقائياً)</span>
+                                        </template>
+                                    </label>
+                                    <input type="number" id="production_quantity" x-model="productionOrder.quantity" min="1"
+                                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                           :disabled="selectedItems.length > 1">
+                                    <template x-if="selectedItems.length > 1">
+                                        <p class="mt-1 text-xs text-gray-500">سيتم إنشاء أمر إنتاج لكل عنصر بالكمية المطلوبة لتعويض النقص</p>
+                                    </template>
+                                </div>
+
+                                <div>
+                                    <label for="production_line_id" class="block text-sm font-medium text-gray-700">خط الانتاج <span class="text-red-500">*</span></label>
+                                    <select id="production_line_id" x-model="productionOrder.production_line_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                                        <option value="">-- اختر خط الإنتاج --</option>
+                                        <template x-for="line in productionLines" :key="line.id">
+                                            <option :value="line.id" x-text="line.name"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="warehouse_id" class="block text-sm font-medium text-gray-700">المستودع <span class="text-red-500">*</span></label>
+                                    <select id="warehouse_id" x-model="productionOrder.warehouse_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                                        <option value="">-- اختر المستودع --</option>
+                                        <template x-for="warehouse in warehouses" :key="warehouse.id">
+                                            <option :value="warehouse.id" x-text="warehouse.name"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="scheduled_start" class="block text-sm font-medium text-gray-700">تاريخ ووقت البدء المخطط <span class="text-red-500">*</span></label>
+                                    <input type="datetime-local" id="scheduled_start" x-model="productionOrder.scheduled_start" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                                </div>
+
+                                <div>
+                                    <label for="scheduled_end" class="block text-sm font-medium text-gray-700">تاريخ ووقت الانتهاء المخطط <span class="text-red-500">*</span></label>
+                                    <input type="datetime-local" id="scheduled_end" x-model="productionOrder.scheduled_end" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                                </div>
+
+                                <div>
+                                    <label for="production_notes" class="block text-sm font-medium text-gray-700">ملاحظات</label>
+                                    <textarea id="production_notes" x-model="productionOrder.notes" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="submitProductionOrder()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        إنشاء <span x-text="selectedItems.length > 1 ? selectedItems.length : ''"></span> <span x-text="selectedItems.length > 1 ? 'أوامر' : 'أمر'"></span>
+                    </button>
+                    <button @click="showProductionModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function lowStockItemsManager() {
+    return {
+        items: [],
+        loading: true,
+        selectedItems: [],
+        selectAll: false,
+        showProductionModal: false,
+        productionOrderItem: null,
+        productionLines: [],
+        warehouses: [],
+        productionOrder: {
+            item_id: null,
+            quantity: 1,
+            production_line_id: '',
+            warehouse_id: '',
+            scheduled_start: '',
+            scheduled_end: '',
+            notes: ''
+        },
+
+        // Pagination properties
+        currentPage: 1,
+        itemsPerPage: 20,
+
+        filters: {
+            categoryType: '',
+            search: ''
+        },
+
+        async init() {
+            try {
+                const response = await fetch('/api/dashboard/low-stock');
+                if (response.ok) {
+                    this.items = await response.json();
+                } else {
+                    console.error('Failed to load low stock items');
+                }
+            } catch (error) {
+                console.error('Error loading low stock items:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        get filteredItems() {
+            return this.items.filter(item => {
+                // Filter by category type
+                if (this.filters.categoryType && item.category_type !== this.filters.categoryType) {
+                    return false;
+                }
+
+                // Filter by search term
+                if (this.filters.search && !item.name.toLowerCase().includes(this.filters.search.toLowerCase())) {
+                    return false;
+                }
+
+                return true;
+            });
+        },
+
+        get paginatedItems() {
+            const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+            const endIndex = startIndex + this.itemsPerPage;
+            return this.filteredItems.slice(startIndex, endIndex);
+        },
+
+        get totalPages() {
+            return Math.ceil(this.filteredItems.length / this.itemsPerPage);
+        },
+
+        nextPage() {
+            if (this.currentPage < this.totalPages) {
+                this.currentPage++;
+                this.selectAll = false;
+                this.selectedItems = [];
+            }
+        },
+
+        prevPage() {
+            if (this.currentPage > 1) {
+                this.currentPage--;
+                this.selectAll = false;
+                this.selectedItems = [];
+            }
+        },
+
+        goToPage(page) {
+            if (page >= 1 && page <= this.totalPages) {
+                this.currentPage = page;
+                this.selectAll = false;
+                this.selectedItems = [];
+            }
+        },
+
+        get pageNumbers() {
+            const pages = [];
+            const maxVisiblePages = 5;
+
+            if (this.totalPages <= maxVisiblePages) {
+                // If we have fewer pages than the max visible, show all pages
+                for (let i = 1; i <= this.totalPages; i++) {
+                    pages.push(i);
+                }
+            } else {
+                // Always show first page
+                pages.push(1);
+
+                // Calculate start and end of visible page numbers
+                let startPage = Math.max(2, this.currentPage - 1);
+                let endPage = Math.min(this.totalPages - 1, this.currentPage + 1);
+
+                // Adjust if we're near the beginning
+                if (this.currentPage <= 3) {
+                    endPage = Math.min(this.totalPages - 1, 4);
+                }
+
+                // Adjust if we're near the end
+                if (this.currentPage >= this.totalPages - 2) {
+                    startPage = Math.max(2, this.totalPages - 3);
+                }
+
+                // Add ellipsis after first page if needed
+                if (startPage > 2) {
+                    pages.push('...');
+                }
+
+                // Add visible page numbers
+                for (let i = startPage; i <= endPage; i++) {
+                    pages.push(i);
+                }
+
+                // Add ellipsis before last page if needed
+                if (endPage < this.totalPages - 1) {
+                    pages.push('...');
+                }
+
+                // Always show last page
+                pages.push(this.totalPages);
+            }
+
+            return pages;
+        },
+
+        toggleSelectAll() {
+            // When clicking the checkbox, it toggles the model value first, then calls this function
+            // So we need to check the current state of selectAll after it's been toggled
+            const eligibleItems = this.paginatedItems
+                .filter(item => this.canCreateProductionOrder(item))
+                .map(item => item.id);
+
+            if (this.selectAll) {
+                // Add all eligible items from current page that aren't already selected
+                eligibleItems.forEach(id => {
+                    if (!this.selectedItems.includes(id)) {
+                        this.selectedItems.push(id);
+                    }
+                });
+            } else {
+                // Remove all items from current page
+                this.selectedItems = this.selectedItems.filter(id =>
+                    !eligibleItems.includes(id)
+                );
+            }
+        },
+
+        getCategoryTypeLabel(type) {
+            switch (type) {
+                case 'RawMaterial':
+                    return 'مواد خام';
+                case 'IntermediateProduct':
+                    return 'منتج وسيط';
+                case 'FinalProduct':
+                    return 'منتج نهائي';
+                case 'PackagingMaterial':
+                    return 'مواد تعبئة';
+                default:
+                    return type;
+            }
+        },
+
+        canCreateProductionOrder(item) {
+            // Only intermediate and final products can have production orders
+            return item.category_type === 'IntermediateProduct' || item.category_type === 'FinalProduct';
+        },
+
+        async createProductionOrder(itemId) {
+            const item = this.items.find(i => i.id === itemId);
+            if (!item) return;
+
+            // Fetch production lines
+            try {
+                const linesResponse = await fetch('/api/production/lines');
+                if (linesResponse.ok) {
+                    this.productionLines = await linesResponse.json();
+                } else {
+                    console.error('Failed to load production lines');
+                    this.productionLines = [];
+                }
+            } catch (error) {
+                console.error('Error loading production lines:', error);
+                this.productionLines = [];
+            }
+
+            // Fetch warehouses
+            try {
+                const warehousesResponse = await fetch('/api/warehouses');
+                if (warehousesResponse.ok) {
+                    this.warehouses = await warehousesResponse.json();
+                } else {
+                    console.error('Failed to load warehouses');
+                    this.warehouses = [];
+                }
+            } catch (error) {
+                console.error('Error loading warehouses:', error);
+                this.warehouses = [];
+            }
+
+            // Set default dates (now for start, 24 hours later for end)
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            // Format dates for datetime-local input (YYYY-MM-DDThh:mm)
+            const formatDate = (date) => {
+                return date.toISOString().slice(0, 16);
+            };
+
+            this.productionOrderItem = item;
+            this.productionOrder = {
+                item_id: item.id,
+                quantity: Math.max(1, item.reorder_level - item.quantity), // Default to quantity needed to reach reorder level
+                production_line_id: '',
+                warehouse_id: '',
+                scheduled_start: formatDate(now),
+                scheduled_end: formatDate(tomorrow),
+                notes: `أمر إنتاج تلقائي لتعويض النقص في المخزون (${item.quantity}/${item.reorder_level})`
+            };
+
+            this.showProductionModal = true;
+        },
+
+        async createProductionOrders() {
+            if (this.selectedItems.length === 0) return;
+
+            // Fetch production lines and warehouses first
+            try {
+                const linesResponse = await fetch('/api/production/lines');
+                if (linesResponse.ok) {
+                    this.productionLines = await linesResponse.json();
+                } else {
+                    console.error('Failed to load production lines');
+                    this.productionLines = [];
+                }
+            } catch (error) {
+                console.error('Error loading production lines:', error);
+                this.productionLines = [];
+            }
+
+            try {
+                const warehousesResponse = await fetch('/api/warehouses');
+                if (warehousesResponse.ok) {
+                    this.warehouses = await warehousesResponse.json();
+                } else {
+                    console.error('Failed to load warehouses');
+                    this.warehouses = [];
+                }
+            } catch (error) {
+                console.error('Error loading warehouses:', error);
+                this.warehouses = [];
+            }
+
+            // Set default dates (now for start, 24 hours later for end)
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            // Format dates for datetime-local input (YYYY-MM-DDThh:mm)
+            const formatDate = (date) => {
+                return date.toISOString().slice(0, 16);
+            };
+
+            // Get the first selected item to display in the modal
+            const firstItemId = this.selectedItems[0];
+            const firstItem = this.items.find(i => i.id === firstItemId);
+
+            if (!firstItem) return;
+
+            this.productionOrderItem = firstItem;
+            this.productionOrder = {
+                item_id: firstItemId,
+                quantity: Math.max(1, firstItem.reorder_level - firstItem.quantity),
+                production_line_id: '',
+                warehouse_id: '',
+                scheduled_start: formatDate(now),
+                scheduled_end: formatDate(tomorrow),
+                notes: `أمر إنتاج تلقائي لتعويض النقص في المخزون (${this.selectedItems.length} عناصر)`
+            };
+
+            this.showProductionModal = true;
+        },
+
+        async submitProductionOrder() {
+            // Validate required fields
+            if (!this.productionOrder.production_line_id) {
+                showNotification('يرجى اختيار خط الإنتاج', 'error');
+                return;
+            }
+
+            if (!this.productionOrder.warehouse_id) {
+                showNotification('يرجى اختيار المستودع', 'error');
+                return;
+            }
+
+            if (!this.productionOrder.scheduled_start) {
+                showNotification('يرجى تحديد تاريخ ووقت البدء المخطط', 'error');
+                return;
+            }
+
+            if (!this.productionOrder.scheduled_end) {
+                showNotification('يرجى تحديد تاريخ ووقت الانتهاء المخطط', 'error');
+                return;
+            }
+
+            try {
+                // Show loading notification
+                showNotification('جاري إنشاء أوامر الإنتاج...', 'info');
+
+                let successCount = 0;
+                let errorCount = 0;
+
+                // Create production orders for all selected items
+                for (const itemId of this.selectedItems) {
+                    const item = this.items.find(i => i.id === itemId);
+                    if (!item) continue;
+
+                    // Skip items that can't have production orders
+                    if (!this.canCreateProductionOrder(item)) continue;
+
+                    // Create a production order for this item
+                    const orderData = {
+                        item_id: itemId,
+                        quantity: Math.max(1, item.reorder_level - item.quantity),
+                        production_line_id: this.productionOrder.production_line_id,
+                        warehouse_id: this.productionOrder.warehouse_id,
+                        scheduled_start: this.productionOrder.scheduled_start,
+                        scheduled_end: this.productionOrder.scheduled_end,
+                        notes: `أمر إنتاج تلقائي لتعويض النقص في المخزون (${item.quantity}/${item.reorder_level})`
+                    };
+
+                    try {
+                        const response = await fetch('/api/production/orders', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(orderData)
+                        });
+
+                        if (response.ok) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                            const error = await response.json();
+                            console.error(`Error creating production order for item ${item.name}: ${error.message}`);
+                        }
+                    } catch (error) {
+                        errorCount++;
+                        console.error(`Error creating production order for item ${item.name}:`, error);
+                    }
+                }
+
+                // Show result notification
+                if (successCount > 0 && errorCount === 0) {
+                    showNotification(`تم إنشاء ${successCount} أمر إنتاج بنجاح`, 'success');
+                } else if (successCount > 0 && errorCount > 0) {
+                    showNotification(`تم إنشاء ${successCount} أمر إنتاج بنجاح، وفشل ${errorCount} أمر`, 'warning');
+                } else if (successCount === 0 && errorCount > 0) {
+                    showNotification(`فشل إنشاء جميع أوامر الإنتاج (${errorCount})`, 'error');
+                }
+
+                // Close the modal and clear selected items
+                this.showProductionModal = false;
+                this.selectedItems = [];
+                this.selectAll = false;
+
+            } catch (error) {
+                console.error('Error creating production orders:', error);
+                showNotification('حدث خطأ أثناء إنشاء أوامر الإنتاج', 'error');
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

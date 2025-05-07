@@ -1,6 +1,13 @@
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
-from models import db, Supplier, SupplierItem, Item, Category, Inventory, InventoryTransaction, Warehouse, PurchaseOrder, PurchaseOrderDetail
+import sys
+import os
+
+# Add the parent directory to sys.path to allow importing from the root directory
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import from the models_helper module
+from models_helper import db, Supplier, SupplierItem, Item, Category, Inventory, InventoryTransaction, Warehouse, PurchaseOrder, PurchaseOrderDetail
 from datetime import datetime
 
 supplier_bp = Blueprint('supplier_bp', __name__)
@@ -60,11 +67,11 @@ def get_supplier(id):
 @login_required
 def create_supplier():
     data = request.get_json()
-    
+
     # Validate required fields
     if not data.get('supplier_name'):
         return jsonify({'message': 'اسم المورد مطلوب'}), 400
-    
+
     supplier = Supplier(
         supplier_name=data['supplier_name'],
         contact_info=data.get('contact_info'),
@@ -77,10 +84,10 @@ def create_supplier():
         website=data.get('website'),
         contact_person=data.get('contact_person')
     )
-    
+
     db.session.add(supplier)
     db.session.commit()
-    
+
     return jsonify({
         'id': supplier.id,
         'supplier_name': supplier.supplier_name,
@@ -100,7 +107,7 @@ def create_supplier():
 def update_supplier(id):
     supplier = Supplier.query.get_or_404(id)
     data = request.get_json()
-    
+
     if 'supplier_name' in data:
         supplier.supplier_name = data['supplier_name']
     if 'contact_info' in data:
@@ -121,9 +128,9 @@ def update_supplier(id):
         supplier.website = data['website']
     if 'contact_person' in data:
         supplier.contact_person = data['contact_person']
-    
+
     db.session.commit()
-    
+
     return jsonify({
         'id': supplier.id,
         'supplier_name': supplier.supplier_name,
@@ -142,15 +149,15 @@ def update_supplier(id):
 @login_required
 def delete_supplier(id):
     supplier = Supplier.query.get_or_404(id)
-    
+
     # Check if supplier has any items
     supplier_items = SupplierItem.query.filter_by(supplier_id=id).first()
     if supplier_items:
         return jsonify({'message': 'لا يمكن حذف المورد لأنه مرتبط بعناصر'}), 400
-    
+
     db.session.delete(supplier)
     db.session.commit()
-    
+
     return '', 204
 
 # Supplier Item Routes
@@ -159,11 +166,11 @@ def delete_supplier(id):
 def get_supplier_items():
     supplier_items = SupplierItem.query.all()
     result = []
-    
+
     for si in supplier_items:
         item = Item.query.get(si.item_id)
         supplier = Supplier.query.get(si.supplier_id)
-        
+
         result.append({
             'id': si.id,
             'supplier_id': si.supplier_id,
@@ -173,7 +180,7 @@ def get_supplier_items():
             'supplier_sku': si.supplier_sku,
             'cost': si.cost
         })
-    
+
     return jsonify(result)
 
 @supplier_bp.route('/api/supplier-items/<int:id>', methods=['GET'])
@@ -182,7 +189,7 @@ def get_supplier_item(id):
     supplier_item = SupplierItem.query.get_or_404(id)
     item = Item.query.get(supplier_item.item_id)
     supplier = Supplier.query.get(supplier_item.supplier_id)
-    
+
     return jsonify({
         'id': supplier_item.id,
         'supplier_id': supplier_item.supplier_id,
@@ -197,40 +204,47 @@ def get_supplier_item(id):
 @login_required
 def create_supplier_item():
     data = request.get_json()
-    
+
     # Validate required fields
     if not data.get('supplier_id') or not data.get('item_id') or 'cost' not in data:
         return jsonify({'message': 'المورد والعنصر والتكلفة مطلوبة'}), 400
-    
+
     # Check if supplier exists
     supplier = Supplier.query.get(data['supplier_id'])
     if not supplier:
         return jsonify({'message': 'المورد غير موجود'}), 400
-    
+
     # Check if item exists
     item = Item.query.get(data['item_id'])
     if not item:
         return jsonify({'message': 'العنصر غير موجود'}), 400
-    
+
     # Check if this supplier-item combination already exists
     existing = SupplierItem.query.filter_by(
         supplier_id=data['supplier_id'],
         item_id=data['item_id']
     ).first()
-    
+
     if existing:
         return jsonify({'message': 'هذا العنصر مرتبط بالفعل بهذا المورد'}), 400
-    
+
     supplier_item = SupplierItem(
         supplier_id=data['supplier_id'],
         item_id=data['item_id'],
         supplier_sku=data.get('supplier_sku'),
         cost=data['cost']
     )
-    
+
     db.session.add(supplier_item)
+
+    # Check if we should update the item cost
+    update_item_cost = data.get('update_item_cost', False)
+    if update_item_cost:
+        # Update the item cost with the supplier cost
+        item.cost = data['cost']
+
     db.session.commit()
-    
+
     return jsonify({
         'id': supplier_item.id,
         'supplier_id': supplier_item.supplier_id,
@@ -238,25 +252,37 @@ def create_supplier_item():
         'item_id': supplier_item.item_id,
         'item_name': item.name,
         'supplier_sku': supplier_item.supplier_sku,
-        'cost': supplier_item.cost
+        'cost': supplier_item.cost,
+        'item_cost_updated': update_item_cost
     }), 201
+
 
 @supplier_bp.route('/api/supplier-items/<int:id>', methods=['PUT'])
 @login_required
 def update_supplier_item(id):
     supplier_item = SupplierItem.query.get_or_404(id)
     data = request.get_json()
-    
+
     if 'supplier_sku' in data:
         supplier_item.supplier_sku = data['supplier_sku']
+
+    cost_updated = False
     if 'cost' in data:
         supplier_item.cost = data['cost']
-    
+        cost_updated = True
+
+    # Check if we should update the item cost
+    update_item_cost = data.get('update_item_cost', False)
+    if cost_updated and update_item_cost:
+        item = Item.query.get(supplier_item.item_id)
+        if item:
+            item.cost = supplier_item.cost
+
     db.session.commit()
-    
+
     item = Item.query.get(supplier_item.item_id)
     supplier = Supplier.query.get(supplier_item.supplier_id)
-    
+
     return jsonify({
         'id': supplier_item.id,
         'supplier_id': supplier_item.supplier_id,
@@ -264,7 +290,8 @@ def update_supplier_item(id):
         'item_id': supplier_item.item_id,
         'item_name': item.name if item else None,
         'supplier_sku': supplier_item.supplier_sku,
-        'cost': supplier_item.cost
+        'cost': supplier_item.cost,
+        'item_cost_updated': update_item_cost and cost_updated
     })
 
 @supplier_bp.route('/api/supplier-items/<int:id>', methods=['DELETE'])
@@ -273,7 +300,7 @@ def delete_supplier_item(id):
     supplier_item = SupplierItem.query.get_or_404(id)
     db.session.delete(supplier_item)
     db.session.commit()
-    
+
     return '', 204
 
 # Additional utility endpoints
@@ -282,7 +309,7 @@ def delete_supplier_item(id):
 def get_supplier_items_by_supplier(supplier_id):
     supplier = Supplier.query.get_or_404(supplier_id)
     supplier_items = SupplierItem.query.filter_by(supplier_id=supplier_id).all()
-    
+
     result = []
     for si in supplier_items:
         item = Item.query.get(si.item_id)
@@ -295,7 +322,7 @@ def get_supplier_items_by_supplier(supplier_id):
             'cost': si.cost,
             'reorder_level': item.reorder_level if item else None
         })
-    
+
     return jsonify(result)
 
 @supplier_bp.route('/api/items/<int:item_id>/suppliers', methods=['GET'])
@@ -303,7 +330,7 @@ def get_supplier_items_by_supplier(supplier_id):
 def get_item_suppliers(item_id):
     item = Item.query.get_or_404(item_id)
     supplier_items = SupplierItem.query.filter_by(item_id=item_id).all()
-    
+
     result = []
     for si in supplier_items:
         supplier = Supplier.query.get(si.supplier_id)
@@ -314,7 +341,7 @@ def get_item_suppliers(item_id):
             'supplier_sku': si.supplier_sku,
             'cost': si.cost
         })
-    
+
     return jsonify(result)
 
 # Get best supplier for an item (lowest cost)
@@ -322,14 +349,14 @@ def get_item_suppliers(item_id):
 @login_required
 def get_best_supplier_for_item(item_id):
     item = Item.query.get_or_404(item_id)
-    
+
     best_supplier_item = SupplierItem.query.filter_by(item_id=item_id).order_by(SupplierItem.cost).first()
-    
+
     if not best_supplier_item:
         return jsonify({'message': 'لا يوجد موردين لهذا العنصر'}), 404
-    
+
     supplier = Supplier.query.get(best_supplier_item.supplier_id)
-    
+
     return jsonify({
         'supplier_item_id': best_supplier_item.id,
         'supplier_id': best_supplier_item.supplier_id,
@@ -343,20 +370,20 @@ def get_best_supplier_for_item(item_id):
 def get_supplier_inventory(supplier_id):
     """Get inventory for all items supplied by a specific supplier"""
     supplier = Supplier.query.get_or_404(supplier_id)
-    
+
     # Get all items from this supplier
     supplier_items = SupplierItem.query.filter_by(supplier_id=supplier_id).all()
     item_ids = [si.item_id for si in supplier_items]
-    
+
     # Get inventory for these items
     inventory_items = Inventory.query.filter(Inventory.item_id.in_(item_ids)).all()
-    
+
     result = []
     for inv in inventory_items:
         item = Item.query.get(inv.item_id)
         warehouse = Warehouse.query.get(inv.warehouse_id)
         supplier_item = SupplierItem.query.filter_by(supplier_id=supplier_id, item_id=inv.item_id).first()
-        
+
         result.append({
             'inventory_id': inv.id,
             'item_id': inv.item_id,
@@ -368,7 +395,7 @@ def get_supplier_inventory(supplier_id):
             'supplier_cost': supplier_item.cost if supplier_item else None,
             'last_updated': inv.last_updated.isoformat()
         })
-    
+
     return jsonify(result)
 
 @supplier_bp.route('/api/suppliers/<int:supplier_id>/restock', methods=['POST'])
@@ -377,26 +404,26 @@ def restock_from_supplier(supplier_id):
     """Create a transaction to restock inventory from a specific supplier"""
     supplier = Supplier.query.get_or_404(supplier_id)
     data = request.get_json()
-    
+
     # Validate required fields
     if not data.get('item_id') or not data.get('warehouse_id') or 'quantity' not in data:
         return jsonify({'message': 'العنصر والمستودع والكمية مطلوبة'}), 400
-    
+
     item_id = data['item_id']
     warehouse_id = data['warehouse_id']
     quantity = data['quantity']
-    
+
     # Verify this supplier supplies this item
     supplier_item = SupplierItem.query.filter_by(supplier_id=supplier_id, item_id=item_id).first()
     if not supplier_item:
         return jsonify({'message': 'هذا المورد لا يوفر هذا العنصر'}), 400
-    
+
     # Get current inventory record
     inventory = Inventory.query.filter_by(
         item_id=item_id,
         warehouse_id=warehouse_id
     ).first()
-    
+
     # Create new inventory record if it doesn't exist
     if not inventory:
         inventory = Inventory(
@@ -408,7 +435,7 @@ def restock_from_supplier(supplier_id):
     else:
         # Update existing inventory
         inventory.quantity += quantity
-    
+
     # Create transaction record
     reference = f"Restock from supplier: {supplier.supplier_name}"
     transaction = InventoryTransaction(
@@ -419,13 +446,13 @@ def restock_from_supplier(supplier_id):
         reference=reference
     )
     db.session.add(transaction)
-    
+
     try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Database error: {str(e)}'}), 500
-    
+
     return jsonify({
         'inventory_id': inventory.id,
         'quantity': inventory.quantity,
@@ -438,15 +465,15 @@ def restock_from_supplier(supplier_id):
 def get_supplier_purchase_orders(supplier_id):
     """Get all purchase orders for a specific supplier"""
     supplier = Supplier.query.get_or_404(supplier_id)
-    
+
     purchase_orders = PurchaseOrder.query.filter_by(supplier_id=supplier_id).all()
-    
+
     result = []
     for po in purchase_orders:
         # Get total items and total amount
         po_details = PurchaseOrderDetail.query.filter_by(po_id=po.id).all()
         total_items = len(po_details)
-        
+
         result.append({
             'id': po.id,
             'order_date': po.order_date.isoformat() if po.order_date else None,
@@ -454,7 +481,7 @@ def get_supplier_purchase_orders(supplier_id):
             'total_amount': po.total_amount,
             'total_items': total_items
         })
-    
+
     return jsonify(result)
 
 # In supplier_routes.py, modify the create_purchase_order function:
@@ -464,29 +491,29 @@ def get_supplier_purchase_orders(supplier_id):
 def create_purchase_order():
     """Create a new purchase order"""
     data = request.get_json()
-    
+
     # Validate required fields
     if not data.get('supplier_id') or not data.get('items') or len(data['items']) == 0:
         return jsonify({'message': 'المورد والعناصر مطلوبة'}), 400
-    
+
     supplier_id = data['supplier_id']
-    
+
     # Verify supplier exists
     supplier = Supplier.query.get(supplier_id)
     if not supplier:
         return jsonify({'message': 'المورد غير موجود'}), 400
-    
+
     # Calculate total amount
     total_amount = 0
     for item in data['items']:
         if 'quantity_ordered' not in item or 'unit_price' not in item:
             return jsonify({'message': 'الكمية والسعر مطلوبان لكل عنصر'}), 400
-        
+
         # Convert values to float before multiplication
         quantity = float(item['quantity_ordered'])
         price = float(item['unit_price'])
         total_amount += quantity * price
-    
+
     # Create purchase order
     purchase_order = PurchaseOrder(
         supplier_id=supplier_id,
@@ -494,10 +521,10 @@ def create_purchase_order():
         status='Pending',
         total_amount=total_amount
     )
-    
+
     db.session.add(purchase_order)
     db.session.flush()  # Get ID without committing
-    
+
     # Create purchase order details
     for item in data['items']:
         po_detail = PurchaseOrderDetail(
@@ -508,13 +535,13 @@ def create_purchase_order():
             quantity_received=0
         )
         db.session.add(po_detail)
-    
+
     try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Database error: {str(e)}'}), 500
-    
+
     return jsonify({
         'id': purchase_order.id,
         'supplier_id': purchase_order.supplier_id,
@@ -528,10 +555,10 @@ def create_purchase_order():
 def get_low_stock_suppliers(item_id):
     """Get suppliers for a low stock item, sorted by rating and cost"""
     item = Item.query.get_or_404(item_id)
-    
+
     # Get all suppliers for this item
     supplier_items = SupplierItem.query.filter_by(item_id=item_id).all()
-    
+
     result = []
     for si in supplier_items:
         supplier = Supplier.query.get(si.supplier_id)
@@ -546,10 +573,10 @@ def get_low_stock_suppliers(item_id):
                 'cost': si.cost,
                 'rating': supplier.rating or 0
             })
-    
+
     # Sort by rating (highest first) and then by cost (lowest first)
     result.sort(key=lambda x: (-x['rating'], x['cost']))
-    
+
     return jsonify(result)
 
 @supplier_bp.route('/api/suppliers/search', methods=['GET'])
@@ -557,16 +584,16 @@ def get_low_stock_suppliers(item_id):
 def search_suppliers():
     """Search suppliers by name or contact info"""
     query = request.args.get('q', '')
-    
+
     if not query or len(query) < 2:
         return jsonify([])
-    
+
     # Search for suppliers matching the query
     suppliers = Supplier.query.filter(
-        (Supplier.supplier_name.ilike(f'%{query}%')) | 
+        (Supplier.supplier_name.ilike(f'%{query}%')) |
         (Supplier.contact_info.ilike(f'%{query}%'))
     ).all()
-    
+
     result = [{
         'id': s.id,
         'supplier_name': s.supplier_name,
@@ -574,7 +601,7 @@ def search_suppliers():
         'payment_terms': s.payment_terms,
         'rating': s.rating
     } for s in suppliers]
-    
+
     return jsonify(result)
 
 @supplier_bp.route('/api/suppliers/stats', methods=['GET'])
@@ -583,20 +610,20 @@ def get_supplier_stats():
     """Get statistics about suppliers"""
     # Total number of suppliers
     total_suppliers = Supplier.query.count()
-    
+
     # Average supplier rating
     avg_rating_result = db.session.query(db.func.avg(Supplier.rating)).filter(Supplier.rating != None).first()
     avg_rating = float(avg_rating_result[0]) if avg_rating_result[0] else 0
-    
+
     # Number of items with suppliers
     items_with_suppliers = db.session.query(db.func.count(db.distinct(SupplierItem.item_id))).scalar()
-    
+
     # Total number of items
     total_items = Item.query.count()
-    
+
     # Items without suppliers
     items_without_suppliers = total_items - items_with_suppliers
-    
+
     # Top rated suppliers (limit to 5)
     top_suppliers = Supplier.query.filter(Supplier.rating != None).order_by(Supplier.rating.desc()).limit(5).all()
     top_suppliers_data = [{
@@ -604,7 +631,7 @@ def get_supplier_stats():
         'supplier_name': s.supplier_name,
         'rating': s.rating
     } for s in top_suppliers]
-    
+
     return jsonify({
         'total_suppliers': total_suppliers,
         'avg_rating': avg_rating,

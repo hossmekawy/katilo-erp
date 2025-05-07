@@ -1,0 +1,595 @@
+{% extends "base.html" %}
+
+{% block title %}عرض ملصق المنتج - نظام قاتيلو{% endblock %}
+
+{% block page_header %}عرض ملصق المنتج للدفعة {{ label.batch.lot_number }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/batches/{{ label.batch_id }}" class="text-blue-600 hover:text-blue-800">الدفعة {{ label.batch.lot_number }}</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">عرض الملصق</span>
+</li>
+{% endblock %}
+
+{% block head %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <!-- Success Banner -->
+    <div class="mb-6 bg-green-50 border-r-4 border-green-500 p-4 rounded-lg shadow-sm">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i class="fas fa-check-circle text-green-500"></i>
+            </div>
+            <div class="mr-3">
+                <p class="text-green-800 font-medium">تم إنشاء ملصق المنتج بنجاح!</p>
+                <p class="text-green-700 text-sm mt-1">يمكنك الآن طباعة الملصق أو تحميله</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Label Preview Card -->
+        <div class="md:col-span-2">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-tag text-blue-600 ml-2"></i>
+                        معاينة الملصق
+                    </h3>
+                </div>
+
+                <div class="p-6">
+                    <!-- Label Preview Container -->
+                    <div class="flex justify-center mb-6">
+                        <div id="label-container" class="border border-gray-300 rounded-lg shadow-sm p-6 bg-white max-w-md">
+                            <!-- Company Logo -->
+                            <div class="text-center mb-4">
+                                <img src="/static/uploads/images/katilo.png" alt="Katilo Logo" class="h-16 mx-auto">
+                                <h3 class="font-bold text-lg mt-2">منتجات قاتيلو</h3>
+                            </div>
+
+                            <!-- Product Name and Description -->
+                            <div class="text-center mb-4">
+                                <h2 class="text-xl font-bold">{{ label.label_data.product_name }}</h2>
+                                {% if label.label_data.description %}
+                                <p class="text-sm text-gray-600 mt-1">{{ label.label_data.description }}</p>
+                                {% endif %}
+                            </div>
+
+                            <!-- Product Details -->
+                            <div class="grid grid-cols-2 gap-3 mb-4">
+                                <div>
+                                    <p class="text-sm text-gray-600">رقم الدفعة:</p>
+                                    <p class="font-medium">{{ label.label_data.batch_number }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">الرمز:</p>
+                                    <p class="font-medium">{{ label.label_data.sku }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">تاريخ الإنتاج:</p>
+                                    <p class="font-medium">{{ label.label_data.production_date }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">تاريخ الانتهاء:</p>
+                                    <p class="font-medium">{{ label.label_data.expiry_date }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Barcode -->
+                            <div class="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div id="barcode-container" style="max-width: 100%; overflow: hidden;" class="mb-2">
+                                    <!-- Barcode will be inserted here by JavaScript -->
+                                </div>
+                                <p class="text-xs text-gray-600 mt-1">{{ label.label_data.barcode }}</p>
+                            </div>
+
+                            <!-- Additional Information -->
+                            {% if label.label_data.additional_info %}
+                            <div class="mt-4 pt-4 border-t border-gray-200">
+                                <p class="text-sm text-gray-600">{{ label.label_data.additional_info }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Print and Download Buttons -->
+                    <div class="flex justify-center space-x-4 space-x-reverse">
+                        <button onclick="printLabel()" class="btn btn-primary">
+                            <i class="fas fa-print ml-1"></i>
+                            طباعة الملصق
+                        </button>
+                        <button onclick="downloadLabel()" class="btn btn-outline-primary">
+                            <i class="fas fa-download ml-1"></i>
+                            تحميل الملصق
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Label Settings Card -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mt-6">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-cog text-blue-600 ml-2"></i>
+                        إعدادات الطباعة
+                    </h3>
+                </div>
+
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Print Settings -->
+                        <div>
+                            <h4 class="font-medium text-gray-800 mb-3">إعدادات الطباعة</h4>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="print_size" class="block text-sm font-medium text-gray-700 mb-1">حجم الطباعة</label>
+                                    <select id="print_size" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="original">الحجم الأصلي</option>
+                                        <option value="fit">ملائمة للصفحة</option>
+                                        <option value="custom">حجم مخصص</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="print_orientation" class="block text-sm font-medium text-gray-700 mb-1">اتجاه الطباعة</label>
+                                    <select id="print_orientation" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="portrait">عمودي</option>
+                                        <option value="landscape">أفقي</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="print_copies" class="block text-sm font-medium text-gray-700 mb-1">عدد النسخ</label>
+                                    <input type="number" id="print_copies" min="1" value="{{ label.quantity }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Download Settings -->
+                        <div>
+                            <h4 class="font-medium text-gray-800 mb-3">إعدادات التحميل</h4>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="download_format" class="block text-sm font-medium text-gray-700 mb-1">صيغة الملف</label>
+                                    <select id="download_format" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="pdf">PDF</option>
+                                        <option value="png">PNG</option>
+                                        <option value="jpg">JPG</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="download_quality" class="block text-sm font-medium text-gray-700 mb-1">جودة الملف</label>
+                                    <select id="download_quality" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="high">عالية</option>
+                                        <option value="medium">متوسطة</option>
+                                        <option value="low">منخفضة</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="download_filename" class="block text-sm font-medium text-gray-700 mb-1">اسم الملف</label>
+                                    <input type="text" id="download_filename" value="label_{{ label.batch.lot_number }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="p-6 pt-0 border-t border-gray-200 mt-6">
+                        <div class="grid grid-cols-1 gap-3">
+                            <!-- Print Settings Button -->
+                            <button type="button" class="btn btn-primary w-full" onclick="printLabel()">
+                                <i class="fas fa-cog ml-1"></i>
+                                إعدادات الطباعة
+                            </button>
+
+                            <!-- Direct Print Button -->
+                            <button type="button" class="btn btn-success w-full" onclick="directPrint()">
+                                <i class="fas fa-print ml-1"></i>
+                                طباعة مباشرة
+                            </button>
+
+                            <!-- Download Button -->
+                            <button type="button" class="btn btn-secondary w-full" onclick="downloadLabel()">
+                                <i class="fas fa-download ml-1"></i>
+                                تحميل الملصق
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Label Information Card -->
+        <div class="md:col-span-1">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden sticky top-6">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-info-circle text-blue-600 ml-2"></i>
+                        معلومات الملصق
+                    </h3>
+                </div>
+
+                <div class="p-6">
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-sm text-gray-600">رقم الملصق:</p>
+                            <p class="font-medium text-gray-800">#{{ label.id }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">رقم الدفعة:</p>
+                            <p class="font-medium text-gray-800">{{ label.batch.lot_number }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">المنتج:</p>
+                            <p class="font-medium text-gray-800">{{ label.label_data.product_name }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">نوع القالب:</p>
+                            <p class="font-medium text-gray-800">
+                                {% if label.label_template == 'standard' %}
+                                قالب قياسي
+                                {% elif label.label_template == 'detailed' %}
+                                قالب مفصل
+                                {% else %}
+                                {{ label.label_template }}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">عدد النسخ:</p>
+                            <p class="font-medium text-gray-800">{{ label.quantity }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">تاريخ الإنشاء:</p>
+                            <p class="font-medium text-gray-800">{{ label.generated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">تم الإنشاء بواسطة:</p>
+                            <p class="font-medium text-gray-800">{{ label.generator.username }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-gray-200">
+                        <div class="space-y-3">
+                            <a href="/production/batches/{{ label.batch_id }}" class="text-blue-600 hover:text-blue-800 flex items-center text-sm">
+                                <i class="fas fa-layer-group ml-1"></i>
+                                العودة إلى الدفعة
+                            </a>
+                            <a href="/production/labels/generate/{{ label.batch_id }}" class="text-blue-600 hover:text-blue-800 flex items-center text-sm">
+                                <i class="fas fa-plus-circle ml-1"></i>
+                                إنشاء ملصق جديد
+                            </a>
+                            <a href="/production/labels/history/{{ label.batch_id }}" class="text-blue-600 hover:text-blue-800 flex items-center text-sm">
+                                <i class="fas fa-history ml-1"></i>
+                                سجل الملصقات
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Print Preview Modal -->
+<div id="print-preview-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+<div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <h3 class="text-lg font-semibold text-gray-900">معاينة الطباعة</h3>
+        <button type="button" class="text-gray-400 hover:text-gray-500" onclick="closePrintPreview()">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="p-6">
+        <div class="bg-gray-100 p-8 rounded-lg flex justify-center">
+            <div id="print-preview-content" class="bg-white shadow-lg p-6 rounded-lg">
+                <!-- Print preview content will be cloned here -->
+            </div>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+            <button type="button" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50" onclick="closePrintPreview()">
+                إلغاء
+            </button>
+            <button type="button" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700" onclick="confirmPrint()">
+                <i class="fas fa-print ml-1"></i>
+                تأكيد الطباعة
+            </button>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+
+
+{% block scripts %}
+<script>
+// Generate barcode
+document.addEventListener('DOMContentLoaded', function() {
+    generateBarcode();
+});
+
+function generateBarcode() {
+    try {
+        // Create a new SVG element for the barcode
+        const barcodeContainer = document.getElementById('barcode-container');
+        const barcodeSvg = document.createElement('svg');
+        barcodeSvg.id = 'barcode';
+        barcodeContainer.innerHTML = '';
+        barcodeContainer.appendChild(barcodeSvg);
+
+        // Generate the barcode
+        JsBarcode("#barcode", "{{ label.label_data.barcode }}", {
+            format: "CODE128",
+            lineColor: "#000",
+            width: 2,
+            height: 50,
+            displayValue: true,
+            margin: 5,
+            fontSize: 12
+        });
+        console.log("Barcode generated successfully");
+    } catch (error) {
+        console.error("Error generating barcode:", error);
+        // Fallback to text if barcode generation fails
+        document.getElementById('barcode-container').innerHTML = '<div class="text-center"><i class="fas fa-barcode text-gray-800 text-3xl"></i><p class="text-xs mt-1">{{ label.label_data.barcode }}</p></div>';
+    }
+}
+
+// Direct Print Function - Print immediately without preview
+function directPrint() {
+    const copies = document.getElementById('print_copies').value || 1;
+    const orientation = document.getElementById('print_orientation').value;
+    const size = document.getElementById('print_size').value;
+
+    // Create a printable version
+    const printContent = document.getElementById('label-container').cloneNode(true);
+    const printWindow = window.open('', '_blank');
+
+    // Generate barcode in the new window
+    const barcodeValue = "{{ label.label_data.barcode }}";
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <title>طباعة ملصق المنتج - {{ label.batch.lot_number }}</title>
+            <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+            <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
+            <style>
+                @media print {
+                    body {
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .print-container {
+                        width: 100%;
+                        height: 100%;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-container p-8">
+                ${printContent.outerHTML}
+            </div>
+            <script>
+                window.onload = function() {
+                    // Regenerate barcode in the print window
+                    try {
+                        const barcodeContainer = document.querySelector("#barcode-container");
+                        const barcodeSvg = document.createElement('svg');
+                        barcodeSvg.id = 'barcode';
+                        barcodeContainer.innerHTML = '';
+                        barcodeContainer.appendChild(barcodeSvg);
+
+                        JsBarcode("#barcode", "${barcodeValue}", {
+                            format: "CODE128",
+                            lineColor: "#000",
+                            width: 2,
+                            height: 50,
+                            displayValue: true,
+                            margin: 5,
+                            fontSize: 12
+                        });
+                    } catch (error) {
+                        console.error("Error generating barcode in print window:", error);
+                        document.querySelector("#barcode-container").innerHTML = '<div class="text-center"><i class="fas fa-barcode text-gray-800 text-3xl"></i><p class="text-xs mt-1">${barcodeValue}</p></div>';
+                    }
+
+                    // Print after a short delay to ensure barcode is rendered
+                    setTimeout(function() {
+                        window.print();
+                        window.setTimeout(function() {
+                            window.close();
+                        }, 500);
+                    }, 500);
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+}
+
+// Print Label Function with preview
+function printLabel() {
+    const copies = document.getElementById('print_copies').value;
+    const orientation = document.getElementById('print_orientation').value;
+    const size = document.getElementById('print_size').value;
+
+    // Show print preview
+    const previewModal = document.getElementById('print-preview-modal');
+    const previewContent = document.getElementById('print-preview-content');
+    const labelContainer = document.getElementById('label-container').cloneNode(true);
+
+    // Clear previous content
+    previewContent.innerHTML = '';
+    previewContent.appendChild(labelContainer);
+
+    // Apply print settings to preview
+    if (orientation === 'landscape') {
+        previewContent.style.transform = 'rotate(90deg)';
+    } else {
+        previewContent.style.transform = 'none';
+    }
+
+    if (size === 'fit') {
+        previewContent.style.transform = 'scale(0.9)';
+    } else if (size === 'custom') {
+        // Custom size logic could be added here
+    }
+
+    // Regenerate barcode in the preview
+    try {
+        const barcodeContainer = previewContent.querySelector("#barcode-container");
+        const barcodeSvg = document.createElement('svg');
+        barcodeSvg.id = 'barcode-preview';
+        barcodeContainer.innerHTML = '';
+        barcodeContainer.appendChild(barcodeSvg);
+
+        JsBarcode("#barcode-preview", "{{ label.label_data.barcode }}", {
+            format: "CODE128",
+            lineColor: "#000",
+            width: 2,
+            height: 50,
+            displayValue: true,
+            margin: 5,
+            fontSize: 12
+        });
+    } catch (error) {
+        console.error("Error generating barcode in preview:", error);
+    }
+
+    // Show the modal
+    previewModal.classList.remove('hidden');
+}
+
+function closePrintPreview() {
+    document.getElementById('print-preview-modal').classList.add('hidden');
+}
+
+function confirmPrint() {
+    // Close the preview modal
+    closePrintPreview();
+    directPrint();
+}
+
+// Download Label Function using wkhtmltoimage
+function downloadLabel() {
+    const format = document.getElementById('download_format').value;
+    const quality = document.getElementById('download_quality').value;
+    const filename = document.getElementById('download_filename').value;
+
+    // Show loading indicator
+    const loadingMsg = document.createElement('div');
+    loadingMsg.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
+    loadingMsg.innerHTML = '<div class="bg-white p-4 rounded-lg shadow-lg"><i class="fas fa-spinner fa-spin mr-2"></i> جاري تحميل الملصق...</div>';
+    document.body.appendChild(loadingMsg);
+
+    // Create a form to submit to the server for processing with wkhtmltoimage
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/production/labels/download/{{ label.id }}';
+    form.style.display = 'none';
+
+    // Add parameters
+    const formatInput = document.createElement('input');
+    formatInput.name = 'format';
+    formatInput.value = format;
+    form.appendChild(formatInput);
+
+    const qualityInput = document.createElement('input');
+    qualityInput.name = 'quality';
+    qualityInput.value = quality;
+    form.appendChild(qualityInput);
+
+    const filenameInput = document.createElement('input');
+    filenameInput.name = 'filename';
+    filenameInput.value = filename;
+    form.appendChild(filenameInput);
+
+    // Add CSRF token if needed
+    // const csrfInput = document.createElement('input');
+    // csrfInput.name = 'csrf_token';
+    // csrfInput.value = '{{ csrf_token }}';
+    // form.appendChild(csrfInput);
+
+    document.body.appendChild(form);
+
+    // Submit the form
+    form.submit();
+
+    // Remove loading indicator after a delay
+    setTimeout(() => {
+        document.body.removeChild(loadingMsg);
+        document.body.removeChild(form);
+    }, 2000);
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const printModal = document.getElementById('print-preview-modal');
+
+    if (printModal && !printModal.classList.contains('hidden') && event.target === printModal) {
+        closePrintPreview();
+    }
+});
+
+// Input validation
+document.addEventListener('DOMContentLoaded', function() {
+    const printCopies = document.getElementById('print_copies');
+
+    if (printCopies) {
+        printCopies.addEventListener('input', function() {
+            if (this.value < 1) {
+                this.value = 1;
+            }
+        });
+    }
+
+    // Initialize download filename with valid characters
+    const downloadFilename = document.getElementById('download_filename');
+
+    if (downloadFilename) {
+        downloadFilename.addEventListener('input', function() {
+            // Remove invalid filename characters
+            this.value = this.value.replace(/[\\/:*?"<>|]/g, '_');
+        });
+    }
+
+    // Add direct print button
+    const printSettingsSection = document.querySelector('.print-settings');
+    if (printSettingsSection) {
+        const directPrintBtn = document.createElement('button');
+        directPrintBtn.type = 'button';
+        directPrintBtn.className = 'btn btn-success w-full mt-4';
+        directPrintBtn.innerHTML = '<i class="fas fa-print ml-1"></i> طباعة مباشرة';
+        directPrintBtn.onclick = directPrint;
+        printSettingsSection.appendChild(directPrintBtn);
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}معاينة استيراد قائمة المواد{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="bomPreview()">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800">معاينة استيراد قائمة المواد</h1>
+
+        <div class="mb-6 p-4" :class="{'bg-yellow-50': hasWarnings, 'bg-green-50': !hasWarnings}" class="rounded-md">
+            <h2 class="text-lg font-semibold mb-2" :class="{'text-yellow-700': hasWarnings, 'text-green-700': !hasWarnings}">
+                <i class="fas" :class="{'fa-exclamation-triangle': hasWarnings, 'fa-check-circle': !hasWarnings}"></i>
+                <span x-text="hasWarnings ? 'تنبيهات' : 'جاهز للاستيراد'"></span>
+            </h2>
+            <div x-show="hasWarnings">
+                <p class="text-gray-700 mb-2">تم العثور على بعض المشكلات المحتملة:</p>
+                <ul class="list-disc list-inside text-gray-700 space-y-1">
+                    <template x-for="warning in warnings" :key="warning.id">
+                        <li x-text="warning.message"></li>
+                    </template>
+                </ul>
+            </div>
+            <p x-show="!hasWarnings" class="text-gray-700">
+                لم يتم العثور على أي مشكلات. يمكنك مراجعة البيانات أدناه ثم النقر على "استيراد" للمتابعة.
+            </p>
+        </div>
+
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">ملخص الاستيراد</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-blue-50 p-4 rounded-md">
+                    <p class="text-sm text-gray-500">عدد المنتجات النهائية</p>
+                    <p class="text-2xl font-bold text-blue-700" x-text="finalProducts.length"></p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-md">
+                    <p class="text-sm text-gray-500">عدد المواد الخام</p>
+                    <p class="text-2xl font-bold text-green-700" x-text="rawMaterials.length"></p>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-md">
+                    <p class="text-sm text-gray-500">إجمالي عدد العلاقات</p>
+                    <p class="text-2xl font-bold text-purple-700" x-text="totalRelationships"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">المواد الخام الجديدة</h2>
+            <div x-show="newRawMaterials.length === 0" class="text-gray-500 italic">
+                لا توجد مواد خام جديدة.
+            </div>
+            <div x-show="newRawMaterials.length > 0" class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                الاسم
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                الوصف
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                وحدة القياس
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                التكلفة
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                السعر
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                استيراد
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="(material, index) in newRawMaterials" :key="index">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="text" x-model="material.name" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="text" x-model="material.description" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="text" x-model="material.unit_of_measure" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="number" x-model="material.cost" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="number" x-model="material.price" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" x-model="material.import" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">المنتجات النهائية الجديدة</h2>
+            <div x-show="newFinalProducts.length === 0" class="text-gray-500 italic">
+                لا توجد منتجات نهائية جديدة.
+            </div>
+            <div x-show="newFinalProducts.length > 0" class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                الاسم
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                الوصف
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                وحدة القياس
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                التكلفة
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                السعر
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                استيراد
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="(product, index) in newFinalProducts" :key="index">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="text" x-model="product.name" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="text" x-model="product.description" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="text" x-model="product.unit_of_measure" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="number" x-model="product.cost" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="number" x-model="product.price" class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" x-model="product.import" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">معاينة قوائم المواد</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                المنتج النهائي
+                            </th>
+                            <template x-for="(material, index) in rawMaterials" :key="index">
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <span x-text="material.name"></span>
+                                </th>
+                            </template>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                استيراد
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="(product, productIndex) in finalProducts" :key="productIndex">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                                    <span x-text="product.name"></span>
+                                </td>
+                                <template x-for="(material, materialIndex) in rawMaterials" :key="materialIndex">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="number" step="0.01"
+                                               x-model="bomData[productIndex][materialIndex].quantity"
+                                               class="border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 w-full">
+                                    </td>
+                                </template>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" x-model="product.import" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="flex justify-end space-x-3 space-x-reverse">
+            <a href="{{ url_for('bom.import_excel_form') }}" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                إلغاء
+            </a>
+            <button @click="processImport" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                استيراد
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function bomPreview() {
+    return {
+        // Data from server
+        rawData: {{ bom_data|tojson }},
+        rawMaterialCategoryId: {{ raw_material_category }},
+        finalProductCategoryId: {{ final_product_category }},
+        filePath: "{{ file_path }}",
+        sheetName: "{{ sheet_name }}",
+        defaultUnit: "{{ default_unit }}",
+
+        // Processed data
+        finalProducts: [],
+        rawMaterials: [],
+        newRawMaterials: [],
+        newFinalProducts: [],
+        bomData: [],
+        warnings: [],
+
+        // Computed properties
+        get hasWarnings() {
+            return this.warnings.length > 0;
+        },
+
+        get totalRelationships() {
+            let count = 0;
+            for (let i = 0; i < this.bomData.length; i++) {
+                for (let j = 0; j < this.bomData[i].length; j++) {
+                    if (this.bomData[i][j].quantity > 0) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        },
+
+        // Methods
+        init() {
+            this.processData();
+        },
+
+        processData() {
+            // Process raw materials (columns)
+            this.rawMaterials = this.rawData.materials.map(material => ({
+                ...material,
+                import: true
+            }));
+
+            // Process final products (rows)
+            this.finalProducts = this.rawData.products.map(product => ({
+                ...product,
+                import: true
+            }));
+
+            // Process BOM data (matrix)
+            this.bomData = [];
+            for (let i = 0; i < this.finalProducts.length; i++) {
+                this.bomData[i] = [];
+                for (let j = 0; j < this.rawMaterials.length; j++) {
+                    this.bomData[i][j] = {
+                        product_id: this.finalProducts[i].id,
+                        material_id: this.rawMaterials[j].id,
+                        quantity: this.rawData.quantities[i][j] || 0
+                    };
+                }
+            }
+
+            // Identify new raw materials
+            this.newRawMaterials = this.rawMaterials.filter(material => material.is_new).map(material => ({
+                ...material,
+                description: "أضيف عند استيراد قائمة المواد من ملف Excel",
+                cost: 0,
+                price: 0,
+                unit_of_measure: this.defaultUnit || "وحدة",
+                import: true
+            }));
+
+            // Identify new final products
+            this.newFinalProducts = this.finalProducts.filter(product => product.is_new).map(product => ({
+                ...product,
+                description: "أضيف عند استيراد قائمة المواد من ملف Excel",
+                cost: 0,
+                price: 0,
+                unit_of_measure: this.defaultUnit || "وحدة",
+                import: true
+            }));
+
+            // Generate warnings
+            this.generateWarnings();
+        },
+
+        generateWarnings() {
+            this.warnings = [];
+
+            // Warning for new raw materials
+            if (this.newRawMaterials.length > 0) {
+                this.warnings.push({
+                    id: 'new-materials',
+                    message: `سيتم إضافة ${this.newRawMaterials.length} من المواد الخام الجديدة إلى النظام.`
+                });
+            }
+
+            // Warning for new final products
+            if (this.newFinalProducts.length > 0) {
+                this.warnings.push({
+                    id: 'new-products',
+                    message: `سيتم إضافة ${this.newFinalProducts.length} من المنتجات النهائية الجديدة إلى النظام.`
+                });
+            }
+
+            // Warning for empty BOMs
+            const emptyBoms = this.finalProducts.filter(product => {
+                const productIndex = this.finalProducts.indexOf(product);
+                return !this.bomData[productIndex].some(item => item.quantity > 0);
+            });
+
+            if (emptyBoms.length > 0) {
+                this.warnings.push({
+                    id: 'empty-boms',
+                    message: `يوجد ${emptyBoms.length} من المنتجات بدون مكونات (قائمة مواد فارغة).`
+                });
+            }
+        },
+
+        processImport() {
+            // Prepare data for submission
+            const importData = {
+                file_path: this.filePath,
+                sheet_name: this.sheetName,
+                raw_material_category_id: this.rawMaterialCategoryId,
+                final_product_category_id: this.finalProductCategoryId,
+                new_raw_materials: this.newRawMaterials.filter(m => m.import),
+                new_final_products: this.newFinalProducts.filter(p => p.import),
+                bom_data: []
+            };
+
+            // Process BOM data for products that are marked for import
+            for (let i = 0; i < this.finalProducts.length; i++) {
+                if (!this.finalProducts[i].import) continue;
+
+                const productBom = {
+                    product_id: this.finalProducts[i].id,
+                    product_name: this.finalProducts[i].name,
+                    is_new_product: this.finalProducts[i].is_new,
+                    components: []
+                };
+
+                for (let j = 0; j < this.rawMaterials.length; j++) {
+                    if (!this.rawMaterials[j].import) continue;
+
+                    if (this.bomData[i][j].quantity > 0) {
+                        productBom.components.push({
+                            material_id: this.rawMaterials[j].id,
+                            material_name: this.rawMaterials[j].name,
+                            is_new_material: this.rawMaterials[j].is_new,
+                            quantity: this.bomData[i][j].quantity,
+                            unit_of_measure: this.rawMaterials[j].unit_of_measure || this.defaultUnit
+                        });
+                    }
+                }
+
+                if (productBom.components.length > 0) {
+                    importData.bom_data.push(productBom);
+                }
+            }
+
+            // Submit data to server
+            fetch("{{ url_for('bom.process_excel_import') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(importData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    alert(data.message);
+                    // Redirect to BOM management page
+                    window.location.href = "{{ url_for('bom.bom_management_page') }}";
+                } else {
+                    // Show error message
+                    alert("حدث خطأ أثناء الاستيراد: " + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("حدث خطأ أثناء الاستيراد. يرجى المحاولة مرة أخرى.");
+            });
+        }
+    };
+}
+</script>
+{% endblock %}

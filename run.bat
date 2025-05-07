@@ -1,8 +1,5 @@
 @echo off
-echo === STARTING KATILO-ERP ===
-echo.
-
+echo === STARTING KATILO-ERP (Production Mode via WSGI) ===
 call venv\Scripts\activate.bat
-python app.py
-
+python wsgi.py
 pause
