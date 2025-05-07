@@ -1,0 +1,855 @@
+{% extends "base.html" %}
+
+{% block title %}العميل: {{ customer.customer_name }} - نظام قاتيلو{% endblock %}
+
+{% block page_header %}تفاصيل العميل: {{ customer.customer_name }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales/customers" class="text-blue-600 hover:text-blue-800">العملاء</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">{{ customer.customer_name }}</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="customerDetails()">
+    <!-- Customer Profile Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-start md:items-center gap-6">
+            <!-- Customer Avatar -->
+            <div class="h-20 w-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-3xl font-bold shadow-md">
+                <span>{{ customer.customer_name[0].upper() }}</span>
+            </div>
+            
+            <!-- Customer Info -->
+            <div class="flex-1">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">{{ customer.customer_name }}</h1>
+                        <p class="text-gray-500 flex items-center mt-1">
+                            <i class="fas fa-id-card text-blue-500 ml-2"></i>
+                            العميل #{{ customer.id }}
+                            <span class="mx-2 text-gray-300">|</span>
+                            <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                نشط
+                            </span>
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="/sales/customers" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center">
+                            <i class="fas fa-arrow-right ml-1.5"></i>
+                            العودة
+                        </a>
+                        <a href="/sales/orders/new?customer_id={{ customer.id }}" class="btn btn-primary flex items-center">
+                            <i class="fas fa-plus-circle ml-1.5"></i>
+                            طلب جديد
+                        </a>
+                        <button @click="showAddInteractionModal = true" class="btn bg-indigo-600 hover:bg-indigo-700 text-white flex items-center">
+                            <i class="fas fa-comment-alt ml-1.5"></i>
+                            إضافة تفاعل
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Contact Info Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div class="bg-gray-50 rounded-lg p-3 flex items-start">
+                        <div class="rounded-full bg-blue-100 p-2 ml-3">
+                            <i class="fas fa-phone text-blue-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-semibold text-gray-500 mb-1">معلومات الاتصال</h3>
+                            <p class="text-sm text-gray-800">{{ customer.contact_info or 'غير متوفر' }}</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 flex items-start">
+                        <div class="rounded-full bg-green-100 p-2 ml-3">
+                            <i class="fas fa-file-invoice text-green-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-semibold text-gray-500 mb-1">عنوان الفواتير</h3>
+                            <p class="text-sm text-gray-800 line-clamp-2">{{ customer.billing_address or 'غير متوفر' }}</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 flex items-start">
+                        <div class="rounded-full bg-purple-100 p-2 ml-3">
+                            <i class="fas fa-shipping-fast text-purple-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-semibold text-gray-500 mb-1">عنوان الشحن</h3>
+                            <p class="text-sm text-gray-800 line-clamp-2">{{ customer.shipping_address or 'غير متوفر' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">إجمالي الطلبات</p>
+                    <h3 class="text-2xl font-bold text-gray-800 mt-1">{{ customer.sales_orders|length }}</h3>
+                </div>
+                <div class="rounded-full bg-blue-100 p-3">
+                    <i class="fas fa-shopping-cart text-blue-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <p class="text-xs text-gray-500">
+                    <i class="fas fa-calendar-alt ml-1"></i>
+                    آخر طلب: {{ customer.last_order_date|default('--')|format_date }}
+                </p>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">إجمالي المشتريات</p>
+                    <h3 class="text-2xl font-bold text-green-600 mt-1">{{ customer.total_spent|default(0)|format_currency }}</h3>
+                </div>
+                <div class="rounded-full bg-green-100 p-3">
+                    <i class="fas fa-money-bill-wave text-green-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <p class="text-xs text-gray-500">
+                    <i class="fas fa-chart-line ml-1"></i>
+                    متوسط الطلب: {{ customer.avg_order_value|default(0)|format_currency }}
+                </p>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">التفاعلات</p>
+                    <h3 class="text-2xl font-bold text-indigo-600 mt-1">{{ customer.interactions|length }}</h3>
+                </div>
+                <div class="rounded-full bg-indigo-100 p-3">
+                    <i class="fas fa-comments text-indigo-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <button @click="showAddInteractionModal = true" class="text-xs text-indigo-600 hover:text-indigo-800">
+                    <i class="fas fa-plus-circle ml-1"></i>
+                    إضافة تفاعل جديد
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">الحالة</p>
+                    <h3 class="text-2xl font-bold text-gray-800 mt-1">نشط</h3>
+                </div>
+                <div class="rounded-full bg-yellow-100 p-3">
+                    <i class="fas fa-user-check text-yellow-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <p class="text-xs text-gray-500">
+                    <i class="fas fa-clock ml-1"></i>
+                    منذ {{ customer.created_at|default('--')|time_ago }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column -->
+        <div class="lg:col-span-2">
+            <!-- Order History -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                <div class="border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+                    <h2 class="font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-shopping-cart text-blue-500 ml-2"></i>
+                        سجل الطلبات
+                    </h2>
+                    <a href="/sales/orders/new?customer_id={{ customer.id }}" class="text-blue-600 hover:text-blue-800 flex items-center text-sm">
+                        <i class="fas fa-plus-circle ml-1"></i>
+                        طلب جديد
+                    </a>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    رقم الطلب
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    التاريخ
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    عدد العناصر
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    المبلغ الإجمالي
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الحالة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الإجراءات
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% if customer.sales_orders %}
+                                {% for order in customer.sales_orders %}
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">#{{ order.id }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">{{ order.order_date|format_date }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">{{ order.details|length }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">{{ order.total_amount|format_currency }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                                            {% if order.status == 'Delivered' %}
+                                                bg-green-100 text-green-800
+                                            {% elif order.status == 'Pending' %}
+                                                bg-yellow-100 text-yellow-800
+                                            {% elif order.status == 'Processing' %}
+                                                bg-blue-100 text-blue-800
+                                            {% else %}
+                                                bg-gray-100 text-gray-800
+                                            {% endif %}">
+                                            {{ order.status }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                                        <div class="flex space-x-2 space-x-reverse">
+                                            <a href="/sales/orders/{{ order.id }}" class="text-indigo-600 hover:text-indigo-900" title="عرض التفاصيل">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if order.invoices %}
+                                            <a href="/sales/invoices/{{ order.invoices[0].id }}" class="text-blue-600 hover:text-blue-900" title="عرض الفاتورة">
+                                                <i class="fas fa-file-invoice"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="px-6 py-8 text-center">
+                                        <div class="flex flex-col items-center justify-center">
+                                            <div class="rounded-full bg-gray-100 p-3 mb-3">
+                                                <i class="fas fa-shopping-cart text-gray-400 text-xl"></i>
+                                            </div>
+                                            <p class="text-gray-500 mb-1">لا توجد طلبات لهذا العميل</p>
+                                            <a href="/sales/orders/new?customer_id={{ customer.id }}" class="mt-3 btn btn-sm btn-primary">
+                                                <i class="fas fa-plus-circle ml-1"></i>
+                                                إنشاء طلب جديد
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if customer.sales_orders and customer.sales_orders|length > 5 %}
+                <div class="bg-gray-50 px-6 py-3 border-t border-gray-100 text-center">
+                    <a href="/sales/orders?customer_id={{ customer.id }}" class="text-blue-600 hover:text-blue-800 text-sm">
+                        عرض جميع الطلبات
+                        <i class="fas fa-arrow-left mr-1"></i>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Charts -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="border-b border-gray-100 px-6 py-4">
+                        <h2 class="font-semibold text-gray-800 flex items-center">
+                            <i class="fas fa-chart-line text-blue-500 ml-2"></i>
+                            سجل المشتريات
+                        </h2>
+                    </div>
+                    <div class="p-4 h-64">
+                        <canvas id="purchaseHistoryChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="border-b border-gray-100 px-6 py-4">
+                        <h2 class="font-semibold text-gray-800 flex items-center">
+                            <i class="fas fa-chart-pie text-blue-500 ml-2"></i>
+                            المنتجات الأكثر شراءً
+                        </h2>
+                    </div>
+                    <div class="p-4 h-64">
+                        <canvas id="topProductsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Column -->
+        <div class="lg:col-span-1">
+            <!-- Customer Interactions -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                <div class="border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+                    <h2 class="font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-comments text-blue-500 ml-2"></i>
+                        التفاعلات
+                    </h2>
+                    <button @click="showAddInteractionModal = true" class="text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-plus-circle"></i>
+                    </button>
+                </div>
+                
+                <div class="p-4">
+                    {% if customer.interactions %}
+                    <div class="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                        {% for interaction in customer.interactions %}
+                        <div class="bg-gray-50 rounded-lg p-4 relative border-r-2 
+                            {% if interaction.interaction_type == 'Call' %}
+                                border-blue-500
+                            {% elif interaction.interaction_type == 'Email' %}
+                                border-green-500
+                            {% elif interaction.interaction_type == 'Visit' %}
+                                border-purple-500
+                            {% else %}
+                                border-gray-500
+                            {% endif %}">
+                            <div class="absolute right-[-5px] top-4 w-3 h-3 rounded-full 
+                                {% if interaction.interaction_type == 'Call' %}
+                                    bg-blue-500
+                                {% elif interaction.interaction_type == 'Email' %}
+                                    bg-green-500
+                                {% elif interaction.interaction_type == 'Visit' %}
+                                    bg-purple-500
+                                {% else %}
+                                    bg-gray-500
+                                {% endif %}">
+                            </div>
+                            
+                            <div class="flex items-center mb-2">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full 
+                                    {% if interaction.interaction_type == 'Call' %}
+                                        bg-blue-100 text-blue-800
+                                    {% elif interaction.interaction_type == 'Email' %}
+                                        bg-green-100 text-green-800
+                                    {% elif interaction.interaction_type == 'Visit' %}
+                                        bg-purple-100 text-purple-800
+                                    {% else %}
+                                        bg-gray-100 text-gray-800
+                                    {% endif %}">
+                                    {{ interaction.interaction_type }}
+                                </span>
+                                <span class="text-xs text-gray-500 mr-auto">{{ interaction.created_at|format_datetime }}</span>
+                            </div>
+                            
+                            <p class="text-sm text-gray-700 mb-2">{{ interaction.notes }}</p>
+                            
+                            {% if interaction.follow_up_date %}
+                            <div class="flex items-center text-xs text-gray-500">
+                                <i class="fas fa-calendar-alt ml-1"></i>
+                                متابعة: {{ interaction.follow_up_date|format_date }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-8">
+                        <div class="rounded-full bg-gray-100 h-16 w-16 flex items-center justify-center mx-auto mb-3">
+                            <i class="fas fa-comments text-gray-400 text-xl"></i>
+                        </div>
+                        <p class="text-gray-500 mb-3">لا توجد تفاعلات مسجلة بعد</p>
+                        <button @click="showAddInteractionModal = true" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus-circle ml-1"></i>
+                            إضافة تفاعل
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Additional Information -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                <div class="border-b border-gray-100 px-6 py-4">
+                    <h2 class="font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-info-circle text-blue-500 ml-2"></i>
+                        معلومات إضافية
+                    </h2>
+                </div>
+                
+                <div class="p-4">
+                    <ul class="divide-y divide-gray-100">
+                        <li class="py-3 flex justify-between">
+                            <span class="text-sm text-gray-500">تاريخ التسجيل</span>
+                            <span class="text-sm font-medium">{{ customer.created_at|default('--')|format_date }}</span>
+                        </li>
+                        <li class="py-3 flex justify-between">
+                            <span class="text-sm text-gray-500">عدد الفواتير</span>
+                            <span class="text-sm font-medium">{{ customer.invoices|default([])|length }}</span>
+                        </li>
+                        <li class="py-3 flex justify-between">
+                            <span class="text-sm text-gray-500">آخر تفاعل</span>
+                            <span class="text-sm font-medium">
+                                {% if customer.interactions %}
+                                    {{ customer.interactions[0].created_at|format_date }}
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </span>
+                        </li>
+                        <li class="py-3 flex justify-between">
+                            <span class="text-sm text-gray-500">الحالة</span>
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                نشط
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="bg-gray-50 px-6 py-4 border-t border-gray-100">
+                    <button @click="openEditModal()" class="btn btn-sm bg-gray-200 hover:bg-gray-300 text-gray-700 w-full flex items-center justify-center">
+                        <i class="fas fa-edit ml-1"></i>
+                        تعديل بيانات العميل
+                    </button>
+                    
+                    
+                </div>
+                
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="border-b border-gray-100 px-6 py-4">
+                    <h2 class="font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-bolt text-blue-500 ml-2"></i>
+                        إجراءات سريعة
+                    </h2>
+                </div>
+                <!-- Edit Customer Modal -->
+<div x-show="showEditModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="showEditModal = false">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="flex justify-between items-start mb-4">
+                    <button @click="showEditModal = false" class="text-gray-400 hover:text-gray-500">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">تعديل بيانات العميل</h3>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="customerName" class="block text-sm font-medium text-gray-700 mb-1">اسم العميل <span class="text-red-500">*</span></label>
+                        <input type="text" id="customerName" x-model="customerData.customer_name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <p x-show="errors.customer_name" x-text="errors.customer_name" class="mt-1 text-sm text-red-600"></p>
+                    </div>
+                    
+                    <div>
+                        <label for="contactInfo" class="block text-sm font-medium text-gray-700 mb-1">معلومات الاتصال</label>
+                        <input type="text" id="contactInfo" x-model="customerData.contact_info" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    </div>
+                    
+                    <div>
+                        <label for="billingAddress" class="block text-sm font-medium text-gray-700 mb-1">عنوان الفواتير</label>
+                        <textarea id="billingAddress" x-model="customerData.billing_address" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label for="shippingAddress" class="block text-sm font-medium text-gray-700 mb-1">عنوان الشحن</label>
+                        <textarea id="shippingAddress" x-model="customerData.shipping_address" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button @click="updateCustomer()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    حفظ التغييرات
+                </button>
+                <button @click="showEditModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+                <div class="p-4 space-y-2">
+                    <a href="/sales/orders/new?customer_id={{ customer.id }}" class="btn bg-blue-600 hover:bg-blue-700 text-white w-full flex items-center justify-center">
+                        <i class="fas fa-shopping-cart ml-1"></i>
+                        إنشاء طلب جديد
+                    </a>
+                    
+                    <a href="/sales/invoices/new?customer_id={{ customer.id }}" class="btn bg-green-600 hover:bg-green-700 text-white w-full flex items-center justify-center">
+                        <i class="fas fa-file-invoice ml-1"></i>
+                        إنشاء فاتورة
+                    </a>
+                    
+                    <button @click="showAddInteractionModal = true" class="btn bg-indigo-600 hover:bg-indigo-700 text-white w-full flex items-center justify-center">
+                        <i class="fas fa-comment-alt ml-1"></i>
+                        إضافة تفاعل
+                    </button>
+                    
+                    <a href="mailto:{{ customer.contact_info }}" class="btn bg-yellow-600 hover:bg-yellow-700 text-white w-full flex items-center justify-center">
+                        <i class="fas fa-envelope ml-1"></i>
+                        إرسال بريد إلكتروني
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Interaction Modal -->
+    <div x-show="showAddInteractionModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="showAddInteractionModal = false">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex justify-between items-start mb-4">
+                        <button @click="showAddInteractionModal = false" class="text-gray-400 hover:text-gray-500">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">إضافة تفاعل جديد</h3>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label for="interactionType" class="block text-sm font-medium text-gray-700 mb-1">نوع التفاعل <span class="text-red-500">*</span></label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <label class="flex flex-col items-center bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:border-blue-500 transition-colors"
+                                       :class="{'border-blue-500 ring-2 ring-blue-200': interaction.type === 'Call'}">
+                                    <input type="radio" name="interactionType" value="Call" x-model="interaction.type" class="sr-only">
+                                    <i class="fas fa-phone text-blue-500 text-xl mb-1"></i>
+                                    <span class="text-xs font-medium">مكالمة</span>
+                                </label>
+                                
+                                <label class="flex flex-col items-center bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:border-green-500 transition-colors"
+                                :class="{'border-green-500 ring-2 ring-green-200': interaction.type === 'Email'}">
+                                <input type="radio" name="interactionType" value="Email" x-model="interaction.type" class="sr-only">
+                                <i class="fas fa-envelope text-green-500 text-xl mb-1"></i>
+                                <span class="text-xs font-medium">بريد إلكتروني</span>
+                            </label>
+                            
+                            <label class="flex flex-col items-center bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:border-purple-500 transition-colors"
+                                   :class="{'border-purple-500 ring-2 ring-purple-200': interaction.type === 'Visit'}">
+                                <input type="radio" name="interactionType" value="Visit" x-model="interaction.type" class="sr-only">
+                                <i class="fas fa-user-clock text-purple-500 text-xl mb-1"></i>
+                                <span class="text-xs font-medium">زيارة</span>
+                            </label>
+                            
+                            <label class="flex flex-col items-center bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:border-gray-500 transition-colors"
+                                   :class="{'border-gray-500 ring-2 ring-gray-200': interaction.type === 'Other'}">
+                                <input type="radio" name="interactionType" value="Other" x-model="interaction.type" class="sr-only">
+                                <i class="fas fa-ellipsis-h text-gray-500 text-xl mb-1"></i>
+                                <span class="text-xs font-medium">أخرى</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="interactionNotes" class="block text-sm font-medium text-gray-700 mb-1">ملاحظات <span class="text-red-500">*</span></label>
+                        <textarea id="interactionNotes" x-model="interaction.notes" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        <p x-show="errors.notes" x-text="errors.notes" class="mt-1 text-sm text-red-600"></p>
+                    </div>
+                    
+                    <div>
+                        <label for="followUpDate" class="block text-sm font-medium text-gray-700 mb-1">تاريخ المتابعة (اختياري)</label>
+                        <input type="date" id="followUpDate" x-model="interaction.followUpDate" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button @click="saveInteraction()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    حفظ
+                </button>
+                <button @click="showAddInteractionModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+function customerDetails() {
+    return {
+        showAddInteractionModal: false,
+        showEditModal: false,
+        customerData: {
+            customer_name: '{{ customer.customer_name }}',
+            contact_info: '{{ customer.contact_info }}',
+            billing_address: '{{ customer.billing_address }}',
+            shipping_address: '{{ customer.shipping_address }}'
+        },
+        interaction: {
+            type: 'Call',
+            notes: '',
+            followUpDate: ''
+        },
+        errors: {},
+        
+        init() {
+            this.initCharts();
+        },
+        
+        validateInteraction() {
+            this.errors = {};
+            
+            if (!this.interaction.notes || !this.interaction.notes.trim()) {
+                this.errors.notes = 'الملاحظات مطلوبة';
+                return false;
+            }
+            
+            return true;
+        },
+        openEditModal() {
+            this.customerData = {
+                customer_name: '{{ customer.customer_name }}',
+                contact_info: '{{ customer.contact_info }}',
+                billing_address: '{{ customer.billing_address }}',
+                shipping_address: '{{ customer.shipping_address }}'
+            };
+            this.errors = {};
+            this.showEditModal = true;
+        },
+        
+        validateCustomer() {
+            this.errors = {};
+            
+            if (!this.customerData.customer_name || !this.customerData.customer_name.trim()) {
+                this.errors.customer_name = 'اسم العميل مطلوب';
+                return false;
+            }
+            
+            return true;
+        },
+        
+        updateCustomer() {
+            if (!this.validateCustomer()) {
+                return;
+            }
+            
+            fetchAPI('/sales/customers/{{ customer.id }}', 'PUT', this.customerData)
+                .then(response => {
+                    showNotification('تم تحديث بيانات العميل بنجاح', 'success');
+                    this.showEditModal = false;
+                    
+                    // Reload page after short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                })
+                .catch(error => {
+                    showNotification('حدث خطأ أثناء تحديث بيانات العميل', 'error');
+                });
+        },
+        
+        saveInteraction() {
+            if (!this.validateInteraction()) {
+                return;
+            }
+            
+            const interactionData = {
+                customer_id: {{ customer.id }},
+                interaction_type: this.interaction.type,
+                notes: this.interaction.notes,
+                follow_up_date: this.interaction.followUpDate || null
+            };
+            
+            fetchAPI('/sales/customers/interactions', 'POST', interactionData)
+                .then(response => {
+                    showNotification('تم إضافة التفاعل بنجاح', 'success');
+                    this.showAddInteractionModal = false;
+                    
+                    // Reload page after short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                })
+                .catch(error => {
+                    showNotification('حدث خطأ أثناء حفظ التفاعل', 'error');
+                });
+        },
+        
+        initCharts() {
+            // Purchase History Chart
+            const purchaseHistoryCtx = document.getElementById('purchaseHistoryChart').getContext('2d');
+            const purchaseHistoryChart = new Chart(purchaseHistoryCtx, {
+                type: 'line',
+                data: {
+                    labels: {{ purchase_history_dates|default([])|tojson }},
+                    datasets: [{
+                        label: 'مبلغ المشتريات',
+                        data: {{ purchase_history_amounts|default([])|tojson }},
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        pointRadius: 3,
+                        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                        pointBorderColor: 'rgba(59, 130, 246, 1)',
+                        pointHoverRadius: 5,
+                        pointHoverBackgroundColor: 'rgba(59, 130, 246, 1)',
+                        pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
+                        pointHitRadius: 10,
+                        pointBorderWidth: 2,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            left: 10,
+                            right: 25,
+                            top: 25,
+                            bottom: 0
+                        }
+                    },
+                    scales: {
+                        x: {
+                            time: {
+                                unit: 'date'
+                            },
+                            grid: {
+                                display: false,
+                                drawBorder: false
+                            },
+                            ticks: {
+                                maxTicksLimit: 7
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                maxTicksLimit: 5,
+                                padding: 10,
+                                callback: function(value, index, values) {
+                                    return value.toFixed(2) + ' ج.م';
+                                }
+                            },
+                            grid: {
+                                color: "rgb(234, 236, 244)",
+                                zeroLineColor: "rgb(234, 236, 244)",
+                                drawBorder: false,
+                                borderDash: [2],
+                                zeroLineBorderDash: [2]
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: "rgb(255, 255, 255)",
+                            bodyColor: "#858796",
+                            titleMarginBottom: 10,
+                            titleColor: '#6e707e',
+                            titleFontSize: 14,
+                            borderColor: '#dddfeb',
+                            borderWidth: 1,
+                            xPadding: 15,
+                            yPadding: 15,
+                            displayColors: false,
+                            intersect: false,
+                            mode: 'index',
+                            caretPadding: 10,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'المبلغ: ' + context.parsed.y.toFixed(2) + ' ج.م';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Top Products Chart
+            const topProductsCtx = document.getElementById('topProductsChart').getContext('2d');
+            const topProductsChart = new Chart(topProductsCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: {{ top_products_names|default([])|tojson }},
+                    datasets: [{
+                        data: {{ top_products_quantities|default([])|tojson }},
+                        backgroundColor: [
+                            '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+                            '#5a5c69', '#6f42c1', '#fd7e14', '#20c9a6', '#858796'
+                        ],
+                        hoverBackgroundColor: [
+                            '#2e59d9', '#17a673', '#2c9faf', '#dda20a', '#be2617',
+                            '#3a3b45', '#5d36a4', '#ca6510', '#169b80', '#60616f'
+                        ],
+                        hoverBorderColor: "rgba(234, 236, 244, 1)",
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            rtl: true,
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20,
+                                font: {
+                                    family: "'Tajawal', sans-serif"
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: "rgb(255, 255, 255)",
+                            bodyColor: "#858796",
+                            borderColor: '#dddfeb',
+                            borderWidth: 1,
+                            xPadding: 15,
+                            yPadding: 15,
+                            displayColors: false,
+                            caretPadding: 10,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': ' + context.parsed + ' وحدة';
+                                }
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+    };
+}
+</script>
+{% endblock %}

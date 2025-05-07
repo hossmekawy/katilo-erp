@@ -1,0 +1,557 @@
+{% extends 'base.html' %}
+
+{% block title %}تعديل طلب #{{ order.id }}{% endblock %}
+
+{% block page_header %}تعديل طلب #{{ order.id }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.sales_dashboard') }}" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.list_orders') }}" class="text-blue-600 hover:text-blue-800">الطلبات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.view_order', order_id=order.id) }}" class="text-blue-600 hover:text-blue-800">طلب #{{ order.id }}</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">تعديل</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="editOrderApp()" class="space-y-6">
+    <!-- Order Details Card -->
+    <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-blue-100 p-2 rounded-lg">
+                    <i class="fas fa-file-invoice text-blue-600 text-lg"></i>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800">تعديل طلب #{{ order.id }}</h2>
+            </div>
+            <div class="text-sm text-gray-500">
+                <span class="font-medium">التاريخ:</span> <span>{{ order.order_date.strftime('%Y-%m-%d') }}</span>
+            </div>
+        </div>
+        <div class="p-6">
+            <form id="editOrderForm" class="space-y-6" @submit.prevent="submitOrder">
+                <!-- Customer Selection -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="customer" class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-user text-blue-500 ml-1"></i> العميل <span class="text-red-500">*</span>
+                        </label>
+                        <select id="customer" x-model="formData.customer_id" class="form-select" :class="errors.customer ? 'border-red-500' : ''">
+                            <option value="">اختر العميل</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.id }}" {% if customer.id == order.customer_id %}selected{% endif %}>{{ customer.customer_name }}</option>
+                            {% endfor %}
+                        </select>
+                        <p x-show="errors.customer" x-text="errors.customer" class="mt-1 text-sm text-red-600"></p>
+                    </div>
+
+                    <!-- Sales Representative -->
+                    <div>
+                        <label for="representative" class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-user-tie text-blue-500 ml-1"></i> مندوب المبيعات
+                        </label>
+                        <select id="representative" x-model="formData.representative_id" class="form-select">
+                            <option value="">اختر المندوب (اختياري)</option>
+                            {% for rep in representatives %}
+                            <option value="{{ rep.id }}" {% if order.sales_rep_id and rep.id == order.sales_rep_id %}selected{% endif %}>{{ rep.user.username if rep.user else 'غير معروف' }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Items Card -->
+    <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-blue-100 p-2 rounded-lg">
+                    <i class="fas fa-boxes text-blue-600 text-lg"></i>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800">المنتجات</h2>
+            </div>
+            <button @click="showAddItemModal = true" type="button" class="btn btn-sm btn-primary flex items-center">
+                <i class="fas fa-plus ml-1"></i> إضافة منتج
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المنتج</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الكمية</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">السعر</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجمالي</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="(item, index) in orderItems" :key="index">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="item.item_name"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="item.quantity"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(item.unit_price)"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(item.quantity * item.unit_price)"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <button @click="editItem(index)" type="button" class="text-blue-600 hover:text-blue-900 ml-2">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button @click="removeItem(index)" type="button" class="text-red-600 hover:text-red-900">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="orderItems.length === 0">
+                            <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">لا توجد منتجات مضافة للطلب</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Summary Card -->
+    <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-blue-100 p-2 rounded-lg">
+                    <i class="fas fa-calculator text-blue-600 text-lg"></i>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800">ملخص الطلب</h2>
+            </div>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <div class="mb-4">
+                        <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-sticky-note text-blue-500 ml-1"></i> ملاحظات
+                        </label>
+                        <textarea id="notes" x-model="formData.notes" rows="4" class="form-textarea"></textarea>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">إجمالي المنتجات:</span>
+                            <span class="font-medium" x-text="formatCurrency(subtotal)"></span>
+                        </div>
+                        <div class="border-t border-gray-200 pt-3 flex justify-between">
+                            <span class="text-gray-800 font-bold">الإجمالي النهائي:</span>
+                            <span class="text-blue-600 font-bold text-lg" x-text="formatCurrency(total)"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                <a href="{{ url_for('sales.view_order', order_id=order.id) }}" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    إلغاء
+                </a>
+                <button type="button" @click="submitOrder" class="btn btn-primary" :disabled="isSubmitting || orderItems.length === 0">
+                    <span x-show="!isSubmitting">حفظ التغييرات</span>
+                    <span x-show="isSubmitting" class="flex items-center">
+                        <svg class="animate-spin ml-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        جاري الحفظ...
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Item Modal -->
+    <div x-show="showAddItemModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div x-show="showAddItemModal" @click="showAddItemModal = false" class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <div x-show="showAddItemModal" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">إضافة منتج</h3>
+                            <div class="mt-2 space-y-4">
+                                <div>
+                                    <label for="itemId" class="block text-sm font-medium text-gray-700 mb-1">المنتج <span class="text-red-500">*</span></label>
+                                    <select id="itemId" x-model="currentItem.item_id" @change="getItemDetails()" class="form-select" :class="errors.item ? 'border-red-500' : ''">
+                                        <option value="">اختر المنتج</option>
+                                        {% for item in items %}
+                                        <option value="{{ item.id }}">{{ item.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <p x-show="errors.item" x-text="errors.item" class="mt-1 text-sm text-red-600"></p>
+                                </div>
+
+                                <div>
+                                    <label for="quantity" class="block text-sm font-medium text-gray-700 mb-1">الكمية <span class="text-red-500">*</span></label>
+                                    <input type="number" id="quantity" x-model="currentItem.quantity" @input="checkAvailability()" min="1" class="form-input" :class="errors.quantity ? 'border-red-500' : ''">
+                                    <p x-show="errors.quantity" x-text="errors.quantity" class="mt-1 text-sm text-red-600"></p>
+
+                                    <div x-show="availabilityText" :class="availabilityClass" class="mt-2 p-2 rounded-md text-sm flex items-center">
+                                        <i :class="availabilityIcon" class="ml-1"></i>
+                                        <span x-text="availabilityText"></span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="price" class="block text-sm font-medium text-gray-700 mb-1">السعر <span class="text-red-500">*</span></label>
+                                    <input type="number" id="price" x-model="currentItem.price" min="0" step="0.01" class="form-input" :class="errors.price ? 'border-red-500' : ''">
+                                    <p x-show="errors.price" x-text="errors.price" class="mt-1 text-sm text-red-600"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" @click="addItem()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        إضافة
+                    </button>
+                    <button type="button" @click="showAddItemModal = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global currency formatter function
+    function formatCurrency(amount) {
+        if (amount === undefined || amount === null) return '';
+        return new Intl.NumberFormat('ar-EG', {
+            style: 'currency',
+            currency: 'EGP'
+        }).format(amount);
+    }
+
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('editOrderApp', () => ({
+            orderItems: [],
+            subtotal: 0,
+            total: 0,
+            isSubmitting: false,
+            errors: {},
+            showAddItemModal: false,
+            editingItemIndex: null,
+
+            // Current item being added/edited
+            currentItem: {
+                item_id: '',
+                item_name: '',
+                quantity: 1,
+                price: 0
+            },
+
+            // Availability check
+            isLoading: false,
+            isAvailable: false,
+            availabilityText: '',
+            availabilityClass: '',
+            availabilityIcon: '',
+
+            // Form data
+            formData: {
+                customer_id: '{{ order.customer_id }}',
+                representative_id: '{{ order.sales_rep_id or "" }}',
+                notes: '{{ order.notes or "" }}'
+            },
+
+            init() {
+                // Load existing order items
+                this.loadOrderItems();
+            },
+
+            loadOrderItems() {
+                // Fetch order items from the server
+                fetch('/sales/api/orders/{{ order.id }}/edit-items', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load order items');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.orderItems = data;
+                    this.updateOrderSummary();
+                })
+                .catch(error => {
+                    console.error('Error loading order items:', error);
+                    showNotification('حدث خطأ أثناء تحميل عناصر الطلب', 'error');
+                });
+            },
+
+            updateOrderSummary() {
+                // Calculate subtotal
+                this.subtotal = this.orderItems.reduce((sum, item) => {
+                    return sum + (item.quantity * item.unit_price);
+                }, 0);
+
+                // Calculate total
+                this.total = this.subtotal;
+            },
+
+            getItemDetails() {
+                if (!this.currentItem.item_id) {
+                    return;
+                }
+
+                // Fetch item details from the server
+                fetch(`/inventory/api/items/${this.currentItem.item_id}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load item details');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.currentItem.item_name = data.name;
+                    this.currentItem.price = data.selling_price;
+                    this.checkAvailability();
+                })
+                .catch(error => {
+                    console.error('Error loading item details:', error);
+                });
+            },
+
+            checkAvailability() {
+                if (!this.currentItem.item_id || !this.currentItem.quantity) {
+                    this.availabilityText = '';
+                    return;
+                }
+
+                this.isLoading = true;
+                this.availabilityText = 'جاري التحقق من المتاح...';
+                this.availabilityClass = 'bg-blue-50 text-blue-700';
+                this.availabilityIcon = 'fas fa-spinner fa-spin';
+
+                // Check if the item is already in the order (for the same item_id)
+                const existingItem = this.orderItems.find(item =>
+                    item.item_id === this.currentItem.item_id &&
+                    (this.editingItemIndex === null || this.orderItems.indexOf(item) !== this.editingItemIndex)
+                );
+
+                const existingQuantity = existingItem ? existingItem.quantity : 0;
+                const totalQuantity = parseInt(this.currentItem.quantity) + existingQuantity;
+
+                // Fetch availability from the server
+                fetch(`/inventory/api/items/${this.currentItem.item_id}/availability?quantity=${totalQuantity}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to check availability');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.isLoading = false;
+                    this.isAvailable = data.is_available;
+
+                    if (data.is_available) {
+                        this.availabilityText = `متاح (${data.available_quantity} في المخزن)`;
+                        this.availabilityClass = 'bg-green-50 text-green-700';
+                        this.availabilityIcon = 'fas fa-check-circle';
+                    } else {
+                        this.availabilityText = `غير متاح (${data.available_quantity} فقط في المخزن)`;
+                        this.availabilityClass = 'bg-red-50 text-red-700';
+                        this.availabilityIcon = 'fas fa-exclamation-circle';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking availability:', error);
+                    this.isLoading = false;
+                    this.availabilityText = 'حدث خطأ أثناء التحقق من المتاح';
+                    this.availabilityClass = 'bg-red-50 text-red-700';
+                    this.availabilityIcon = 'fas fa-exclamation-triangle';
+                    this.isAvailable = false;
+                });
+            },
+
+            validate() {
+                this.errors = {};
+
+                if (!this.currentItem.item_id) {
+                    this.errors.item = 'يرجى اختيار منتج';
+                }
+
+                if (!this.currentItem.price || parseFloat(this.currentItem.price) <= 0) {
+                    this.errors.price = 'يرجى إدخال سعر صحيح';
+                }
+
+                if (!this.currentItem.quantity || parseInt(this.currentItem.quantity) <= 0) {
+                    this.errors.quantity = 'يرجى إدخال كمية صحيحة';
+                }
+
+                if (!this.isAvailable) {
+                    this.errors.quantity = 'الكمية المطلوبة غير متاحة في المخزن';
+                }
+
+                return Object.keys(this.errors).length === 0;
+            },
+
+            addItem() {
+                if (!this.validate()) {
+                    return;
+                }
+
+                if (this.editingItemIndex !== null) {
+                    // Update existing item
+                    this.orderItems[this.editingItemIndex] = {
+                        item_id: this.currentItem.item_id,
+                        item_name: this.currentItem.item_name,
+                        quantity: parseInt(this.currentItem.quantity),
+                        unit_price: parseFloat(this.currentItem.price)
+                    };
+                    this.editingItemIndex = null;
+                } else {
+                    // Add new item
+                    this.orderItems.push({
+                        item_id: this.currentItem.item_id,
+                        item_name: this.currentItem.item_name,
+                        quantity: parseInt(this.currentItem.quantity),
+                        unit_price: parseFloat(this.currentItem.price)
+                    });
+                }
+
+                // Reset current item
+                this.currentItem = {
+                    item_id: '',
+                    item_name: '',
+                    quantity: 1,
+                    price: 0
+                };
+
+                // Close modal
+                this.showAddItemModal = false;
+
+                // Update order summary
+                this.updateOrderSummary();
+            },
+
+            editItem(index) {
+                const item = this.orderItems[index];
+                this.currentItem = {
+                    item_id: item.item_id,
+                    item_name: item.item_name,
+                    quantity: item.quantity,
+                    price: item.unit_price
+                };
+                this.editingItemIndex = index;
+                this.checkAvailability();
+                this.showAddItemModal = true;
+            },
+
+            removeItem(index) {
+                if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
+                    this.orderItems.splice(index, 1);
+                    this.updateOrderSummary();
+                }
+            },
+
+            validateForm() {
+                this.errors = {};
+
+                if (!this.formData.customer_id) {
+                    this.errors.customer = 'يرجى اختيار عميل';
+                }
+
+                if (this.orderItems.length === 0) {
+                    showNotification('يرجى إضافة عنصر واحد على الأقل إلى الطلب', 'error');
+                    return false;
+                }
+
+                return Object.keys(this.errors).length === 0;
+            },
+
+            submitOrder() {
+                if (!this.validateForm()) {
+                    return;
+                }
+
+                this.isSubmitting = true;
+
+                // Prepare order data
+                const orderData = {
+                    customer_id: this.formData.customer_id,
+                    representative_id: this.formData.representative_id || null,
+                    total_amount: this.total,
+                    notes: this.formData.notes,
+                    items: this.orderItems.map(item => ({
+                        item_id: item.item_id,
+                        quantity: item.quantity,
+                        unit_price: item.unit_price
+                    }))
+                };
+
+                // Submit order
+                fetch('/sales/orders/{{ order.id }}', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(orderData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'حدث خطأ أثناء تحديث الطلب');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    showNotification(data.message || 'تم تحديث الطلب بنجاح', 'success');
+
+                    // Redirect to order view page after short delay
+                    setTimeout(function() {
+                        window.location.href = '/sales/orders/{{ order.id }}';
+                    }, 1500);
+                })
+                .catch(error => {
+                    console.error('Error updating order:', error);
+                    showNotification(error.message || 'حدث خطأ أثناء تحديث الطلب', 'error');
+                    this.isSubmitting = false;
+                });
+            },
+
+            formatCurrency(amount) {
+                // Use the global formatCurrency function
+                return formatCurrency(amount);
+            }
+        }));
+    });
+</script>
+{% endblock %}

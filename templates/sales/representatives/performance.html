@@ -1,0 +1,487 @@
+{% extends "base.html" %}
+
+{% block title %}أداء المندوب | نظام قاتيلو{% endblock %}
+
+{% block page_header %}تقييم أداء المندوب{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.sales_dashboard') }}" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('rep_routes.list_representatives') }}" class="text-blue-600 hover:text-blue-800">مندوبي المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">أداء المندوب: {{ representative.user.username }}</span>
+</li>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .metric-card {
+        transition: all 0.2s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .performance-score {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        font-weight: bold;
+        color: white;
+        margin: 0 auto;
+    }
+    .score-excellent {
+        background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+    }
+    .score-good {
+        background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+    }
+    .score-average {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    }
+    .score-poor {
+        background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    }
+    .chart-container {
+        height: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="performanceApp()" class="mb-10">
+    <!-- Header Section -->
+    <div class="mb-6 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">أداء المندوب: {{ representative.user.username }}</h1>
+            <p class="text-gray-600">{{ representative.territory or 'لا توجد منطقة محددة' }}</p>
+        </div>
+        <div class="flex space-x-2 rtl:space-x-reverse">
+            <button @click="generateReport()" class="btn btn-primary flex items-center">
+                <i class="fas fa-file-pdf ml-2"></i>
+                <span>تصدير التقرير</span>
+            </button>
+            <a href="{{ url_for('rep_routes.list_representatives') }}" class="btn btn-secondary flex items-center">
+                <i class="fas fa-arrow-right ml-2"></i>
+                <span>العودة للمندوبين</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Date Range Filter -->
+    <div class="card p-6 mb-6">
+        <div class="flex flex-wrap items-center gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">الفترة</label>
+                <select x-model="dateRange" @change="updatePerformanceData()" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+                    <option value="7">آخر 7 أيام</option>
+                    <option value="30">آخر 30 يوم</option>
+                    <option value="90">آخر 3 أشهر</option>
+                    <option value="180">آخر 6 أشهر</option>
+                    <option value="365">آخر سنة</option>
+                    <option value="custom">فترة مخصصة</option>
+                </select>
+            </div>
+
+            <template x-if="dateRange === 'custom'">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label>
+                    <input type="date" x-model="customStartDate" @change="updatePerformanceData()" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+                </div>
+            </template>
+
+            <template x-if="dateRange === 'custom'">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label>
+                    <input type="date" x-model="customEndDate" @change="updatePerformanceData()" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+                </div>
+            </template>
+
+            <div class="flex items-end">
+                <button @click="updatePerformanceData()" class="btn btn-blue h-[42px]">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Overview -->
+    <div class="card p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-6">نظرة عامة على الأداء</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <div class="text-blue-500 mb-2">
+                    <i class="fas fa-users text-3xl"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">إجمالي الزيارات</h3>
+                <p class="text-2xl font-bold text-gray-800" x-text="performanceData.total_visits || 0"></p>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <div class="text-green-500 mb-2">
+                    <i class="fas fa-check-circle text-3xl"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">الزيارات المكتملة</h3>
+                <p class="text-2xl font-bold text-gray-800" x-text="performanceData.completed_visits || 0"></p>
+                <p class="text-sm text-gray-500" x-text="getCompletionRate() + '%'"></p>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <div class="text-purple-500 mb-2">
+                    <i class="fas fa-shopping-cart text-3xl"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">إجمالي الطلبات</h3>
+                <p class="text-2xl font-bold text-gray-800" x-text="performanceData.total_orders || 0"></p>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <div class="text-yellow-500 mb-2">
+                    <i class="fas fa-dollar-sign text-3xl"></i>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">إجمالي المبيعات</h3>
+                <p class="text-2xl font-bold text-gray-800" x-text="formatCurrency(performanceData.total_sales || 0)"></p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <h3 class="text-sm font-medium text-gray-500 mb-3">معدل التحويل</h3>
+                <div class="relative pt-1">
+                    <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
+                        <div :style="`width: ${performanceData.conversion_rate || 0}%`" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500"></div>
+                    </div>
+                </div>
+                <p class="text-xl font-bold text-gray-800" x-text="(performanceData.conversion_rate || 0).toFixed(1) + '%'"></p>
+                <p class="text-xs text-gray-500">نسبة الزيارات التي أدت إلى مبيعات</p>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <h3 class="text-sm font-medium text-gray-500 mb-3">متوسط قيمة الطلب</h3>
+                <p class="text-xl font-bold text-gray-800" x-text="formatCurrency(performanceData.average_order_value || 0)"></p>
+                <p class="text-xs text-gray-500">متوسط قيمة الطلبات</p>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-6 text-center">
+                <h3 class="text-sm font-medium text-gray-500 mb-3">تقييم الأداء</h3>
+                <div
+                    class="performance-score"
+                    :class="getScoreClass(performanceData.evaluation_score || 0)"
+                >
+                    <span x-text="Math.round(performanceData.evaluation_score || 0)"></span>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">من 100 نقطة</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="card p-6">
+            <h2 class="text-lg font-semibold mb-4">المبيعات الشهرية</h2>
+            <div class="chart-container">
+                <canvas id="salesChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <h2 class="text-lg font-semibold mb-4">معدل إكمال الزيارات</h2>
+            <div class="chart-container">
+                <canvas id="visitsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visit Outcomes -->
+    <div class="card p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-4">نتائج الزيارات</h2>
+        <div class="chart-container" style="height: 250px;">
+            <canvas id="outcomesChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Recent Performance Records -->
+    <div class="card p-6">
+        <h2 class="text-lg font-semibold mb-4">سجلات الأداء الأخيرة</h2>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الفترة</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الزيارات</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المبيعات</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">معدل التحويل</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التقييم</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="record in performanceRecords" :key="record.id">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="formatDateRange(record.period_start, record.period_end)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="record.completed_visits + '/' + record.total_visits"></div>
+                                <div class="text-xs text-gray-500" x-text="(record.completed_visits / record.total_visits * 100).toFixed(1) + '%'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="formatCurrency(record.total_sales)"></div>
+                                <div class="text-xs text-gray-500" x-text="record.total_orders + ' طلب'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="record.conversion_rate.toFixed(1) + '%'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getScoreBadgeClass(record.evaluation_score)">
+                                    <span x-text="Math.round(record.evaluation_score)"></span>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+
+                    <template x-if="performanceRecords.length === 0">
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">
+                                لا توجد سجلات أداء متاحة
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+function performanceApp() {
+    return {
+        representative: {{ representative|tojson|safe }},
+        performanceData: {},
+        performanceRecords: [],
+        salesChart: null,
+        visitsChart: null,
+        outcomesChart: null,
+        dateRange: '30',
+        customStartDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
+        customEndDate: new Date().toISOString().split('T')[0],
+
+        init() {
+            this.updatePerformanceData();
+        },
+
+        updatePerformanceData() {
+            // Calculate date range
+            let startDate, endDate;
+
+            if (this.dateRange === 'custom') {
+                startDate = this.customStartDate;
+                endDate = this.customEndDate;
+            } else {
+                endDate = new Date().toISOString().split('T')[0];
+                startDate = new Date(new Date().setDate(new Date().getDate() - parseInt(this.dateRange))).toISOString().split('T')[0];
+            }
+
+            // Fetch performance data
+            fetch(`/sales/representatives/${this.representative.id}/performance-data?start_date=${startDate}&end_date=${endDate}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch performance data');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.performanceData = data.current_performance;
+                    this.performanceRecords = data.performance_records;
+
+                    // Initialize charts after data is loaded
+                    this.$nextTick(() => {
+                        this.initCharts(data);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('حدث خطأ أثناء تحميل بيانات الأداء', 'error');
+                });
+        },
+
+        initCharts(data) {
+            // Destroy existing charts if they exist
+            if (this.salesChart) this.salesChart.destroy();
+            if (this.visitsChart) this.visitsChart.destroy();
+            if (this.outcomesChart) this.outcomesChart.destroy();
+
+            // Sales Chart
+            const salesCtx = document.getElementById('salesChart').getContext('2d');
+            this.salesChart = new Chart(salesCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.monthly_data.map(item => item.month),
+                    datasets: [{
+                        label: 'المبيعات (ج.م)',
+                        data: data.monthly_data.map(item => item.sales),
+                        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Visits Chart
+            const visitsCtx = document.getElementById('visitsChart').getContext('2d');
+            this.visitsChart = new Chart(visitsCtx, {
+                type: 'line',
+                data: {
+                    labels: data.monthly_data.map(item => item.month),
+                    datasets: [{
+                        label: 'إجمالي الزيارات',
+                        data: data.monthly_data.map(item => item.total_visits),
+                        backgroundColor: 'rgba(107, 114, 128, 0.2)',
+                        borderColor: 'rgba(107, 114, 128, 1)',
+                        borderWidth: 2,
+                        fill: false
+                    }, {
+                        label: 'الزيارات المكتملة',
+                        data: data.monthly_data.map(item => item.completed_visits),
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        borderWidth: 2,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Outcomes Chart
+            const outcomesCtx = document.getElementById('outcomesChart').getContext('2d');
+            this.outcomesChart = new Chart(outcomesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['بيع', 'لا بيع', 'متابعة مطلوبة'],
+                    datasets: [{
+                        data: [
+                            data.visit_outcomes.sale || 0,
+                            data.visit_outcomes.no_sale || 0,
+                            data.visit_outcomes.follow_up || 0
+                        ],
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(59, 130, 246, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(16, 185, 129, 1)',
+                            'rgba(239, 68, 68, 1)',
+                            'rgba(59, 130, 246, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        },
+
+        getCompletionRate() {
+            if (!this.performanceData.total_visits || this.performanceData.total_visits === 0) {
+                return '0.0';
+            }
+
+            return ((this.performanceData.completed_visits / this.performanceData.total_visits) * 100).toFixed(1);
+        },
+
+        formatCurrency(amount) {
+            return new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP' }).format(amount);
+        },
+
+        formatDateRange(startDate, endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            return `${start.toLocaleDateString('ar-EG', options)} - ${end.toLocaleDateString('ar-EG', options)}`;
+        },
+
+        getScoreClass(score) {
+            if (score >= 80) return 'score-excellent';
+            if (score >= 60) return 'score-good';
+            if (score >= 40) return 'score-average';
+            return 'score-poor';
+        },
+
+        getScoreBadgeClass(score) {
+            if (score >= 80) return 'bg-green-100 text-green-800';
+            if (score >= 60) return 'bg-blue-100 text-blue-800';
+            if (score >= 40) return 'bg-yellow-100 text-yellow-800';
+            return 'bg-red-100 text-red-800';
+        },
+
+        generateReport() {
+            // Calculate date range
+            let startDate, endDate;
+
+            if (this.dateRange === 'custom') {
+                startDate = this.customStartDate;
+                endDate = this.customEndDate;
+            } else {
+                endDate = new Date().toISOString().split('T')[0];
+                startDate = new Date(new Date().setDate(new Date().getDate() - parseInt(this.dateRange))).toISOString().split('T')[0];
+            }
+
+            // Generate report URL
+            const reportUrl = `/sales/representatives/${this.representative.id}/performance-report?start_date=${startDate}&end_date=${endDate}`;
+
+            // Open report in new tab
+            window.open(reportUrl, '_blank');
+        }
+    };
+}
+
+// Helper function to show notifications
+function showNotification(message, type = 'info') {
+    const event = new CustomEvent('show-notification', {
+        detail: { message, type }
+    });
+    window.dispatchEvent(event);
+}
+</script>
+{% endblock %}

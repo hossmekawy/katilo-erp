@@ -1,0 +1,693 @@
+{% extends "base.html" %}
+
+{% block title %}تفاصيل المسار - {{ route.name }}{% endblock %}
+
+{% block styles %}
+<style>
+    .route-status {
+        @apply px-2 py-1 text-xs font-semibold rounded-full;
+    }
+    .status-planned {
+        @apply bg-blue-100 text-blue-800;
+    }
+    .status-in-progress {
+        @apply bg-indigo-100 text-indigo-800;
+    }
+    .status-completed {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-cancelled {
+        @apply bg-red-100 text-red-800;
+    }
+    .map-container {
+        height: 400px;
+        @apply rounded-lg overflow-hidden border border-gray-200;
+    }
+    .stop-status {
+        @apply px-2 py-1 text-xs font-semibold rounded-full;
+    }
+    .stop-status-pending {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .stop-status-completed {
+        @apply bg-green-100 text-green-800;
+    }
+    .stop-status-skipped {
+        @apply bg-gray-100 text-gray-800;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="routeViewApp()">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">{{ route.name }}</h1>
+            <p class="text-gray-600 mt-1">
+                <span class="route-status
+                    {% if route.status == 'Planned' %}status-planned
+                    {% elif route.status == 'InProgress' %}status-in-progress
+                    {% elif route.status == 'Completed' %}status-completed
+                    {% elif route.status == 'Cancelled' %}status-cancelled{% endif %}">
+                    {% if route.status == 'Planned' %}مخطط
+                    {% elif route.status == 'InProgress' %}قيد التنفيذ
+                    {% elif route.status == 'Completed' %}مكتمل
+                    {% elif route.status == 'Cancelled' %}ملغي
+                    {% else %}{{ route.status }}{% endif %}
+                </span>
+            </p>
+        </div>
+        <div class="flex space-x-2 space-x-reverse">
+            <a href="{{ url_for('distribution.routes') }}" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                <i class="fas fa-arrow-right ml-2"></i>
+                العودة إلى المسارات
+            </a>
+
+            {% if route.status == 'Planned' %}
+            <button @click="startRoute()" class="btn btn-primary">
+                <i class="fas fa-play ml-2"></i>
+                بدء المسار
+            </button>
+            {% elif route.status == 'InProgress' %}
+            <button @click="completeRoute()" class="btn btn-success">
+                <i class="fas fa-check ml-2"></i>
+                إنهاء المسار
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Route Information -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">معلومات المسار</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-sm text-gray-500">المركبة</p>
+                        <p class="font-medium">{{ route.vehicle.name if route.vehicle else 'غير معين' }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">تاريخ المسار</p>
+                        <p class="font-medium">{{ route.planned_date.strftime('%Y-%m-%d') if route.planned_date else '-' }}</p>
+                    </div>
+
+                    {% if route.start_time %}
+                    <div>
+                        <p class="text-sm text-gray-500">وقت البدء</p>
+                        <p class="font-medium">{{ route.start_time.strftime('%H:%M') }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if route.end_time %}
+                    <div>
+                        <p class="text-sm text-gray-500">وقت الانتهاء</p>
+                        <p class="font-medium">{{ route.end_time.strftime('%H:%M') }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div>
+                        <p class="text-sm text-gray-500">المسافة الإجمالية</p>
+                        <p class="font-medium">{{ route.total_distance }} كم</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">الوقت المقدر</p>
+                        <p class="font-medium">
+                            {% if route.estimated_duration %}
+                                {% if route.estimated_duration < 60 %}
+                                    {{ route.estimated_duration }} دقيقة
+                                {% else %}
+                                    {% set hours = (route.estimated_duration / 60)|int %}
+                                    {% set minutes = route.estimated_duration % 60 %}
+                                    {% if minutes == 0 %}
+                                        {{ hours }} ساعة
+                                    {% else %}
+                                        {{ hours }} ساعة {{ minutes }} دقيقة
+                                    {% endif %}
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    {% if route.actual_duration %}
+                    <div>
+                        <p class="text-sm text-gray-500">الوقت الفعلي</p>
+                        <p class="font-medium">
+                            {% if route.actual_duration < 60 %}
+                                {{ route.actual_duration }} دقيقة
+                            {% else %}
+                                {% set hours = (route.actual_duration / 60)|int %}
+                                {% set minutes = route.actual_duration % 60 %}
+                                {% if minutes == 0 %}
+                                    {{ hours }} ساعة
+                                {% else %}
+                                    {{ hours }} ساعة {{ minutes }} دقيقة
+                                {% endif %}
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% endif %}
+
+                    <div>
+                        <p class="text-sm text-gray-500">عدد المحطات</p>
+                        <p class="font-medium">{{ route.stops|length }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">المحطات المكتملة</p>
+                        <p class="font-medium">{{ route.stops|selectattr('status', 'equalto', 'Completed')|list|length }} / {{ route.stops|length }}</p>
+                    </div>
+
+                    {% if route.notes %}
+                    <div>
+                        <p class="text-sm text-gray-500">ملاحظات</p>
+                        <p class="font-medium">{{ route.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Map and Stops -->
+        <div class="lg:col-span-2">
+            <!-- Map -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">خريطة المسار</h2>
+
+                <div id="route-map" class="map-container"></div>
+            </div>
+
+            <!-- Stops -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">محطات المسار</h2>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    #
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    العميل
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    العنوان
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الوصول المخطط
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الوصول الفعلي
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الحالة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الإجراءات
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for stop in route.stops|sort(attribute='stop_number') %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">{{ stop.stop_number }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">{{ stop.customer.customer_name if stop.customer else 'غير معروف' }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-900">{{ stop.address or 'بدون عنوان' }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ stop.planned_arrival_time.strftime('%H:%M') if stop.planned_arrival_time else '-' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ stop.actual_arrival_time.strftime('%H:%M') if stop.actual_arrival_time else '-' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="stop-status
+                                        {% if stop.status == 'Pending' %}stop-status-pending
+                                        {% elif stop.status == 'Completed' %}stop-status-completed
+                                        {% elif stop.status == 'Skipped' %}stop-status-skipped{% endif %}">
+                                        {% if stop.status == 'Pending' %}قيد الانتظار
+                                        {% elif stop.status == 'Completed' %}مكتمل
+                                        {% elif stop.status == 'Skipped' %}تم تخطيه
+                                        {% else %}{{ stop.status }}{% endif %}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    {% if route.status == 'InProgress' and stop.status == 'Pending' %}
+                                    <button @click="completeStop({{ stop.id }})" class="text-green-600 hover:text-green-900">
+                                        <i class="fas fa-check ml-1"></i>
+                                        إكمال
+                                    </button>
+                                    {% elif stop.shipment_order %}
+                                    <a href="{{ url_for('distribution.tracking', tracking_number=stop.shipment_order.shipment.tracking_number) }}" class="text-indigo-600 hover:text-indigo-900">
+                                        <i class="fas fa-truck ml-1"></i>
+                                        تتبع
+                                    </a>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modals -->
+    <div x-show="showStartModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div @click.outside="showStartModal = false" class="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">تأكيد بدء المسار</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700">
+                    هل أنت متأكد من رغبتك في بدء المسار؟
+                </p>
+                <p class="text-sm text-gray-600 mt-2">
+                    <i class="fas fa-info-circle ml-1"></i>
+                    سيتم تحديث حالة المسار إلى "قيد التنفيذ" وتحديث حالة جميع الشحنات المرتبطة به إلى "قيد التوصيل".
+                </p>
+
+                <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showStartModal = false" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                        إلغاء
+                    </button>
+                    <button @click="confirmStartRoute()" class="btn btn-primary">
+                        <i class="fas fa-play ml-2"></i>
+                        بدء المسار
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showCompleteModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div @click.outside="showCompleteModal = false" class="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">تأكيد إنهاء المسار</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700">
+                    هل أنت متأكد من رغبتك في إنهاء المسار؟
+                </p>
+                <p class="text-sm text-gray-600 mt-2">
+                    <i class="fas fa-info-circle ml-1"></i>
+                    سيتم تحديث حالة المسار إلى "مكتمل" وتحديث حالة أي محطات متبقية إلى "تم تخطيها".
+                </p>
+
+                <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showCompleteModal = false" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                        إلغاء
+                    </button>
+                    <button @click="confirmCompleteRoute()" class="btn btn-success">
+                        <i class="fas fa-check ml-2"></i>
+                        إنهاء المسار
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showStopModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div @click.outside="showStopModal = false" class="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">إكمال المحطة</h2>
+            </div>
+            <div class="p-6">
+                <form @submit.prevent="confirmCompleteStop()">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات التسليم</label>
+                        <textarea x-model="stopForm.notes" rows="3"
+                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="أدخل أي ملاحظات حول التسليم"></textarea>
+                    </div>
+
+                    <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                        <button type="button" @click="showStopModal = false" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                            إلغاء
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-check ml-2"></i>
+                            تأكيد الإكمال
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let map;
+    let directionsService;
+    let directionsRenderer;
+    let markers = [];
+    let googleMapsLoaded = false;
+
+    // Function to load Google Maps API
+    function loadGoogleMapsAPI() {
+        return new Promise((resolve, reject) => {
+            // Check if Google Maps API is already loaded
+            if (window.google && window.google.maps) {
+                googleMapsLoaded = true;
+                resolve();
+                return;
+            }
+
+            // Create script element
+            const script = document.createElement('script');
+            script.src = "https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places,geometry,marker&callback=googleMapsCallback";
+            script.async = true;
+            script.defer = true;
+
+            // Define callback function
+            window.googleMapsCallback = function() {
+                googleMapsLoaded = true;
+                resolve();
+            };
+
+            // Handle errors
+            script.onerror = function() {
+                reject(new Error('Google Maps failed to load'));
+            };
+
+            // Add script to document
+            document.head.appendChild(script);
+        });
+    }
+
+    function routeViewApp() {
+        return {
+            showStartModal: false,
+            showCompleteModal: false,
+            showStopModal: false,
+            selectedStopId: null,
+            stopForm: {
+                notes: ''
+            },
+            mapInitialized: false,
+
+            init() {
+                // Load Google Maps API and initialize map
+                loadGoogleMapsAPI()
+                    .then(() => {
+                        this.$nextTick(() => {
+                            this.initMap();
+                            this.mapInitialized = true;
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Failed to load Google Maps:', error);
+                        this.showToast('فشل تحميل خرائط Google. يرجى تحديث الصفحة والمحاولة مرة أخرى.', 'error');
+                    });
+            },
+
+            initMap() {
+                try {
+                    // Check if Google Maps is loaded
+                    if (!googleMapsLoaded || typeof google === 'undefined' || typeof google.maps === 'undefined') {
+                        console.error('Google Maps API not loaded yet');
+                        setTimeout(() => this.initMap(), 500); // Try again in 500ms
+                        return;
+                    }
+
+                    const mapElement = document.getElementById('route-map');
+                    if (!mapElement) {
+                        console.error('Map element not found');
+                        return;
+                    }
+
+                    map = new google.maps.Map(mapElement, {
+                        center: { lat: 30.0444, lng: 31.2357 }, // Cairo, Egypt
+                        zoom: 10
+                    });
+
+                    directionsService = new google.maps.DirectionsService();
+                    directionsRenderer = new google.maps.DirectionsRenderer({
+                        map: map,
+                        suppressMarkers: true
+                    });
+
+                    this.loadRouteMap();
+                } catch (error) {
+                    console.error('Error initializing map:', error);
+                    this.showToast('حدث خطأ أثناء تهيئة الخريطة', 'error');
+                }
+            },
+
+            loadRouteMap() {
+                try {
+                    // Check if Google Maps is loaded
+                    if (!googleMapsLoaded || typeof google === 'undefined' || typeof google.maps === 'undefined' || !map) {
+                        console.error('Google Maps API not loaded yet or map not initialized');
+                        setTimeout(() => this.loadRouteMap(), 500); // Try again in 500ms
+                        return;
+                    }
+
+                    // Clear existing markers
+                    if (markers && Array.isArray(markers)) {
+                        markers.forEach(marker => {
+                            if (marker) {
+                                try {
+                                    marker.setMap(null);
+                                } catch (e) {
+                                    console.error('Error clearing marker:', e);
+                                }
+                            }
+                        });
+                    }
+                    markers = [];
+
+                    const stops = [
+                        {% for stop in route.stops|sort(attribute='stop_number') %}
+                        {
+                            id: {{ stop.id }},
+                            stop_number: {{ stop.stop_number }},
+                            customer_name: "{{ stop.customer.customer_name if stop.customer else 'غير معروف' }}",
+                            address: "{{ stop.address or '' }}",
+                            latitude: {{ stop.latitude or 'null' }},
+                            longitude: {{ stop.longitude or 'null' }},
+                            status: "{{ stop.status }}",
+                            shipment_order_id: {{ stop.shipment_order_id or 'null' }}
+                        },
+                        {% endfor %}
+                    ];
+
+                    const validStops = stops.filter(stop => stop.latitude && stop.longitude);
+
+                    if (validStops.length === 0) return;
+
+                    // Add markers for each stop
+                    validStops.forEach(stop => {
+                        try {
+                            const markerIcon = {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                fillColor: stop.status === 'Completed' ? '#10B981' :
+                                          stop.status === 'Skipped' ? '#9CA3AF' : '#3B82F6',
+                                fillOpacity: 1,
+                                strokeWeight: 1,
+                                strokeColor: '#FFFFFF',
+                                scale: 10
+                            };
+
+                            const marker = new google.maps.Marker({
+                                position: { lat: stop.latitude, lng: stop.longitude },
+                                map: map,
+                                label: {
+                                    text: stop.stop_number.toString(),
+                                    color: '#FFFFFF',
+                                    fontSize: '10px'
+                                },
+                                icon: markerIcon,
+                                title: stop.customer_name
+                            });
+
+                            const infoWindow = new google.maps.InfoWindow({
+                                content: `
+                                    <div dir="rtl" class="p-2">
+                                        <h3 class="font-bold">${stop.customer_name}</h3>
+                                        <p>${stop.address || ''}</p>
+                                        <p>الحالة: ${
+                                            stop.status === 'Pending' ? 'قيد الانتظار' :
+                                            stop.status === 'Completed' ? 'مكتمل' :
+                                            stop.status === 'Skipped' ? 'تم تخطيه' : stop.status
+                                        }</p>
+                                        ${stop.shipment_order_id ? `<p>شحنة #${stop.shipment_order_id}</p>` : ''}
+                                    </div>
+                                `
+                            });
+
+                            marker.addListener('click', () => {
+                                infoWindow.open(map, marker);
+                            });
+
+                            markers.push(marker);
+                        } catch (error) {
+                            console.error('Error adding marker for stop:', error, stop);
+                        }
+                    });
+
+                    // Calculate route if there are at least 2 stops
+                    if (validStops.length >= 2) {
+                        try {
+                            const origin = { lat: validStops[0].latitude, lng: validStops[0].longitude };
+                            const destination = {
+                                lat: validStops[validStops.length - 1].latitude,
+                                lng: validStops[validStops.length - 1].longitude
+                            };
+
+                            const waypoints = validStops.slice(1, validStops.length - 1).map(stop => ({
+                                location: { lat: stop.latitude, lng: stop.longitude },
+                                stopover: true
+                            }));
+
+                            directionsService.route({
+                                origin: origin,
+                                destination: destination,
+                                waypoints: waypoints,
+                                optimizeWaypoints: false,
+                                travelMode: google.maps.TravelMode.DRIVING
+                            }, (response, status) => {
+                                if (status === google.maps.DirectionsStatus.OK) {
+                                    directionsRenderer.setDirections(response);
+                                } else {
+                                    console.error('Directions request failed due to ' + status);
+                                }
+                            });
+                        } catch (error) {
+                            console.error('Error calculating route:', error);
+                        }
+                    } else if (validStops.length === 1) {
+                        // If only one stop, center the map on it
+                        try {
+                            map.setCenter({ lat: validStops[0].latitude, lng: validStops[0].longitude });
+                            map.setZoom(14);
+                        } catch (error) {
+                            console.error('Error centering map:', error);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading route map:', error);
+                    this.showToast('حدث خطأ أثناء تحميل خريطة المسار', 'error');
+                }
+            },
+
+            startRoute() {
+                this.showStartModal = true;
+            },
+
+            confirmStartRoute() {
+                fetch('/distribution/api/routes/{{ route.id }}/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.showStartModal = false;
+                        this.showToast('تم بدء المسار بنجاح', 'success');
+                        // Reload the page to reflect changes
+                        window.location.reload();
+                    } else {
+                        this.showToast(data.message || 'حدث خطأ أثناء بدء المسار', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting route:', error);
+                    this.showToast('حدث خطأ أثناء بدء المسار', 'error');
+                });
+            },
+
+            completeRoute() {
+                this.showCompleteModal = true;
+            },
+
+            confirmCompleteRoute() {
+                fetch('/distribution/api/routes/{{ route.id }}/complete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.showCompleteModal = false;
+                        this.showToast('تم إنهاء المسار بنجاح', 'success');
+                        // Reload the page to reflect changes
+                        window.location.reload();
+                    } else {
+                        this.showToast(data.message || 'حدث خطأ أثناء إنهاء المسار', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error completing route:', error);
+                    this.showToast('حدث خطأ أثناء إنهاء المسار', 'error');
+                });
+            },
+
+            completeStop(stopId) {
+                this.selectedStopId = stopId;
+                this.stopForm.notes = '';
+                this.showStopModal = true;
+            },
+
+            confirmCompleteStop() {
+                if (!this.selectedStopId) return;
+
+                fetch(`/distribution/api/stops/${this.selectedStopId}/complete`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        notes: this.stopForm.notes
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.showStopModal = false;
+                        this.showToast('تم إكمال المحطة بنجاح', 'success');
+                        // Reload the page to reflect changes
+                        window.location.reload();
+                    } else {
+                        this.showToast(data.message || 'حدث خطأ أثناء إكمال المحطة', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error completing stop:', error);
+                    this.showToast('حدث خطأ أثناء إكمال المحطة', 'error');
+                });
+            },
+
+            showToast(message, type = 'info') {
+                // This assumes you have a toast notification system
+                // You can implement this based on your application's UI
+                if (window.showToast) {
+                    window.showToast(message, type);
+                } else {
+                    alert(message);
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}

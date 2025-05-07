@@ -1,0 +1,623 @@
+{% extends "base.html" %}
+
+{% block title %}تتبع مندوبي المبيعات | نظام قاتيلو{% endblock %}
+
+{% block page_header %}تتبع مندوبي المبيعات{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.sales_dashboard') }}" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('rep_routes.list_representatives') }}" class="text-blue-600 hover:text-blue-800">مندوبي المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">تتبع المندوبين</span>
+</li>
+{% endblock %}
+
+{% block styles %}
+<style>
+    #map {
+        height: 600px;
+        width: 100%;
+        border-radius: 0.5rem;
+    }
+    .rep-card {
+        transition: all 0.2s ease;
+    }
+    .rep-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .rep-card.active {
+        border-right: 4px solid #10b981;
+    }
+    .status-badge {
+        @apply text-xs font-medium px-2.5 py-0.5 rounded-full;
+    }
+    .status-active {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-inactive {
+        @apply bg-gray-100 text-gray-800;
+    }
+    .status-planned {
+        @apply bg-blue-100 text-blue-800;
+    }
+    .status-in-progress {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .status-completed {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-pending {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .status-missed {
+        @apply bg-red-100 text-red-800;
+    }
+    .visit-item {
+        transition: all 0.2s ease;
+    }
+    .visit-item:hover {
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="trackingApp()" class="mb-10">
+    <!-- Header Section -->
+    <div class="mb-6 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">تتبع مندوبي المبيعات</h1>
+        <div class="flex space-x-2 rtl:space-x-reverse">
+            <button @click="refreshData()" class="btn btn-secondary flex items-center">
+                <i class="fas fa-sync-alt ml-2"></i>
+                <span>تحديث</span>
+            </button>
+            <a href="{{ url_for('rep_routes.list_routes') }}" class="btn btn-blue flex items-center">
+                <i class="fas fa-route ml-2"></i>
+                <span>المسارات</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column - Representatives List -->
+        <div>
+            <div class="card p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">المندوبين النشطين</h2>
+                    <div class="relative">
+                        <input type="text" x-model="repSearch" placeholder="بحث..." class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 pl-10">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="max-h-[300px] overflow-y-auto">
+                    <template x-if="filteredRepresentatives.length === 0">
+                        <div class="text-center py-8">
+                            <div class="text-gray-400 mb-2">
+                                <i class="fas fa-user-slash text-4xl"></i>
+                            </div>
+                            <p class="text-gray-500">لا يوجد مندوبين نشطين</p>
+                        </div>
+                    </template>
+
+                    <div class="space-y-3">
+                        <template x-for="rep in filteredRepresentatives" :key="rep.id">
+                            <div
+                                class="rep-card bg-white border border-gray-200 rounded-lg p-4 cursor-pointer"
+                                :class="{'active': selectedRep && selectedRep.id === rep.id}"
+                                @click="selectRepresentative(rep)"
+                            >
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-lg font-semibold ml-3">
+                                            <span x-text="rep.name ? rep.name[0].toUpperCase() : 'U'"></span>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-sm font-medium text-gray-800" x-text="rep.name || 'Unknown'"></h3>
+                                            <p class="text-xs text-gray-500" x-text="rep.territory || 'لا توجد منطقة محددة'"></p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span
+                                            class="status-badge"
+                                            :class="rep.is_tracking ? 'status-active' : 'status-inactive'"
+                                            x-text="rep.is_tracking ? 'نشط' : 'غير نشط'"
+                                        ></span>
+                                    </div>
+                                </div>
+
+                                <template x-if="getActiveRoute(rep.id)">
+                                    <div class="mt-3 pt-3 border-t border-gray-100">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-route text-blue-500 ml-2"></i>
+                                            <span class="text-sm text-gray-700" x-text="getActiveRoute(rep.id).route_name"></span>
+                                        </div>
+                                        <div class="flex justify-between items-center mt-1">
+                                            <span class="text-xs text-gray-500" x-text="getActiveRoute(rep.id).visits.length + ' زيارة'"></span>
+                                            <span
+                                                class="status-badge"
+                                                :class="'status-' + getActiveRoute(rep.id).status.toLowerCase().replace(' ', '-')"
+                                                x-text="getRouteStatusText(getActiveRoute(rep.id).status)"
+                                            ></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected Representative Details -->
+            <div x-show="selectedRep" class="card p-6">
+                <h2 class="text-lg font-semibold mb-4" x-text="selectedRep ? selectedRep.name : ''"></h2>
+
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i class="fas fa-map-marker-alt text-red-500 ml-2"></i>
+                            <span class="text-sm text-gray-700">الموقع الحالي</span>
+                        </div>
+                        <span class="text-sm text-gray-500" x-text="selectedRep && selectedRep.last_location ? formatTime(selectedRep.last_location.timestamp) : 'غير متاح'"></span>
+                    </div>
+
+                    <div x-show="selectedRep && selectedRep.last_location">
+                        <div class="text-xs text-gray-500 mb-1">الإحداثيات:</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm">
+                            <div x-text="'خط العرض: ' + (selectedRep.last_location ? selectedRep.last_location.latitude.toFixed(6) : '')"></div>
+                            <div x-text="'خط الطول: ' + (selectedRep.last_location ? selectedRep.last_location.longitude.toFixed(6) : '')"></div>
+                        </div>
+                    </div>
+
+                    <template x-if="selectedRoute">
+                        <div>
+                            <div class="flex items-center justify-between mt-4 mb-2">
+                                <h3 class="text-md font-medium">المسار الحالي</h3>
+                                <span
+                                    class="status-badge"
+                                    :class="'status-' + selectedRoute.status.toLowerCase().replace(' ', '-')"
+                                    x-text="getRouteStatusText(selectedRoute.status)"
+                                ></span>
+                            </div>
+
+                            <div class="text-sm mb-3">
+                                <div class="flex items-center">
+                                    <i class="fas fa-route text-blue-500 ml-2"></i>
+                                    <span x-text="selectedRoute.route_name"></span>
+                                </div>
+                                <div class="flex items-center mt-1">
+                                    <i class="fas fa-calendar-day text-gray-500 ml-2"></i>
+                                    <span x-text="formatDate(selectedRoute.route_date)"></span>
+                                </div>
+                            </div>
+
+                            <div class="mt-4">
+                                <h4 class="text-sm font-medium mb-2">الزيارات</h4>
+                                <div class="space-y-2 max-h-[300px] overflow-y-auto">
+                                    <template x-for="(visit, index) in selectedRoute.visits" :key="visit.id">
+                                        <div class="visit-item bg-white border border-gray-100 rounded p-3">
+                                            <div class="flex justify-between items-start">
+                                                <div class="flex items-center">
+                                                    <span class="w-5 h-5 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full text-xs font-medium ml-2" x-text="index + 1"></span>
+                                                    <div>
+                                                        <h5 class="text-sm font-medium" x-text="visit.customer.customer_name"></h5>
+                                                        <p class="text-xs text-gray-500" x-text="formatTime(visit.scheduled_time)"></p>
+                                                    </div>
+                                                </div>
+                                                <span
+                                                    class="status-badge"
+                                                    :class="'status-' + visit.status.toLowerCase()"
+                                                    x-text="getVisitStatusText(visit.status)"
+                                                ></span>
+                                            </div>
+
+                                            <template x-if="visit.actual_visit_time">
+                                                <div class="mt-2 text-xs">
+                                                    <div class="flex items-center">
+                                                        <i class="fas fa-clock text-gray-400 ml-1"></i>
+                                                        <span x-text="'زيارة فعلية: ' + formatTime(visit.actual_visit_time)"></span>
+                                                    </div>
+                                                    <div class="flex items-center mt-1" x-show="visit.visit_outcome">
+                                                        <i class="fas fa-clipboard-check text-gray-400 ml-1"></i>
+                                                        <span x-text="'النتيجة: ' + getVisitOutcomeText(visit.visit_outcome)"></span>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column - Map -->
+        <div class="lg:col-span-2">
+            <div class="card p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">خريطة التتبع</h2>
+                    <div class="flex space-x-2 rtl:space-x-reverse">
+                        <button @click="centerMapOnRep()" class="btn btn-sm btn-blue flex items-center" :disabled="!selectedRep || !selectedRep.last_location">
+                            <i class="fas fa-crosshairs ml-1"></i>
+                            <span>تركيز</span>
+                        </button>
+                        <button @click="showAllReps()" class="btn btn-sm btn-secondary flex items-center">
+                            <i class="fas fa-users ml-1"></i>
+                            <span>عرض الكل</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="map" class="mb-4"></div>
+
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="text-sm font-medium mb-3">دليل الخريطة</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex items-center">
+                            <div class="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs ml-2">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <span class="text-sm text-gray-700">موقع المندوب</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center text-white text-xs ml-2">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <span class="text-sm text-gray-700">زيارة مكتملة</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center text-white text-xs ml-2">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <span class="text-sm text-gray-700">زيارة قادمة</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs ml-2">
+                                <i class="fas fa-times"></i>
+                            </div>
+                            <span class="text-sm text-gray-700">زيارة فائتة</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include Google Maps API -->
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places,geometry&callback=Function.prototype" async defer></script>
+<!-- Include our Google Maps integration -->
+<script src="{{ url_for('static', filename='js/google_maps_integration.js') }}"></script>
+
+<script>
+function trackingApp() {
+    return {
+        map: null,
+        representatives: {{ representatives|tojson }},
+        activeRoutes: {{ active_routes|tojson }},
+        repSearch: '',
+        selectedRep: null,
+        selectedRoute: null,
+        trackingInterval: null,
+
+        init() {
+            this.$nextTick(() => {
+                this.initMap();
+                this.startTracking();
+
+                // Auto-refresh data every 2 minutes
+                this.trackingInterval = setInterval(() => {
+                    this.refreshData();
+                }, 2 * 60 * 1000);
+            });
+        },
+
+        destroy() {
+            if (this.trackingInterval) {
+                clearInterval(this.trackingInterval);
+            }
+        },
+
+        initMap() {
+            // Initialize the map
+            this.map = initMap('map', {
+                center: { lat: 30.0444, lng: 31.2357 }, // Cairo, Egypt
+                zoom: 10,
+                directions: true,
+                geocoding: true
+            });
+
+            // Add markers for all representatives with last_location
+            this.representatives.forEach(rep => {
+                if (rep.last_location) {
+                    this.addRepMarker(rep);
+                }
+            });
+
+            // Add route markers if any representative is selected
+            if (this.selectedRep) {
+                this.showRouteOnMap();
+            }
+        },
+
+        get filteredRepresentatives() {
+            if (!this.repSearch) {
+                return this.representatives;
+            }
+
+            const search = this.repSearch.toLowerCase();
+            return this.representatives.filter(rep =>
+                (rep.name && rep.name.toLowerCase().includes(search)) ||
+                (rep.territory && rep.territory.toLowerCase().includes(search))
+            );
+        },
+
+        getActiveRoute(repId) {
+            return this.activeRoutes.find(route => route.representative_id === repId);
+        },
+
+        selectRepresentative(rep) {
+            this.selectedRep = rep;
+            this.selectedRoute = this.getActiveRoute(rep.id);
+
+            // Clear existing markers and show the selected rep's route
+            clearMarkers();
+            this.showRouteOnMap();
+
+            // Center map on representative
+            if (rep.last_location) {
+                this.map.setCenter({
+                    lat: rep.last_location.latitude,
+                    lng: rep.last_location.longitude
+                });
+                this.map.setZoom(14);
+            }
+        },
+
+        addRepMarker(rep) {
+            if (!rep.last_location) return;
+
+            const position = {
+                lat: rep.last_location.latitude,
+                lng: rep.last_location.longitude
+            };
+
+            const content = `
+                <div class="p-2">
+                    <h3 class="font-bold mb-1">${rep.name || 'Unknown'}</h3>
+                    <p class="text-sm text-gray-600">${rep.territory || 'لا توجد منطقة محددة'}</p>
+                    <p class="text-xs text-gray-500 mt-1">آخر تحديث: ${this.formatTime(rep.last_location.timestamp)}</p>
+                </div>
+            `;
+
+            // Custom icon with rep's initial
+            const icon = {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: '#3b82f6',
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+                scale: 10
+            };
+
+            addMarker(position, rep.name || 'Unknown', icon, content);
+        },
+
+        showRouteOnMap() {
+            if (!this.selectedRep) return;
+
+            // Add marker for the representative
+            if (this.selectedRep.last_location) {
+                this.addRepMarker(this.selectedRep);
+            }
+
+            // If there's an active route, show it on the map
+            if (this.selectedRoute) {
+                // Add markers for each visit
+                this.selectedRoute.visits.forEach(visit => {
+                    if (visit.location_latitude && visit.location_longitude) {
+                        const position = {
+                            lat: visit.location_latitude,
+                            lng: visit.location_longitude
+                        };
+
+                        // Determine icon based on visit status
+                        let icon;
+                        if (visit.status === 'Completed') {
+                            icon = 'https://maps.google.com/mapfiles/ms/icons/green-dot.png';
+                        } else if (visit.status === 'Missed') {
+                            icon = 'https://maps.google.com/mapfiles/ms/icons/red-dot.png';
+                        } else {
+                            icon = 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png';
+                        }
+
+                        const content = `
+                            <div class="p-2">
+                                <h3 class="font-bold mb-1">${visit.customer.customer_name}</h3>
+                                <p class="text-sm">${this.formatTime(visit.scheduled_time)}</p>
+                                <p class="text-xs text-gray-600 mt-1">${this.getVisitStatusText(visit.status)}</p>
+                                ${visit.actual_visit_time ? `<p class="text-xs text-gray-500">زيارة فعلية: ${this.formatTime(visit.actual_visit_time)}</p>` : ''}
+                                ${visit.visit_outcome ? `<p class="text-xs text-gray-500">النتيجة: ${this.getVisitOutcomeText(visit.visit_outcome)}</p>` : ''}
+                            </div>
+                        `;
+
+                        addMarker(position, visit.customer.customer_name, icon, content);
+                    }
+                });
+
+                // If there are at least 2 visits with locations, show the route
+                const visitsWithLocations = this.selectedRoute.visits.filter(
+                    v => v.location_latitude && v.location_longitude
+                );
+
+                if (visitsWithLocations.length >= 2) {
+                    // Prepare waypoints
+                    const waypoints = visitsWithLocations.slice(1, -1).map(visit => ({
+                        location: {
+                            lat: visit.location_latitude,
+                            lng: visit.location_longitude
+                        },
+                        stopover: true
+                    }));
+
+                    // Calculate and display the route
+                    calculateRoute(
+                        waypoints,
+                        {
+                            lat: visitsWithLocations[0].location_latitude,
+                            lng: visitsWithLocations[0].location_longitude
+                        },
+                        {
+                            lat: visitsWithLocations[visitsWithLocations.length - 1].location_latitude,
+                            lng: visitsWithLocations[visitsWithLocations.length - 1].location_longitude
+                        },
+                        'DRIVING'
+                    );
+                }
+            }
+        },
+
+        centerMapOnRep() {
+            if (!this.selectedRep || !this.selectedRep.last_location) return;
+
+            this.map.setCenter({
+                lat: this.selectedRep.last_location.latitude,
+                lng: this.selectedRep.last_location.longitude
+            });
+            this.map.setZoom(15);
+        },
+
+        showAllReps() {
+            // Clear existing markers
+            clearMarkers();
+
+            // Add markers for all representatives with last_location
+            this.representatives.forEach(rep => {
+                if (rep.last_location) {
+                    this.addRepMarker(rep);
+                }
+            });
+
+            // Fit map to show all markers
+            if (markers.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                markers.forEach(marker => {
+                    bounds.extend(marker.getPosition());
+                });
+                this.map.fitBounds(bounds);
+            } else {
+                // Default to Cairo if no markers
+                this.map.setCenter({ lat: 30.0444, lng: 31.2357 });
+                this.map.setZoom(10);
+            }
+        },
+
+        refreshData() {
+            fetch('/sales/representatives/tracking/data')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch tracking data');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.representatives = data.representatives;
+                    this.activeRoutes = data.active_routes;
+
+                    // Update selected rep and route if they exist
+                    if (this.selectedRep) {
+                        const updatedRep = this.representatives.find(r => r.id === this.selectedRep.id);
+                        if (updatedRep) {
+                            this.selectedRep = updatedRep;
+                            this.selectedRoute = this.getActiveRoute(updatedRep.id);
+
+                            // Update map
+                            clearMarkers();
+                            this.showRouteOnMap();
+                        }
+                    }
+
+                    showNotification('تم تحديث بيانات التتبع', 'success');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('حدث خطأ أثناء تحديث بيانات التتبع', 'error');
+                });
+        },
+
+        startTracking() {
+            // This function would be used to start real-time tracking
+            // For now, we'll just refresh data periodically
+        },
+
+        formatDate(dateString) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString('ar-EG', options);
+        },
+
+        formatTime(timeString) {
+            if (!timeString) return '';
+
+            try {
+                const date = new Date(timeString);
+                return date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                return timeString;
+            }
+        },
+
+        getRouteStatusText(status) {
+            switch (status) {
+                case 'Planned': return 'مخطط';
+                case 'In Progress': return 'قيد التنفيذ';
+                case 'Completed': return 'مكتمل';
+                case 'Cancelled': return 'ملغي';
+                default: return status;
+            }
+        },
+
+        getVisitStatusText(status) {
+            switch (status) {
+                case 'Pending': return 'قيد الانتظار';
+                case 'Completed': return 'مكتملة';
+                case 'Missed': return 'فائتة';
+                case 'Rescheduled': return 'معاد جدولتها';
+                default: return status;
+            }
+        },
+
+        getVisitOutcomeText(outcome) {
+            switch (outcome) {
+                case 'Sale': return 'بيع';
+                case 'No Sale': return 'لا بيع';
+                case 'Follow-up Required': return 'متابعة مطلوبة';
+                default: return outcome;
+            }
+        }
+    };
+}
+
+// Helper function to show notifications
+function showNotification(message, type = 'info') {
+    const event = new CustomEvent('show-notification', {
+        detail: { message, type }
+    });
+    window.dispatchEvent(event);
+}
+</script>
+{% endblock %}

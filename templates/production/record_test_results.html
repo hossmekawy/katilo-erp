@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}تسجيل نتائج الفحص - نظام قاتيلو{% endblock %}
+
+{% block page_header %}تسجيل نتائج الفحص #{{ test.id }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/qc/tests" class="text-blue-600 hover:text-blue-800">فحوصات الجودة</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">تسجيل نتائج الفحص #{{ test.id }}</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Test Information Card -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-clipboard-check text-blue-600 ml-2"></i>
+                معلومات الفحص
+            </h3>
+        </div>
+        
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-sm text-gray-600">رقم الفحص:</p>
+                    <p class="font-medium text-gray-800">#{{ test.id }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">نوع الفحص:</p>
+                    <p class="font-medium text-gray-800">{{ test.test_type }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">رقم الدفعة:</p>
+                    <p class="font-medium text-gray-800">{{ test.batch.lot_number }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">المنتج:</p>
+                    <p class="font-medium text-gray-800">{{ test.batch.item.name }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">تاريخ الإنشاء:</p>
+                    <p class="font-medium text-gray-800">{{ test.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">المفتش:</p>
+                    <p class="font-medium text-gray-800">{{ test.inspector.username if test.inspector else 'غير محدد' }}</p>
+                </div>
+                <div class="md:col-span-2">
+                    <p class="text-sm text-gray-600">ملاحظات:</p>
+                    <p class="font-medium text-gray-800">{{ test.notes or 'لا توجد ملاحظات' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Test Results Form -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-vial text-blue-600 ml-2"></i>
+                تسجيل نتائج الفحص
+            </h3>
+        </div>
+        
+        <form method="POST" action="/production/qc/tests/{{ test.id }}/results" class="p-6 space-y-6">
+            <!-- Test Parameters -->
+            <div class="space-y-4">
+                <h4 class="font-medium text-gray-800">معايير الفحص</h4>
+                
+                {% if test.parameters %}
+                    {% for param_name, param_data in test.parameters.items() %}
+<!-- In the form section for existing parameters -->
+<div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700">اسم المعيار</label>
+            <input type="text" name="param_name_{{ param_data.id }}" value="{{ param_name }}" readonly
+                   class="mt-1 w-full rounded-md border-gray-300 bg-gray-100 shadow-sm">
+            <input type="hidden" name="param_id_{{ param_data.id }}" value="{{ param_data.id }}">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">القيمة المتوقعة</label>
+            <input type="text" name="expected_{{ param_data.id }}" value="{{ param_data.expected }}" readonly
+                   class="mt-1 w-full rounded-md border-gray-300 bg-gray-100 shadow-sm">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">القيمة الفعلية <span class="text-red-500">*</span></label>
+            <input type="text" name="param_{{ param_data.id }}" required
+                   class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+        </div>
+    </div>
+    <div class="mt-3 flex items-center">
+        <input type="checkbox" id="passed_{{ param_data.id }}" name="passed_{{ param_data.id }}" 
+               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+        <label for="passed_{{ param_data.id }}" class="mr-2 block text-sm text-gray-900">
+            المعيار مطابق للمواصفات
+        </label>
+    </div>
+</div>
+
+                    {% endfor %}
+                {% else %}
+                    <!-- No parameters defined, allow adding them -->
+                    <div id="parameters-container" class="space-y-4">
+                        <div class="parameter-row bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">اسم المعيار <span class="text-red-500">*</span></label>
+                                    <input type="text" name="param_name_1" required
+                                           class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">القيمة المتوقعة <span class="text-red-500">*</span></label>
+                                    <input type="text" name="expected_1" required
+                                           class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">القيمة الفعلية <span class="text-red-500">*</span></label>
+                                    <input type="text" name="param_1" required
+                                           class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            <div class="mt-3 flex items-center">
+                                <input type="checkbox" id="passed_1" name="passed_1" 
+                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="passed_1" class="mr-2 block text-sm text-gray-900">
+                                    المعيار مطابق للمواصفات
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" id="add-parameter" class="text-sm text-blue-600 hover:text-blue-800 flex items-center">
+                        <i class="fas fa-plus-circle ml-1"></i>
+                        إضافة معيار
+                    </button>
+                {% endif %}
+            </div>
+            
+            <!-- Test Result -->
+            <div class="space-y-1 pt-4 border-t border-gray-200">
+                <label for="test_status" class="block text-sm font-medium text-gray-700">نتيجة الفحص النهائية <span class="text-red-500">*</span></label>
+                <select id="test_status" name="test_status" required
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">-- اختر نتيجة الفحص --</option>
+                    <option value="Passed">ناجح - الدفعة مطابقة للمواصفات</option>
+                    <option value="Failed">فاشل - الدفعة غير مطابقة للمواصفات</option>
+                </select>
+            </div>
+            
+            <!-- Additional Notes -->
+            <div class="space-y-1">
+                <label for="result_notes" class="block text-sm font-medium text-gray-700">ملاحظات إضافية</label>
+                <textarea id="result_notes" name="result_notes" rows="3"
+                          class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          placeholder="أي ملاحظات إضافية حول نتائج الفحص..."></textarea>
+            </div>
+            
+            <!-- Form Actions -->
+            <div class="flex items-center justify-end space-x-3 space-x-reverse pt-4 border-t border-gray-200">
+                <a href="/production/qc/tests" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    إلغاء
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save ml-1"></i>
+                    حفظ النتائج
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const addParameterBtn = document.getElementById('add-parameter');
+        const parametersContainer = document.getElementById('parameters-container');
+        
+        let paramCount = 1;
+        
+        // Add parameter row
+        if (addParameterBtn && parametersContainer) {
+            addParameterBtn.addEventListener('click', function() {
+                paramCount++;
+                
+                const newRow = document.createElement('div');
+                newRow.className = 'parameter-row bg-gray-50 p-4 rounded-lg border border-gray-200';
+                newRow.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">اسم المعيار <span class="text-red-500">*</span></label>
+                            <input type="text" name="param_name_${paramCount}" required
+                                   class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">القيمة المتوقعة <span class="text-red-500">*</span></label>
+                            <input type="text" name="expected_${paramCount}" required
+                                   class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">القيمة الفعلية <span class="text-red-500">*</span></label>
+                            <input type="text" name="param_${paramCount}" required
+                                   class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between">
+                        <div>
+                            <input type="checkbox" id="passed_${paramCount}" name="passed_${paramCount}" 
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="passed_${paramCount}" class="mr-2 block text-sm text-gray-900">
+                                المعيار مطابق للمواصفات
+                            </label>
+                        </div>
+                        <button type="button" class="text-red-500 hover:text-red-700 remove-param">
+                            <i class="fas fa-times"></i> حذف
+                        </button>
+                    </div>
+                `;
+                
+                parametersContainer.appendChild(newRow);
+                
+                // Add event listener to remove button
+                newRow.querySelector('.remove-param').addEventListener('click', function() {
+                    newRow.remove();
+                });
+            });
+        }
+        
+        // Initialize remove buttons for existing parameters
+        const removeButtons = document.querySelectorAll('.remove-param');
+        removeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const paramRow = this.closest('.parameter-row');
+                paramRow.remove();
+            });
+        });
+        
+        // Auto-check "passed" checkbox when values match
+        const form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('input', function(event) {
+                const target = event.target;
+                
+                // Check if this is an actual value input field
+                if (target.name && target.name.startsWith('param_') && !target.name.startsWith('param_name_')) {
+                    const paramId = target.name.replace('param_', '');
+                    const expectedInput = document.querySelector(`[name="expected_${paramId}"]`);
+                    const passedCheckbox = document.getElementById(`passed_${paramId}`);
+                    
+                    if (expectedInput && passedCheckbox) {
+                        // Auto-check if values match (case insensitive)
+                        const actualValue = target.value.trim().toLowerCase();
+                        const expectedValue = expectedInput.value.trim().toLowerCase();
+                        
+                        if (actualValue && expectedValue) {
+                            passedCheckbox.checked = (actualValue === expectedValue);
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Form validation
+        if (form) {
+            form.addEventListener('submit', function(event) {
+                const testStatus = document.getElementById('test_status').value;
+                
+                if (!testStatus) {
+                    event.preventDefault();
+                    alert('يرجى اختيار نتيجة الفحص النهائية');
+                    document.getElementById('test_status').focus();
+                    return;
+                }
+                
+                // Check if all required fields are filled
+                const requiredInputs = form.querySelectorAll('input[required]');
+                let allFilled = true;
+                
+                requiredInputs.forEach(input => {
+                    if (!input.value.trim()) {
+                        allFilled = false;
+                        input.classList.add('border-red-500');
+                    } else {
+                        input.classList.remove('border-red-500');
+                    }
+                });
+                
+                if (!allFilled) {
+                    event.preventDefault();
+                    alert('يرجى ملء جميع الحقول المطلوبة');
+                    return;
+                }
+                
+                // Confirm submission
+                if (!confirm('هل أنت متأكد من حفظ نتائج الفحص؟')) {
+                    event.preventDefault();
+                }
+            });
+        }
+        
+        // Auto-suggest test status based on parameter results
+        const passedCheckboxes = document.querySelectorAll('[id^="passed_"]');
+        const testStatusSelect = document.getElementById('test_status');
+        
+        if (passedCheckboxes.length > 0 && testStatusSelect) {
+            passedCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    updateTestStatus();
+                });
+            });
+            
+            function updateTestStatus() {
+                const allCheckboxes = document.querySelectorAll('[id^="passed_"]');
+                const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+                
+                if (allCheckboxes.length > 0) {
+                    testStatusSelect.value = allChecked ? 'Passed' : 'Failed';
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

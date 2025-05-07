@@ -1,0 +1,1103 @@
+{% extends "base.html" %}
+
+{% block title %}تفاصيل أمر الإنتاج #{{ order.id }} | نظام قاتيلو{% endblock %}
+
+{% block page_header %}تفاصيل أمر الإنتاج #{{ order.id }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('production.production_dashboard') }}" class="text-blue-600 hover:text-blue-800">الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('production.production_orders') }}" class="text-blue-600 hover:text-blue-800">أوامر الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">أمر إنتاج #{{ order.id }}</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Order Status Banner -->
+    <div class="rounded-lg overflow-hidden shadow-sm">
+        {% if order.status == 'Planned' %}
+        <div class="bg-blue-50 border-t-4 border-blue-500 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-600 text-xl"></i>
+                </div>
+                <div class="mr-3">
+                    <p class="text-blue-800 font-medium">أمر إنتاج مخطط</p>
+                    <p class="text-blue-700 text-sm mt-1">هذا الأمر في مرحلة التخطيط ولم يبدأ الإنتاج بعد.</p>
+                </div>
+                <div class="mr-auto flex items-center space-x-3 space-x-reverse">
+                    {% if not order.production_line_id %}
+                    <button type="button"
+                            class="btn bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded-md flex items-center"
+                            data-order-id="{{ order.id }}"
+                            onclick="openAssignLineModal({{ order.id }})">
+                        <i class="fas fa-tasks mr-1"></i>
+                        تعيين خط إنتاج
+                    </button>
+                    {% endif %}
+
+                    {% if order.production_line_id %}
+                    <button type="button"
+                            class="btn bg-yellow-600 hover:bg-yellow-700 text-white text-sm px-3 py-1 rounded-md flex items-center"
+                            data-order-id="{{ order.id }}"
+                            data-product-id="{{ order.product_id }}"
+                            onclick="checkBomAndStartProduction({{ order.id }}, {{ order.product_id }})">
+                        <i class="fas fa-play mr-1"></i>
+                        بدء الإنتاج
+                    </button>
+                    {% endif %}
+
+                    <button type="button"
+                            class="btn bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded-md flex items-center"
+                            data-order-id="{{ order.id }}"
+                            onclick="openCancelOrderModal({{ order.id }})">
+                        <i class="fas fa-times mr-1"></i>
+                        إلغاء الأمر
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% elif order.status == 'InProgress' %}
+        <div class="bg-yellow-50 border-t-4 border-yellow-500 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-cogs text-yellow-600 text-xl"></i>
+                </div>
+                <div class="mr-3">
+                    <p class="text-yellow-800 font-medium">أمر إنتاج قيد التنفيذ</p>
+                    <p class="text-yellow-700 text-sm mt-1">هذا الأمر قيد التنفيذ حالياً.</p>
+                </div>
+                <div class="mr-auto">
+                    <span class="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                        بدأ منذ: {{ order.actual_start.strftime('%Y-%m-%d %H:%M') if order.actual_start else 'غير محدد' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% elif order.status == 'Completed' %}
+        <div class="bg-green-50 border-t-4 border-green-500 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                </div>
+                <div class="mr-3">
+                    <p class="text-green-800 font-medium">أمر إنتاج مكتمل</p>
+                    <p class="text-green-700 text-sm mt-1">تم إكمال هذا الأمر بنجاح.</p>
+                </div>
+                <div class="mr-auto">
+                    <span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                        اكتمل في: {{ order.actual_end.strftime('%Y-%m-%d %H:%M') if order.actual_end else 'غير محدد' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% elif order.status == 'Cancelled' %}
+        <div class="bg-red-50 border-t-4 border-red-500 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-ban text-red-600 text-xl"></i>
+                </div>
+                <div class="mr-3">
+                    <p class="text-red-800 font-medium">أمر إنتاج ملغي</p>
+                    <p class="text-red-700 text-sm mt-1">تم إلغاء هذا الأمر.</p>
+                    {% if order.notes %}
+                    <p class="text-red-700 text-sm mt-1">سبب الإلغاء: {{ order.notes }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Order Details and Batches -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Order Details Card -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-medium text-gray-900 flex items-center">
+                        <i class="fas fa-clipboard-list text-blue-600 mr-2"></i>
+                        تفاصيل الأمر
+                    </h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">رقم الأمر:</span>
+                        <span class="font-medium text-gray-900">#{{ order.id }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">المنتج:</span>
+                        <span class="font-medium text-gray-900">{{ order.product.name }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">الكمية:</span>
+                        <span class="font-medium text-gray-900">{{ order.quantity }} {{ order.product.unit_of_measure or 'وحدة' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">خط الإنتاج:</span>
+                        <span class="font-medium text-gray-900">
+                            {% if order.production_line %}
+                                {{ order.production_line.name }}
+                            {% else %}
+                                <span class="text-yellow-600">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    غير معين
+                                </span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">تاريخ البدء المخطط:</span>
+                        <span class="font-medium text-gray-900">{{ order.scheduled_start.strftime('%Y-%m-%d %H:%M') if order.scheduled_start else 'غير محدد' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">تاريخ الانتهاء المخطط:</span>
+                        <span class="font-medium text-gray-900">{{ order.scheduled_end.strftime('%Y-%m-%d %H:%M') if order.scheduled_end else 'غير محدد' }}</span>
+                    </div>
+                    {% if order.actual_start %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">تاريخ البدء الفعلي:</span>
+                        <span class="font-medium text-gray-900">{{ order.actual_start.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                    {% endif %}
+                    {% if order.actual_end %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">تاريخ الانتهاء الفعلي:</span>
+                        <span class="font-medium text-gray-900">{{ order.actual_end.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">تم الإنشاء بواسطة:</span>
+                        <span class="font-medium text-gray-900">{{ order.creator.username if order.creator else 'غير معروف' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">تاريخ الإنشاء:</span>
+                        <span class="font-medium text-gray-900">{{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOM Details -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mt-6">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-medium text-gray-900 flex items-center">
+                        <i class="fas fa-project-diagram text-blue-600 mr-2"></i>
+                        قائمة المواد
+                    </h3>
+                </div>
+                <div class="p-6">
+                    {% set bom = bom_data.get('bom') %}
+                    {% if bom %}
+                        <div class="space-y-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">اسم القائمة:</span>
+                                <span class="font-medium text-gray-900">{{ bom.name }}</span>
+                            </div>
+
+                            <h4 class="font-medium text-gray-800 mt-4">المكونات:</h4>
+                            <div class="space-y-2">
+                                {% for component in bom_data.get('components', []) %}
+                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                                    <span class="text-gray-800">{{ component.name }}</span>
+                                    <span class="text-gray-600">{{ component.quantity_required * order.quantity }} {{ component.unit_of_measure or 'وحدة' }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-gray-500">
+                            <i class="fas fa-exclamation-circle text-yellow-500 text-2xl mb-2"></i>
+                            <p>لا توجد قائمة مواد مرتبطة بهذا المنتج</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Batches and Timeline -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Batches Card -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-gray-900 flex items-center">
+                        <i class="fas fa-cubes text-blue-600 mr-2"></i>
+                        دفعات الإنتاج
+                    </h3>
+                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                        {{ batches|length }} دفعة
+                    </span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    رقم الدفعة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    رقم الدفعة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    رقم التشغيلة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الكمية
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    تاريخ الإنتاج
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الحالة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الإجراءات
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for batch in batches %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    #{{ batch.id }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ batch.lot_number }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ batch.quantity }} {{ order.product.unit_of_measure or 'وحدة' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ batch.production_date.strftime('%Y-%m-%d') if batch.production_date else 'غير محدد' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {% if batch.status == 'Created' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                        تم الإنشاء
+                                    </span>
+                                    {% elif batch.status == 'InProduction' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                        قيد الإنتاج
+                                    </span>
+                                    {% elif batch.status == 'QCPending' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                        بانتظار فحص الجودة
+                                    </span>
+                                    {% elif batch.status == 'QCPassed' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                        اجتاز فحص الجودة
+                                    </span>
+                                    {% elif batch.status == 'QCFailed' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                        فشل في فحص الجودة
+                                    </span>
+                                    {% elif batch.status == 'Packaged' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                        تم التعبئة
+                                    </span>
+                                    {% elif batch.status == 'Stored' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                        تم التخزين
+                                    </span>
+                                    {% elif batch.status == 'Cancelled' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                        ملغي
+                                    </span>
+                                    {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        {{ batch.status }}
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div class="flex space-x-2 space-x-reverse">
+                                        {% if batch.status == 'Created' or batch.status == 'InProduction' %}
+                                        <a href="{{ url_for('production.batch_steps', batch_id=batch.id) }}" class="text-blue-600 hover:text-blue-900" title="خطوات الإنتاج">
+                                            <i class="fas fa-tasks"></i>
+                                        </a>
+                                        {% endif %}
+
+                                        {% if batch.status == 'InProduction' %}
+                                        <a href="{{ url_for('production.monitor_parameters', batch_id=batch.id) }}" class="text-yellow-600 hover:text-yellow-900" title="مراقبة المعايير">
+                                            <i class="fas fa-chart-line"></i>
+                                        </a>
+                                        {% endif %}
+
+                                        {% if batch.status == 'QCPending' %}
+                                        <a href="{{ url_for('production.create_qc_test', batch_id=batch.id) }}" class="text-purple-600 hover:text-purple-900" title="إنشاء اختبار جودة">
+                                            <i class="fas fa-vial"></i>
+                                        </a>
+                                        {% endif %}
+
+                                        {% if batch.status == 'QCPassed' %}
+                                        <a href="{{ url_for('production.create_packaging_order', batch_id=batch.id) }}" class="text-green-600 hover:text-green-900" title="إنشاء أمر تعبئة">
+                                            <i class="fas fa-box"></i>
+                                        </a>
+                                        {% endif %}
+
+                                        {% if batch.status == 'Packaged' %}
+                                        <a href="{{ url_for('production.generate_product_label', batch_id=batch.id) }}" class="text-indigo-600 hover:text-indigo-900" title="إنشاء ملصق منتج">
+                                            <i class="fas fa-tag"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+
+                            {% if not batches %}
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                    لا توجد دفعات إنتاج لهذا الأمر
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Production Timeline -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-medium text-gray-900 flex items-center">
+                        <i class="fas fa-history text-blue-600 mr-2"></i>
+                        الجدول الزمني للإنتاج
+                    </h3>
+                </div>
+                <div class="p-6">
+                    <div class="flow-root">
+                        <ul class="-mb-8">
+                            <li>
+                                <div class="relative pb-8">
+                                    <span class="absolute top-4 right-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                                    <div class="relative flex space-x-3 space-x-reverse">
+                                        <div>
+                                            <span class="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center ring-8 ring-white">
+                                                <i class="fas fa-plus text-white"></i>
+                                            </span>
+                                        </div>
+                                        <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4 space-x-reverse">
+                                            <div>
+                                                <p class="text-sm text-gray-500">تم إنشاء أمر الإنتاج</p>
+                                            </div>
+                                            <div class="text-left text-sm whitespace-nowrap text-gray-500">
+                                                <time datetime="{{ order.created_at.isoformat() }}">{{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</time>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+
+                            {% if order.production_line_id %}
+                            <li>
+                                <div class="relative pb-8">
+                                    <span class="absolute top-4 right-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                                    <div class="relative flex space-x-3 space-x-reverse">
+                                        <div>
+                                            <span class="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center ring-8 ring-white">
+                                                <i class="fas fa-tasks text-white"></i>
+                                            </span>
+                                        </div>
+                                        <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4 space-x-reverse">
+                                            <div>
+                                                <p class="text-sm text-gray-500">تم تعيين خط الإنتاج: {{ order.production_line.name }}</p>
+                                            </div>
+                                            <div class="text-left text-sm whitespace-nowrap text-gray-500">
+                                                <time datetime="{{ order.updated_at.isoformat() }}">{{ order.updated_at.strftime('%Y-%m-%d %H:%M') }}</time>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            {% endif %}
+
+                            {% if order.actual_start %}
+                            <li>
+                                <div class="relative pb-8">
+                                    <span class="absolute top-4 right-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                                    <div class="relative flex space-x-3 space-x-reverse">
+                                        <div>
+                                            <span class="h-8 w-8 rounded-full bg-yellow-500 flex items-center justify-center ring-8 ring-white">
+                                                <i class="fas fa-play text-white"></i>
+                                            </span>
+                                        </div>
+                                        <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4 space-x-reverse">
+                                            <div>
+                                                <p class="text-sm text-gray-500">بدأ الإنتاج</p>
+                                            </div>
+                                            <div class="text-left text-sm whitespace-nowrap text-gray-500">
+                                                <time datetime="{{ order.actual_start.isoformat() }}">{{ order.actual_start.strftime('%Y-%m-%d %H:%M') }}</time>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            {% endif %}
+
+                            {% if order.actual_end %}
+                            <li>
+                                <div class="relative pb-8">
+                                    <div class="relative flex space-x-3 space-x-reverse">
+                                        <div>
+                                            <span class="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center ring-8 ring-white">
+                                                <i class="fas fa-check text-white"></i>
+                                            </span>
+                                        </div>
+                                        <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4 space-x-reverse">
+                                            <div>
+                                                <p class="text-sm text-gray-500">اكتمل الإنتاج</p>
+                                            </div>
+                                            <div class="text-left text-sm whitespace-nowrap text-gray-500">
+                                                <time datetime="{{ order.actual_end.isoformat() }}">{{ order.actual_end.strftime('%Y-%m-%d %H:%M') }}</time>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            {% elif order.status == 'Cancelled' %}
+                            <li>
+                                <div class="relative">
+                                    <div class="relative flex space-x-3 space-x-reverse">
+                                        <div>
+                                            <span class="h-8 w-8 rounded-full bg-red-500 flex items-center justify-center ring-8 ring-white">
+                                                <i class="fas fa-times text-white"></i>
+                                            </span>
+                                        </div>
+                                        <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4 space-x-reverse">
+                                            <div>
+                                                <p class="text-sm text-gray-500">تم إلغاء الأمر</p>
+                                                {% if order.notes %}
+                                                <p class="text-sm text-red-500 mt-1">السبب: {{ order.notes }}</p>
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-left text-sm whitespace-nowrap text-gray-500">
+                                                <time datetime="{{ order.updated_at.isoformat() }}">{{ order.updated_at.strftime('%Y-%m-%d %H:%M') }}</time>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assign Production Line Modal -->
+<div id="assign-line-modal"
+     x-data="{
+         open: false,
+         orderId: null,
+         init() {
+             window.addEventListener('open-assign-line-modal', (event) => {
+                 this.orderId = event.detail.orderId;
+                 this.open = true;
+                 console.log('Opening assign line modal for order:', this.orderId);
+             });
+         }
+     }"
+     x-show="open"
+     class="fixed inset-0 z-50 overflow-y-auto"
+     x-cloak>
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-tasks text-blue-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            تعيين خط إنتاج
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                اختر خط الإنتاج الذي سيتم استخدامه لهذا الأمر.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <form id="assign-line-form" action="{{ url_for('production.assign_production_line') }}" method="POST">
+                        <input type="hidden" name="order_id" x-bind:value="orderId">
+
+                        <div class="mb-4">
+                            <label for="line_id" class="block text-sm font-medium text-gray-700 mb-1">خط الإنتاج</label>
+                            <select id="line_id" name="line_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                                <option value="">-- اختر خط الإنتاج --</option>
+                                {% for line in production_lines %}
+                                <option value="{{ line.id }}">{{ line.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="assign-line-form" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    تعيين
+                </button>
+                <button type="button" @click="open = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start Production Modal -->
+<div id="start-production-modal"
+     x-data="{
+         open: false,
+         orderId: null,
+         init() {
+             window.addEventListener('open-start-production-modal', (event) => {
+                 this.orderId = event.detail.orderId;
+                 this.open = true;
+                 console.log('Opening start production modal for order:', this.orderId);
+             });
+         }
+     }"
+     x-show="open"
+     class="fixed inset-0 z-50 overflow-y-auto"
+     x-cloak>
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-play text-yellow-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            بدء الإنتاج
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                هل أنت متأكد من أنك تريد بدء الإنتاج لهذا الأمر؟ سيتم تغيير حالة الأمر إلى "قيد التنفيذ".
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <form id="start-production-form" action="{{ url_for('production.start_production_order') }}" method="POST">
+                        <input type="hidden" name="order_id" x-bind:value="orderId">
+                    </form>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="start-production-form" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-yellow-600 text-base font-medium text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    بدء الإنتاج
+                </button>
+                <button type="button" @click="open = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick BOM Creation Modal -->
+<div id="quick-bom-modal"
+     x-data="{
+         open: false,
+         productId: null,
+         orderId: null,
+         init() {
+             window.addEventListener('open-quick-bom-modal', (event) => {
+                 this.productId = event.detail.productId;
+                 this.orderId = event.detail.orderId;
+                 this.open = true;
+                 console.log('Opening quick BOM modal for product:', this.productId, 'order:', this.orderId);
+             });
+
+             window.addEventListener('close-quick-bom-modal', () => {
+                 this.open = false;
+                 console.log('Closing quick BOM modal');
+             });
+         }
+     }"
+     x-show="open"
+     class="fixed inset-0 z-50 overflow-y-auto"
+     x-cloak>
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">إنشاء قائمة مواد سريعة</h3>
+                        <div class="mt-4">
+                            <form id="quick-bom-form">
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">المنتج النهائي</label>
+                                    <div class="p-3 bg-gray-50 rounded-lg">
+                                        <div id="quick-bom-product-name" class="font-medium text-gray-800"></div>
+                                        <div id="quick-bom-product-sku" class="text-sm text-gray-500"></div>
+                                    </div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
+                                    <textarea id="quick-bom-description" rows="2"
+                                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="وصف اختياري لقائمة المواد"></textarea>
+                                </div>
+
+                                <div class="mb-4">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <label class="block text-sm font-medium text-gray-700">المكونات</label>
+                                        <button type="button" id="add-component-button" class="text-sm text-blue-600 hover:text-blue-800">
+                                            <i class="fas fa-plus ml-1"></i> إضافة مكون
+                                        </button>
+                                    </div>
+                                    <div id="components-container" class="space-y-3">
+                                        <!-- Component rows will be added here dynamically -->
+                                    </div>
+                                    <div id="no-components-message" class="text-center py-4 text-gray-500">
+                                        <p>لم تتم إضافة أي مكونات بعد</p>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" id="save-quick-bom-button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    حفظ وإكمال
+                </button>
+                <button type="button" @click="open = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Component Template (hidden, used for cloning) -->
+<template id="component-template">
+    <div class="component-row bg-gray-50 p-3 rounded-lg">
+        <div class="flex justify-between mb-2">
+            <div class="font-medium text-gray-800">مكون جديد</div>
+            <button type="button" class="remove-component-button text-red-600 hover:text-red-800">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">المكون</label>
+                <select class="component-select w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <option value="">اختر المكون</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">الكمية</label>
+                <input type="number" class="component-quantity w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" min="0.01" step="0.01" required>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">وحدة القياس</label>
+                <input type="text" class="component-unit w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="كجم، لتر، قطعة، ...">
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Cancel Order Modal -->
+<div id="cancel-order-modal"
+     x-data="{
+         open: false,
+         orderId: null,
+         init() {
+             window.addEventListener('open-cancel-order-modal', (event) => {
+                 this.orderId = event.detail.orderId;
+                 this.open = true;
+                 console.log('Opening cancel order modal for order:', this.orderId);
+             });
+         }
+     }"
+     x-show="open"
+     class="fixed inset-0 z-50 overflow-y-auto"
+     x-cloak>
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-exclamation-triangle text-red-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            إلغاء أمر الإنتاج
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                هل أنت متأكد من أنك تريد إلغاء هذا الأمر؟ لا يمكن التراجع عن هذا الإجراء.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <form id="cancel-order-form" action="{{ url_for('production.cancel_production_order') }}" method="POST">
+                        <input type="hidden" name="order_id" x-bind:value="orderId">
+
+                        <div class="mb-4">
+                            <label for="cancel_reason" class="block text-sm font-medium text-gray-700 mb-1">سبب الإلغاء</label>
+                            <textarea id="cancel_reason" name="cancel_reason" rows="3" class="w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500" placeholder="اذكر سبب إلغاء أمر الإنتاج..."></textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" form="cancel-order-form" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء الأمر
+                </button>
+                <button type="button" @click="open = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global variables
+    let componentItems = [];
+    let componentCount = 0;
+    let currentProductId = null;
+    let currentOrderId = null;
+
+    // Helper function to safely load component items
+    async function loadComponentItems() {
+        try {
+            const response = await fetch('/api/bom/components-by-type');
+            if (response.ok) {
+                componentItems = await response.json();
+            } else {
+                console.error('Failed to load component items');
+            }
+        } catch (error) {
+            console.error('Error loading component items:', error);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Quick BOM Modal Elements
+        const quickBomProductName = document.getElementById('quick-bom-product-name');
+        const quickBomProductSku = document.getElementById('quick-bom-product-sku');
+        const quickBomDescription = document.getElementById('quick-bom-description');
+        const componentsContainer = document.getElementById('components-container');
+        const noComponentsMessage = document.getElementById('no-components-message');
+        const addComponentButton = document.getElementById('add-component-button');
+        const saveQuickBomButton = document.getElementById('save-quick-bom-button');
+
+        // Add event listeners
+        addComponentButton.addEventListener('click', function() {
+            addComponentRow();
+        });
+
+        saveQuickBomButton.addEventListener('click', async function() {
+            if (!validateQuickBomForm()) {
+                return;
+            }
+
+            try {
+                // Create BOM
+                const bomResponse = await fetch('/api/bom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        final_product_id: currentProductId,
+                        description: quickBomDescription.value
+                    })
+                });
+
+                if (!bomResponse.ok) {
+                    const errorData = await bomResponse.json();
+                    throw new Error(errorData.message || 'Failed to create BOM');
+                }
+
+                const bomData = await bomResponse.json();
+                const bomId = bomData.id;
+
+                // Add components
+                const componentRows = document.querySelectorAll('.component-row');
+                for (const row of componentRows) {
+                    const componentSelect = row.querySelector('.component-select');
+                    const quantityInput = row.querySelector('.component-quantity');
+                    const unitInput = row.querySelector('.component-unit');
+
+                    await fetch(`/api/bom/${bomId}/details`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            component_item_id: componentSelect.value,
+                            quantity_required: quantityInput.value,
+                            unit_of_measure: unitInput.value
+                        })
+                    });
+                }
+
+                // Close modal
+                window.dispatchEvent(new CustomEvent('close-quick-bom-modal'));
+
+                // Show success message and continue with starting production
+                alert('تم إنشاء قائمة المواد بنجاح!');
+                openStartProductionModal(currentOrderId);
+            } catch (error) {
+                console.error('Error saving BOM:', error);
+                alert(`حدث خطأ أثناء حفظ قائمة المواد: ${error.message}`);
+            }
+        });
+    });
+
+    // Check if BOM exists for product
+    async function checkBomAndStartProduction(orderId, productId) {
+        currentOrderId = orderId;
+        currentProductId = productId;
+
+        try {
+            const response = await fetch(`/production/api/bom/check/${productId}`);
+            const data = await response.json();
+
+            if (data.exists) {
+                // BOM exists, proceed with starting production
+                openStartProductionModal(orderId);
+            } else {
+                // BOM doesn't exist, show quick BOM creation modal
+                openQuickBomModal(productId, orderId);
+            }
+        } catch (error) {
+            console.error('Error checking BOM:', error);
+            alert('حدث خطأ أثناء التحقق من قائمة المواد.');
+        }
+    }
+
+    // Open Quick BOM Modal
+    async function openQuickBomModal(productId, orderId) {
+        // Save current IDs
+        currentProductId = productId;
+        currentOrderId = orderId;
+
+        try {
+            // Get product details
+            const response = await fetch(`/production/api/products/${productId}`);
+            const product = await response.json();
+
+            // Set product info in modal
+            document.getElementById('quick-bom-product-name').textContent = product.name;
+            document.getElementById('quick-bom-product-sku').textContent = `رمز المنتج: ${product.sku || 'غير محدد'}`;
+
+            // Clear previous data
+            document.getElementById('quick-bom-description').value = '';
+            document.getElementById('components-container').innerHTML = '';
+            document.getElementById('no-components-message').classList.remove('hidden');
+            componentCount = 0;
+
+            // Load component items if not already loaded
+            if (componentItems.length === 0) {
+                await loadComponentItems();
+            }
+
+            // Dispatch event to open the modal
+            window.dispatchEvent(new CustomEvent('open-quick-bom-modal', {
+                detail: { productId, orderId }
+            }));
+
+            console.log('Dispatched open-quick-bom-modal event for product:', productId, 'order:', orderId);
+        } catch (error) {
+            console.error('Error opening quick BOM modal:', error);
+            alert('حدث خطأ أثناء تحميل بيانات المنتج.');
+        }
+    }
+
+    // Add Component Row Function
+    function addComponentRow() {
+        // Clone template
+        const template = document.getElementById('component-template').content.cloneNode(true);
+        const componentRow = template.querySelector('.component-row');
+        const componentSelect = template.querySelector('.component-select');
+
+        // Set unique ID for tracking
+        componentCount++;
+        componentRow.dataset.id = componentCount;
+
+        // Populate component select options
+        populateComponentSelect(componentSelect);
+
+        // Add event listeners
+        template.querySelector('.remove-component-button').addEventListener('click', function() {
+            removeComponentRow(componentRow.dataset.id);
+        });
+
+        // Add to container
+        document.getElementById('components-container').appendChild(template);
+        document.getElementById('no-components-message').classList.add('hidden');
+    }
+
+    // Remove Component Row Function
+    function removeComponentRow(id) {
+        const row = document.querySelector(`.component-row[data-id="${id}"]`);
+        if (row) {
+            row.remove();
+
+            // Show "no components" message if no rows left
+            if (document.getElementById('components-container').children.length === 0) {
+                document.getElementById('no-components-message').classList.remove('hidden');
+            }
+        }
+    }
+
+    // Populate Component Select Function
+    function populateComponentSelect(select) {
+        // Clear existing options except the first one
+        while (select.options.length > 1) {
+            select.remove(1);
+        }
+
+        // Filter for allowed category types (exclude FinalProduct)
+        const allowedCategoryTypes = ['RawMaterial', 'IntermediateProduct', 'Packaging'];
+
+        // Add options from component items
+        componentItems.forEach(category => {
+            // Only include allowed category types
+            if (category.items && category.items.length > 0 && allowedCategoryTypes.includes(category.category_type)) {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = getCategoryTypeLabel(category.category_type);
+
+                category.items.forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.textContent = item.name;
+                    option.dataset.unit = item.unit_of_measure || '';
+                    optgroup.appendChild(option);
+                });
+
+                select.appendChild(optgroup);
+            }
+        });
+
+        // Add change event to set unit of measure
+        select.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption.dataset.unit) {
+                const row = this.closest('.component-row');
+                const unitInput = row.querySelector('.component-unit');
+                unitInput.value = selectedOption.dataset.unit;
+            }
+        });
+    }
+
+    // Validate Quick BOM Form
+    function validateQuickBomForm() {
+        const componentRows = document.querySelectorAll('.component-row');
+
+        if (componentRows.length === 0) {
+            alert('يرجى إضافة مكون واحد على الأقل');
+            return false;
+        }
+
+        for (const row of componentRows) {
+            const componentSelect = row.querySelector('.component-select');
+            const quantityInput = row.querySelector('.component-quantity');
+
+            if (!componentSelect.value) {
+                alert('يرجى اختيار المكون لجميع الصفوف');
+                componentSelect.focus();
+                return false;
+            }
+
+            if (!quantityInput.value || parseFloat(quantityInput.value) <= 0) {
+                alert('يرجى إدخال كمية صالحة لجميع المكونات');
+                quantityInput.focus();
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Helper function to get category type label
+    function getCategoryTypeLabel(type) {
+        switch (type) {
+            case 'RawMaterial': return 'مواد خام';
+            case 'Packaging': return 'مواد تغليف';
+            case 'IntermediateProduct': return 'منتجات وسيطة';
+            case 'FinalProduct': return 'منتجات نهائية';
+            default: return 'أخرى';
+        }
+    }
+
+    function openAssignLineModal(orderId) {
+        // Save current order ID
+        currentOrderId = orderId;
+
+        // Dispatch event to open the modal
+        window.dispatchEvent(new CustomEvent('open-assign-line-modal', {
+            detail: { orderId }
+        }));
+
+        console.log('Dispatched open-assign-line-modal event for order:', orderId);
+    }
+
+    function openStartProductionModal(orderId) {
+        // Save current order ID
+        currentOrderId = orderId;
+
+        // Dispatch event to open the modal
+        window.dispatchEvent(new CustomEvent('open-start-production-modal', {
+            detail: { orderId }
+        }));
+
+        console.log('Dispatched open-start-production-modal event for order:', orderId);
+    }
+
+    function openCancelOrderModal(orderId) {
+        // Save current order ID
+        currentOrderId = orderId;
+
+        // Dispatch event to open the modal
+        window.dispatchEvent(new CustomEvent('open-cancel-order-modal', {
+            detail: { orderId }
+        }));
+
+        console.log('Dispatched open-cancel-order-modal event for order:', orderId);
+    }
+</script>
+{% endblock %}

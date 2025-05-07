@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الخزينة - لوحة التحكم{% endblock %}
+
+{% block page_header %}لوحة تحكم الخزينة{% endblock %}
+
+{% block styles %}
+<style>
+    .stat-card {
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Cash -->
+        <div class="stat-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-md p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-blue-100 text-sm font-medium mb-1">إجمالي النقدية</p>
+                    <h3 class="text-2xl font-bold">{{ total_cash|round(2) }} ج.م</h3>
+                </div>
+                <div class="bg-white/20 p-3 rounded-lg">
+                    <i class="fas fa-money-bill-wave text-2xl"></i>
+                </div>
+            </div>
+            <div class="mt-4">
+                <a href="{{ url_for('cash.accounts') }}" class="text-blue-100 hover:text-white text-sm flex items-center">
+                    <span>عرض الحسابات</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Active Accounts -->
+        <div class="stat-card bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-md p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-green-100 text-sm font-medium mb-1">الحسابات النشطة</p>
+                    <h3 class="text-2xl font-bold">{{ accounts|length }}</h3>
+                </div>
+                <div class="bg-white/20 p-3 rounded-lg">
+                    <i class="fas fa-wallet text-2xl"></i>
+                </div>
+            </div>
+            <div class="mt-4">
+                <a href="{{ url_for('cash.accounts') }}" class="text-green-100 hover:text-white text-sm flex items-center">
+                    <span>إدارة الحسابات</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="stat-card bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-md p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-amber-100 text-sm font-medium mb-1">المعاملات الأخيرة</p>
+                    <h3 class="text-2xl font-bold">{{ recent_transactions|length }}</h3>
+                </div>
+                <div class="bg-white/20 p-3 rounded-lg">
+                    <i class="fas fa-exchange-alt text-2xl"></i>
+                </div>
+            </div>
+            <div class="mt-4">
+                <a href="{{ url_for('cash.transactions') }}" class="text-amber-100 hover:text-white text-sm flex items-center">
+                    <span>عرض المعاملات</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="stat-card bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-md p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-purple-100 text-sm font-medium mb-1">إجراءات سريعة</p>
+                    <h3 class="text-lg font-bold">إدارة الخزينة</h3>
+                </div>
+                <div class="bg-white/20 p-3 rounded-lg">
+                    <i class="fas fa-bolt text-2xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-2">
+                <a href="{{ url_for('cash.add_transaction') }}" class="bg-white/10 hover:bg-white/20 rounded-lg p-2 text-center text-xs">
+                    <i class="fas fa-plus-circle mb-1"></i>
+                    <span class="block">معاملة جديدة</span>
+                </a>
+                <a href="{{ url_for('cash.add_transfer') }}" class="bg-white/10 hover:bg-white/20 rounded-lg p-2 text-center text-xs">
+                    <i class="fas fa-exchange-alt mb-1"></i>
+                    <span class="block">تحويل جديد</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cash Accounts Overview -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Accounts List -->
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-lg font-semibold text-gray-800">حسابات الخزينة</h2>
+                <a href="{{ url_for('cash.add_account') }}" class="btn btn-primary text-sm">
+                    <i class="fas fa-plus ml-1"></i>
+                    إضافة حساب
+                </a>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-right">
+                    <thead class="bg-gray-50 text-gray-600 font-medium border-b">
+                        <tr>
+                            <th class="px-4 py-3">الاسم</th>
+                            <th class="px-4 py-3">النوع</th>
+                            <th class="px-4 py-3">العملة</th>
+                            <th class="px-4 py-3">الرصيد الحالي</th>
+                            <th class="px-4 py-3">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        {% for account in accounts %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 font-medium text-gray-800">{{ account.name }}</td>
+                            <td class="px-4 py-3 text-gray-600">
+                                {% if account.account_type == 'cash' %}
+                                <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">نقدي</span>
+                                {% elif account.account_type == 'bank' %}
+                                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">بنكي</span>
+                                {% else %}
+                                <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">{{ account.account_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-gray-600">{{ account.currency }}</td>
+                            <td class="px-4 py-3 font-medium
+                                {% if account.current_balance > 0 %}text-green-600
+                                {% elif account.current_balance < 0 %}text-red-600
+                                {% else %}text-gray-600{% endif %}">
+                                {{ account.current_balance|round(2) }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex space-x-2 space-x-reverse">
+                                    <a href="{{ url_for('cash.edit_account', account_id=account.id) }}" class="text-blue-600 hover:text-blue-800">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="#" onclick="showTransactions({{ account.id }})" class="text-green-600 hover:text-green-800">
+                                        <i class="fas fa-list"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                        {% if accounts|length == 0 %}
+                        <tr>
+                            <td colspan="5" class="px-4 py-6 text-center text-gray-500">
+                                لا توجد حسابات مضافة بعد
+                                <div class="mt-2">
+                                    <a href="{{ url_for('cash.add_account') }}" class="text-blue-600 hover:underline">
+                                        <i class="fas fa-plus-circle ml-1"></i>
+                                        إضافة حساب جديد
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-6">آخر المعاملات</h2>
+
+            <div class="space-y-4">
+                {% for transaction in recent_transactions %}
+                <div class="flex items-center p-3 rounded-lg {% if transaction.transaction_type == 'deposit' %}bg-green-50{% else %}bg-red-50{% endif %}">
+                    <div class="p-2 rounded-full {% if transaction.transaction_type == 'deposit' %}bg-green-100 text-green-600{% else %}bg-red-100 text-red-600{% endif %} ml-3">
+                        <i class="fas {% if transaction.transaction_type == 'deposit' %}fa-arrow-down{% else %}fa-arrow-up{% endif %}"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-medium text-gray-800">{{ transaction.description or 'معاملة نقدية' }}</p>
+                        <p class="text-xs text-gray-500">{{ transaction.transaction_date.strftime('%Y-%m-%d %H:%M') }}</p>
+                    </div>
+                    <div class="font-bold {% if transaction.transaction_type == 'deposit' %}text-green-600{% else %}text-red-600{% endif %}">
+                        {{ transaction.amount|round(2) }} ج.م
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if recent_transactions|length == 0 %}
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-exchange-alt text-gray-300 text-4xl mb-3"></i>
+                    <p>لا توجد معاملات حديثة</p>
+                </div>
+                {% endif %}
+
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('cash.transactions') }}" class="text-blue-600 hover:underline text-sm">
+                        عرض كل المعاملات
+                        <i class="fas fa-arrow-left mr-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+        <h2 class="text-lg font-semibold text-gray-800 mb-6">إجراءات سريعة</h2>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <a href="{{ url_for('cash.add_transaction') }}" class="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors">
+                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-3">
+                    <i class="fas fa-plus"></i>
+                </div>
+                <span class="text-gray-800 font-medium">إضافة معاملة</span>
+            </a>
+
+            <a href="{{ url_for('cash.add_transfer') }}" class="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors">
+                <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-3">
+                    <i class="fas fa-exchange-alt"></i>
+                </div>
+                <span class="text-gray-800 font-medium">تحويل نقدي</span>
+            </a>
+
+            <a href="{{ url_for('cash.add_reconciliation') }}" class="flex flex-col items-center justify-center p-4 bg-purple-50 hover:bg-purple-100 rounded-xl transition-colors">
+                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-3">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <span class="text-gray-800 font-medium">جرد الخزينة</span>
+            </a>
+
+            <a href="{{ url_for('cash.reports') }}" class="flex flex-col items-center justify-center p-4 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors">
+                <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-3">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <span class="text-gray-800 font-medium">التقارير</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Account Transactions Modal -->
+<div id="transactionsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden" x-cloak x-data="{ open: false }" x-show="open" @keydown.escape.window="open = false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden" @click.away="open = false">
+        <div class="flex justify-between items-center border-b px-6 py-4">
+            <h3 class="text-lg font-semibold text-gray-800" id="modalTitle">معاملات الحساب</h3>
+            <button @click="open = false" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h4 class="text-xl font-bold text-gray-800" id="accountName"></h4>
+                    <p class="text-gray-600">الرصيد الحالي: <span id="accountBalance" class="font-medium"></span></p>
+                </div>
+                <a href="#" id="addTransactionLink" class="btn btn-primary text-sm">
+                    <i class="fas fa-plus ml-1"></i>
+                    إضافة معاملة
+                </a>
+            </div>
+
+            <div class="overflow-x-auto mt-4">
+                <table class="w-full text-sm text-right">
+                    <thead class="bg-gray-50 text-gray-600 font-medium border-b">
+                        <tr>
+                            <th class="px-4 py-3">التاريخ</th>
+                            <th class="px-4 py-3">النوع</th>
+                            <th class="px-4 py-3">المبلغ</th>
+                            <th class="px-4 py-3">الوصف</th>
+                            <th class="px-4 py-3">بواسطة</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y" id="transactionsTable">
+                        <!-- Transactions will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="noTransactions" class="text-center text-gray-500 py-8 hidden">
+                <i class="fas fa-exchange-alt text-gray-300 text-4xl mb-3"></i>
+                <p>لا توجد معاملات لهذا الحساب</p>
+            </div>
+
+            <div id="loadingTransactions" class="text-center text-gray-500 py-8">
+                <i class="fas fa-spinner fa-spin text-gray-400 text-4xl mb-3"></i>
+                <p>جاري تحميل المعاملات...</p>
+            </div>
+        </div>
+
+        <div class="border-t px-6 py-4 bg-gray-50">
+            <button @click="open = false" class="btn bg-gray-200 hover:bg-gray-300 text-gray-800">
+                إغلاق
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for handling transactions modal -->
+<script>
+    function showTransactions(accountId) {
+        // Get the modal Alpine component and open it
+        const modal = document.getElementById('transactionsModal').__x.$data;
+        modal.open = true;
+
+        // Show loading state
+        document.getElementById('loadingTransactions').classList.remove('hidden');
+        document.getElementById('transactionsTable').innerHTML = '';
+        document.getElementById('noTransactions').classList.add('hidden');
+
+        // Fetch account details
+        fetch(`{{ url_for('cash.get_account', account_id=0) }}`.replace('0', accountId))
+            .then(response => response.json())
+            .then(account => {
+                document.getElementById('accountName').textContent = account.name;
+                document.getElementById('accountBalance').textContent = `${account.current_balance.toFixed(2)} ${account.currency}`;
+                document.getElementById('addTransactionLink').href = `{{ url_for('cash.add_transaction') }}?account_id=${accountId}`;
+
+                // Fetch transactions for this account
+                return fetch(`{{ url_for('cash.get_account_transactions', account_id=0) }}`.replace('0', accountId));
+            })
+            .then(response => response.json())
+            .then(transactions => {
+                // Hide loading
+                document.getElementById('loadingTransactions').classList.add('hidden');
+
+                if (transactions.length === 0) {
+                    document.getElementById('noTransactions').classList.remove('hidden');
+                    return;
+                }
+
+                // Populate transactions table
+                const tableBody = document.getElementById('transactionsTable');
+                transactions.forEach(transaction => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50';
+
+                    // Format based on transaction type
+                    const typeClass = transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600';
+                    const typeIcon = transaction.type === 'deposit' ? 'fa-arrow-down' : 'fa-arrow-up';
+                    const typeLabel = transaction.type === 'deposit' ? 'إيداع' : 'سحب';
+
+                    row.innerHTML = `
+                        <td class="px-4 py-3">${transaction.date}</td>
+                        <td class="px-4 py-3">
+                            <span class="${typeClass} flex items-center">
+                                <i class="fas ${typeIcon} ml-1"></i>
+                                ${typeLabel}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 font-medium ${typeClass}">${transaction.amount.toFixed(2)}</td>
+                        <td class="px-4 py-3">
+                            ${transaction.description || '-'}
+                            ${transaction.reference_info ? `<div class="text-xs text-gray-500 mt-1">${transaction.reference_info}</div>` : ''}
+                        </td>
+                        <td class="px-4 py-3 text-gray-600">${transaction.created_by}</td>
+                    `;
+
+                    tableBody.appendChild(row);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching data:', error);
+                document.getElementById('loadingTransactions').classList.add('hidden');
+                document.getElementById('noTransactions').classList.remove('hidden');
+                document.getElementById('noTransactions').innerHTML = `
+                    <i class="fas fa-exclamation-circle text-red-500 text-4xl mb-3"></i>
+                    <p>حدث خطأ أثناء تحميل المعاملات</p>
+                `;
+            });
+    }
+</script>
+{% endblock %}

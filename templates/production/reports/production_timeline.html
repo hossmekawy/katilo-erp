@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: 'Arial', 'Tahoma', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            direction: rtl;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .report-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .report-meta {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .batch-info {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-right: 4px solid #3182ce;
+        }
+        .batch-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .batch-detail {
+            margin-bottom: 5px;
+        }
+        .detail-label {
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+        }
+        .timeline {
+            position: relative;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .timeline::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            background-color: #3182ce;
+            top: 0;
+            bottom: 0;
+            right: 50px;
+            margin-right: -3px;
+        }
+        .timeline-item {
+            padding: 10px 70px 10px 40px;
+            position: relative;
+            background-color: inherit;
+            width: 90%;
+            margin-bottom: 20px;
+        }
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            right: 40px;
+            background-color: white;
+            border: 4px solid #3182ce;
+            top: 15px;
+            border-radius: 50%;
+            z-index: 1;
+        }
+        .timeline-content {
+            padding: 15px;
+            background-color: white;
+            position: relative;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        }
+        .timeline-date {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #3182ce;
+        }
+        .timeline-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .timeline-details {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        .timeline-detail {
+            margin-bottom: 5px;
+        }
+        .process { border-right: 4px solid #3182ce; }
+        .step { border-right: 4px solid #38a169; }
+        .qc_test { border-right: 4px solid #e53e3e; }
+        .packaging { border-right: 4px solid #d69e2e; }
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <div class="report-title">{{ title }}</div>
+        <div class="report-meta">تم إنشاؤه في: {{ generated_at }}</div>
+        <div class="report-meta">بواسطة: {{ generated_by }}</div>
+    </div>
+    
+    <div class="batch-info">
+        <div class="batch-name">دفعة: {{ batch.lot_number }}</div>
+        <div class="batch-detail">
+            <span class="detail-label">المنتج:</span>
+            <span>{{ batch.item_name }} ({{ batch.sku }})</span>
+        </div>
+        <div class="batch-detail">
+            <span class="detail-label">تاريخ الإنتاج:</span>
+            <span>{{ batch.production_date }}</span>
+        </div>
+        <div class="batch-detail">
+            <span class="detail-label">تاريخ انتهاء الصلاحية:</span>
+            <span>{{ batch.expiry_date }}</span>
+        </div>
+        <div class="batch-detail">
+            <span class="detail-label">الكمية:</span>
+            <span>{{ batch.quantity }}</span>
+        </div>
+        <div class="batch-detail">
+            <span class="detail-label">الحالة:</span>
+            <span>{{ batch.status }}</span>
+        </div>
+    </div>
+    
+    {% if timeline %}
+    <div class="timeline">
+        {% for event in timeline %}
+        <div class="timeline-item">
+            <div class="timeline-content {{ event.type }}">
+                <div class="timeline-date">
+                    {{ event.start_time.strftime('%Y-%m-%d %H:%M') if event.start_time else 'غير محدد' }}
+                    {% if event.end_time and event.start_time != event.end_time %}
+                    - {{ event.end_time.strftime('%Y-%m-%d %H:%M') }}
+                    {% endif %}
+                </div>
+                <div class="timeline-title">{{ event.name }}</div>
+                
+                <div class="timeline-details">
+                    {% if event.type == 'process' %}
+                    <div class="timeline-detail">
+                        <strong>درجة الحرارة:</strong> {{ event.details.temperature }}°C
+                    </div>
+                    <div class="timeline-detail">
+                        <strong>الرطوبة:</strong> {{ event.details.humidity }}%
+                    </div>
+                    <div class="timeline-detail">
+                        <strong>درجة الحموضة:</strong> {{ event.details.ph_level }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if event.type == 'step' %}
+                    <div class="timeline-detail">
+                        <strong>الوصف:</strong> {{ event.details.description }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if event.type == 'qc_test' %}
+                    <div class="timeline-detail">
+                        <strong>الحالة:</strong> {{ event.details.status }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if event.type == 'packaging' %}
+                    <div class="timeline-detail">
+                        <strong>الحالة:</strong> {{ event.details.status }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if event.details.notes %}
+                    <div class="timeline-detail">
+                        <strong>ملاحظات:</strong> {{ event.details.notes }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% else %}
+    <div class="no-data">لا توجد أحداث مسجلة لهذه الدفعة</div>
+    {% endif %}
+</body>
+</html>

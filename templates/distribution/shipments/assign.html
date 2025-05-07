@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}تعيين شحنة جديدة{% endblock %}
+
+{% block head %}
+{% endblock %}
+
+{% block styles %}
+<style>
+    .order-card {
+        @apply border border-gray-200 rounded-lg p-4 cursor-pointer transition-all duration-200;
+    }
+    .order-card:hover {
+        @apply border-blue-300 bg-blue-50;
+    }
+    .order-card.selected {
+        @apply border-blue-500 bg-blue-50 ring-2 ring-blue-300;
+    }
+    .order-detail-row {
+        @apply flex justify-between py-2 border-b border-gray-100 text-sm;
+    }
+    .order-detail-row:last-child {
+        @apply border-b-0;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('distribution.dashboard') }}" class="text-blue-600 hover:text-blue-800">إدارة التوزيع</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('distribution.shipments') }}" class="text-blue-600 hover:text-blue-800">إدارة الشحنات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">تعيين شحنة جديدة</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="shipmentAssignmentApp">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">تعيين شحنة جديدة</h1>
+        <div>
+            <a href="{{ url_for('distribution.shipments') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-right ml-2"></i>
+                العودة إلى الشحنات
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Orders Selection -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h2 class="text-lg font-semibold text-gray-800">اختر طلب المبيعات</h2>
+                </div>
+                <div class="p-6">
+                    <!-- Search Box -->
+                    <div class="mb-4">
+                        <div class="relative">
+                            <input type="text" x-model="orderSearch" placeholder="البحث برقم الطلب أو اسم العميل"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 pl-10">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-search text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Orders List -->
+                    <div class="space-y-4 max-h-96 overflow-y-auto">
+                        <template x-if="filteredOrders.length === 0">
+                            <div class="text-center py-8">
+                                <div class="text-gray-400 mb-3">
+                                    <i class="fas fa-shopping-cart text-5xl"></i>
+                                </div>
+                                <h3 class="text-lg font-medium text-gray-500">لا توجد طلبات مبيعات</h3>
+                                <p class="text-gray-400 mt-1" x-show="orderSearch">لا توجد نتائج تطابق بحثك</p>
+                                <p class="text-gray-400 mt-1" x-show="!orderSearch">لا توجد طلبات مبيعات قيد المعالجة</p>
+                            </div>
+                        </template>
+                        <template x-for="order in filteredOrders" :key="order.id">
+                            <div class="order-card"
+                                :class="{'selected': selectedOrder && selectedOrder.id === order.id}"
+                                @click="selectOrder(order)">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-800" x-text="'طلب #' + order.id"></h3>
+                                        <p class="text-gray-600" x-text="order.customer_name || 'عميل غير معروف'"></p>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-sm text-gray-500" x-text="formatDate(order.order_date)"></span>
+                                        <div class="font-bold text-green-600" x-text="formatCurrency(order.total_amount)"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shipment Form -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h2 class="text-lg font-semibold text-gray-800">تفاصيل الشحنة</h2>
+                </div>
+                <div class="p-6">
+                    <template x-if="!selectedOrder">
+                        <div class="text-center py-8">
+                            <div class="text-gray-400 mb-3">
+                                <i class="fas fa-hand-pointer text-5xl"></i>
+                            </div>
+                            <h3 class="text-lg font-medium text-gray-500">يرجى اختيار طلب</h3>
+                            <p class="text-gray-400 mt-1">اختر طلب مبيعات من القائمة لتعيين شحنة له</p>
+                        </div>
+                    </template>
+                    <template x-if="selectedOrder">
+                        <div>
+                            <!-- Order Details Summary -->
+                            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                                <h3 class="font-semibold text-gray-800 mb-2">تفاصيل الطلب المختار</h3>
+                                <div class="order-detail-row">
+                                    <span class="text-gray-600">رقم الطلب:</span>
+                                    <span class="font-medium" x-text="selectedOrder.id"></span>
+                                </div>
+                                <div class="order-detail-row">
+                                    <span class="text-gray-600">العميل:</span>
+                                    <span class="font-medium" x-text="selectedOrder.customer_name || 'غير معروف'"></span>
+                                </div>
+                                <div class="order-detail-row">
+                                    <span class="text-gray-600">تاريخ الطلب:</span>
+                                    <span class="font-medium" x-text="formatDate(selectedOrder.order_date)"></span>
+                                </div>
+                                <div class="order-detail-row">
+                                    <span class="text-gray-600">المبلغ الإجمالي:</span>
+                                    <span class="font-medium text-green-600" x-text="formatCurrency(selectedOrder.total_amount)"></span>
+                                </div>
+                            </div>
+
+                            <!-- Shipment Form -->
+                            <form @submit.prevent="assignShipment()">
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">المركبة</label>
+                                    <select x-model="shipmentForm.vehicle_id" required
+                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <option value="">اختر المركبة</option>
+                                        {% for vehicle in vehicles %}
+                                        <option value="{{ vehicle.id }}">{{ vehicle.name }} ({{ vehicle.plate_number }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">اسم الناقل</label>
+                                    <input type="text" x-model="shipmentForm.carrier_name"
+                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">تاريخ التسليم المتوقع</label>
+                                    <input type="date" x-model="shipmentForm.estimated_delivery_date"
+                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                </div>
+                                <div class="mb-6">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                                    <textarea x-model="shipmentForm.notes" rows="3"
+                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-full">
+                                    <i class="fas fa-shipping-fast ml-2"></i>
+                                    تعيين الشحنة
+                                </button>
+                            </form>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Pass data from Flask to JavaScript
+    window.pendingOrdersData = [
+        {% for order in pending_orders %}
+        {
+            id: {{ order.id }},
+            customer_name: "{{ order.customer.customer_name if order.customer else 'غير معروف' }}",
+            order_date: "{{ order.order_date }}",
+            total_amount: {{ order.total_amount }},
+            status: "{{ order.status }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Define the shipmentAssignmentApp function for Alpine.js
+    function shipmentAssignmentApp() {
+        return {
+            orders: [],
+            selectedOrder: null,
+            orderSearch: '',
+            shipmentForm: {
+                vehicle_id: '',
+                carrier_name: 'التوصيل الداخلي',
+                estimated_delivery_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                notes: ''
+            },
+            init: function() {
+                console.log("Initializing shipment assignment app");
+                this.loadOrders();
+            },
+            loadOrders: function() {
+                // This will be populated from the template
+                console.log("Loading orders");
+                this.orders = window.pendingOrdersData || [];
+                console.log("Loaded orders:", this.orders);
+            },
+            get filteredOrders() {
+                if (!this.orderSearch) return this.orders;
+                var search = this.orderSearch.toLowerCase();
+                return this.orders.filter(function(order) {
+                    return order.id.toString().includes(search) ||
+                        (order.customer_name && order.customer_name.toLowerCase().includes(search));
+                });
+            },
+            selectOrder: function(order) {
+                console.log("Selecting order:", order);
+                this.selectedOrder = order;
+            },
+            formatDate: function(dateString) {
+                if (!dateString) return '-';
+                var date = new Date(dateString);
+                return date.toLocaleDateString('ar-EG');
+            },
+            formatCurrency: function(amount) {
+                return new Intl.NumberFormat('ar-EG', {
+                    style: 'currency',
+                    currency: 'EGP'
+                }).format(amount || 0);
+            },
+            assignShipment: function() {
+                if (!this.selectedOrder || !this.shipmentForm.vehicle_id) {
+                    alert('يرجى اختيار طلب مبيعات ومركبة');
+                    return;
+                }
+
+                console.log("Assigning shipment:", {
+                    order: this.selectedOrder,
+                    form: this.shipmentForm
+                });
+
+                var shipmentData = {
+                    sales_order_id: this.selectedOrder.id,
+                    vehicle_id: this.shipmentForm.vehicle_id,
+                    carrier_name: this.shipmentForm.carrier_name,
+                    estimated_delivery_date: this.shipmentForm.estimated_delivery_date,
+                    notes: this.shipmentForm.notes
+                };
+
+                fetch('/distribution/api/shipments/assign', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(shipmentData)
+                    })
+                    .then(function(response) {
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        if (data.success) {
+                            alert('تم تعيين الشحنة بنجاح');
+                            // Redirect to shipments page
+                            window.location.href = '/distribution/shipments';
+                        } else {
+                            alert(data.message || 'حدث خطأ أثناء تعيين الشحنة');
+                        }
+                    })
+                    .catch(function(error) {
+                        console.error('Error assigning shipment:', error);
+                        alert('حدث خطأ أثناء تعيين الشحنة');
+                    });
+            }
+        };
+    }
+</script>
+{% endblock %}

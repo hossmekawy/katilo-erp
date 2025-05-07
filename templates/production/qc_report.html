@@ -1,0 +1,483 @@
+{% extends "base.html" %}
+
+{% block title %}تقرير فحص الجودة - نظام قاتيلو{% endblock %}
+
+{% block page_header %}تقرير فحص الجودة للدفعة {{ batch.lot_number }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/qc/tests" class="text-blue-600 hover:text-blue-800">فحوصات الجودة</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">تقرير فحص الجودة</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <!-- Report Header -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-file-alt text-blue-600 ml-2"></i>
+                تقرير فحص الجودة
+            </h3>
+            <div class="flex space-x-2 space-x-reverse">
+                <a href="/production/qc/report/{{ batch.id }}/pdf" class="btn btn-primary flex items-center">
+                    <i class="fas fa-file-pdf ml-1"></i>
+                    تحميل التقرير PDF
+                </a>
+                <button onclick="window.print()" class="btn btn-secondary flex items-center">
+                    <i class="fas fa-print ml-1"></i>
+                    طباعة التقرير
+                </button>
+                <a href="/production/qc/tests" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 flex items-center">
+                    <i class="fas fa-arrow-right ml-1"></i>
+                    العودة
+                </a>
+            </div>
+        </div>
+        
+        <div class="p-6">
+            <!-- Company Info -->
+            <div class="flex justify-between items-start mb-8">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">شركة قاتيلو للصناعات الغذائية</h2>
+                    <p class="text-gray-600">قسم مراقبة الجودة</p>
+                </div>
+                <div class="text-left">
+                    <p class="text-gray-600">تاريخ التقرير: {{ now.strftime('%Y-%m-%d') }}</p>
+                    <p class="text-gray-600">وقت التقرير: {{ now.strftime('%H:%M') }}</p>
+                </div>
+            </div>
+            
+            <!-- Batch Information -->
+            <div class="bg-blue-50 rounded-lg p-4 border border-blue-100 mb-6">
+                <h4 class="font-semibold text-blue-800 mb-3">معلومات دفعة الإنتاج</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600">رقم الدفعة:</p>
+                        <p class="font-medium text-gray-800">{{ batch.lot_number }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">المنتج:</p>
+                        <p class="font-medium text-gray-800">{{ batch.item.name }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">الكمية:</p>
+                        <p class="font-medium text-gray-800">{{ batch.quantity }} {{ batch.item.unit_of_measure or 'وحدة' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">تاريخ الإنتاج:</p>
+                        <p class="font-medium text-gray-800">{{ batch.production_date.strftime('%Y-%m-%d') }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">أمر الإنتاج:</p>
+                        <p class="font-medium text-gray-800">#{{ batch.production_order_id }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">حالة الدفعة:</p>
+                        <p class="font-medium">
+                            {% if batch.status == 'QCPassed' %}
+                            <span class="text-green-600">ناجحة - مطابقة للمواصفات</span>
+                            {% elif batch.status == 'QCFailed' %}
+                            <span class="text-red-600">فاشلة - غير مطابقة للمواصفات</span>
+                            {% else %}
+                            <span class="text-blue-600">{{ batch.status }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- QC Tests Summary -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800">
+                ملخص فحوصات الجودة
+            </h3>
+        </div>
+        
+        <div class="p-6">
+            {% if tests %}
+                <div class="mb-4">
+                    <p class="text-gray-600">عدد الفحوصات: <span class="font-medium text-gray-800">{{ tests|length }}</span></p>
+                    <p class="text-gray-600">
+                        النتيجة النهائية: 
+                        {% if batch.status == 'QCPassed' %}
+                        <span class="font-medium text-green-600">ناجحة - مطابقة للمواصفات</span>
+                        {% elif batch.status == 'QCFailed' %}
+                        <span class="font-medium text-red-600">فاشلة - غير مطابقة للمواصفات</span>
+                        {% else %}
+                        <span class="font-medium text-blue-600">{{ batch.status }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    رقم الفحص
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    نوع الفحص
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    تاريخ الفحص
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    المفتش
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    النتيجة
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for test in tests %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    #{{ test.id }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ test.test_type }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ test.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ test.inspector.username if test.inspector else 'غير محدد' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {% if test.status == 'Pending' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                        قيد الانتظار
+                                    </span>
+                                    {% elif test.status == 'InProgress' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                        قيد التنفيذ
+                                    </span>
+                                    {% elif test.status == 'Passed' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                        ناجح
+                                    </span>
+                                    {% elif test.status == 'Failed' %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                        فاشل
+                                    </span>
+                                    {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        {{ test.status }}
+                                    </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-4 text-gray-500">
+                    لا توجد فحوصات جودة مسجلة لهذه الدفعة
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Detailed Test Results -->
+    {% for test in tests %}
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800">
+                تفاصيل الفحص #{{ test.id }} - {{ test.test_type }}
+            </h3>
+        </div>
+        
+        <div class="p-6">
+            <div class="mb-4">
+                <p class="text-gray-600">تاريخ الفحص: <span class="font-medium text-gray-800">{{ test.created_at.strftime('%Y-%m-%d %H:%M') }}</span></p>
+                <p class="text-gray-600">المفتش: <span class="font-medium text-gray-800">{{ test.inspector.username if test.inspector else 'غير محدد' }}</span></p>
+                {% if test.completed_at %}
+                <p class="text-gray-600">تاريخ الانتهاء: <span class="font-medium text-gray-800">{{ test.completed_at.strftime('%Y-%m-%d %H:%M') }}</span></p>
+                {% endif %}
+                <p class="text-gray-600">
+                    النتيجة: 
+                    {% if test.status == 'Passed' %}
+                    <span class="font-medium text-green-600">ناجح</span>
+                    {% elif test.status == 'Failed' %}
+                    <span class="font-medium text-red-600">فاشل</span>
+                    {% else %}
+                    <span class="font-medium text-blue-600">{{ test.status }}</span>
+                    {% endif %}
+                </p>
+                {% if test.notes %}
+                <div class="mt-2">
+                    <p class="text-gray-600">ملاحظات:</p>
+                    <p class="font-medium text-gray-800 whitespace-pre-line">{{ test.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Test Parameters and Results -->
+            {% if test.parameters or test.results %}
+            <div class="mt-4">
+                <h4 class="font-medium text-gray-800 mb-3">معايير ونتائج الفحص</h4>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    المعيار
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    القيمة المتوقعة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    القيمة الفعلية
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    النتيجة
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% if test.results %}
+                                {% for result in test.results %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ result.parameter_name }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ result.expected_value }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ result.actual_value }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if result.is_passed %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            مطابق
+                                        </span>
+                                        {% else %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                            غير مطابق
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% elif test.parameters %}
+                                {% for param_name, param_data in test.parameters.items() %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ param_name }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ param_data.expected }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {% if test.status == 'Pending' %}
+                                        <span class="text-yellow-500">لم يتم التسجيل بعد</span>
+                                        {% else %}
+                                        <span class="text-gray-400">غير متوفر</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if test.status == 'Pending' %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                            قيد الانتظار
+                                        </span>
+                                        {% else %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                            غير متوفر
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        لا توجد معايير مسجلة لهذا الفحص
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    
+    <!-- Certificate of Analysis -->
+    {% if batch.status == 'QCPassed' %}
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800">
+                شهادة تحليل المنتج
+            </h3>
+            <a href="/production/qc/certificate/{{ batch.id }}/pdf" class="btn btn-success flex items-center">
+                <i class="fas fa-file-pdf ml-1"></i>
+                تحميل شهادة التحليل PDF
+            </a>
+        </div>
+        
+        <div class="p-6">
+            <div class="border-2 border-gray-300 border-dashed p-6 rounded-lg">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">شهادة تحليل</h2>
+                    <p class="text-gray-600">Certificate of Analysis (CoA)</p>
+                </div>
+                
+                <div class="mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-600">اسم المنتج:</p>
+                            <p class="font-medium text-gray-800">{{ batch.item.name }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">رقم الدفعة:</p>
+                            <p class="font-medium text-gray-800">{{ batch.lot_number }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">تاريخ الإنتاج:</p>
+                            <p class="font-medium text-gray-800">{{ batch.production_date.strftime('%Y-%m-%d') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">تاريخ الفحص:</p>
+                            <p class="font-medium text-gray-800">{{ now.strftime('%Y-%m-%d') }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <p class="text-center font-medium text-gray-800 mb-2">نتيجة الفحص</p>
+                    <p class="text-center text-green-600 font-bold text-lg">مطابق للمواصفات</p>
+                </div>
+                
+                <div class="mb-6">
+                    <p class="text-sm text-gray-600 mb-2">ملخص نتائج الفحص:</p>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 border">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+                                        المعيار
+                                    </th>
+                                    <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+                                        المواصفة
+                                    </th>
+                                    <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        النتيجة
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% set found_results = false %}
+                                {% for test in tests %}
+                                    {% if test.results %}
+                                        {% set found_results = true %}
+                                        {% for result in test.results %}
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
+                                                {{ result.parameter_name }}
+                                            </td>
+                                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 border-r">
+                                                {{ result.expected_value }}
+                                            </td>
+                                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                                {{ result.actual_value }}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if not found_results %}
+                                <tr>
+                                    <td colspan="3" class="px-4 py-2 text-center text-sm text-gray-500">
+                                        لا توجد نتائج تفصيلية متاحة
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="text-center">
+                        <p class="text-sm text-gray-600 mb-8">مدير مراقبة الجودة</p>
+                        <div class="h-px w-48 bg-gray-300 mx-auto"></div>
+                        <p class="mt-2 text-sm text-gray-600">التوقيع</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-600 mb-8">مدير الإنتاج</p>
+                        <div class="h-px w-48 bg-gray-300 mx-auto"></div>
+                        <p class="mt-2 text-sm text-gray-600">التوقيع</p>
+                    </div>
+                </div>
+                
+                <div class="mt-8 text-center">
+                    <p class="text-xs text-gray-500">تم إصدار هذه الشهادة بواسطة نظام قاتيلو لإدارة الإنتاج</p>
+                    <p class="text-xs text-gray-500">{{ now.strftime('%Y-%m-%d %H:%M') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Actions -->
+    <div class="flex justify-end space-x-3 space-x-reverse mb-6">
+        <a href="/production/qc/tests" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+            العودة إلى قائمة الفحوصات
+        </a>
+        <a href="/production/qc/report/{{ batch.id }}/pdf" class="btn btn-primary flex items-center">
+            <i class="fas fa-file-pdf ml-1"></i>
+            تحميل التقرير PDF
+        </a>
+        <button onclick="window.print()" class="btn btn-secondary flex items-center">
+            <i class="fas fa-print ml-1"></i>
+            طباعة التقرير
+        </button>
+        {% if batch.status == 'QCPassed' %}
+        <a href="/production/packaging/create?batch_id={{ batch.id }}" class="btn btn-success">
+            <i class="fas fa-box ml-1"></i>
+            إنشاء أمر تعبئة
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Print-specific styling
+    window.onbeforeprint = function() {
+        // Hide elements that shouldn't be printed
+        document.querySelectorAll('.no-print').forEach(el => {
+            el.style.display = 'none';
+        });
+    };
+    
+    window.onafterprint = function() {
+        // Restore elements after printing
+        document.querySelectorAll('.no-print').forEach(el => {
+            el.style.display = '';
+        });
+    };
+</script>
+{% endblock %}

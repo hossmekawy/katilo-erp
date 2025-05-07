@@ -1,0 +1,483 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة العملاء - نظام قاتيلو{% endblock %}
+
+{% block page_header %}إدارة العملاء{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">العملاء</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="customersManager()">
+    <!-- Dashboard Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div class="card p-6 flex items-center">
+            <div class="rounded-full bg-blue-100 p-3 mr-4">
+                <i class="fas fa-users text-blue-600 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">إجمالي العملاء</h3>
+                <p class="text-2xl font-bold text-blue-600" x-text="customers.length"></p>
+            </div>
+        </div>
+
+        <div class="card p-6 flex items-center">
+            <div class="rounded-full bg-green-100 p-3 mr-4">
+                <i class="fas fa-shopping-cart text-green-600 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">العملاء النشطين</h3>
+                <p class="text-2xl font-bold text-green-600" x-text="activeCustomers"></p>
+            </div>
+        </div>
+
+        <div class="card p-6 flex items-center">
+            <div class="rounded-full bg-purple-100 p-3 mr-4">
+                <i class="fas fa-chart-line text-purple-600 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">متوسط المبيعات</h3>
+                <p class="text-2xl font-bold text-purple-600">--</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header with actions -->
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">قائمة العملاء</h1>
+            <p class="text-gray-600 mt-1">إدارة قاعدة بيانات العملاء وتتبع معلوماتهم</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="{{ url_for('sales.export_customers') }}" class="btn bg-green-600 hover:bg-green-700 text-white flex items-center">
+                <i class="fas fa-file-excel mr-2"></i>
+                تصدير Excel
+            </a>
+            <a href="{{ url_for('sales.import_customers_form') }}" class="btn bg-purple-600 hover:bg-purple-700 text-white flex items-center">
+                <i class="fas fa-file-import mr-2"></i>
+                استيراد
+            </a>
+            <button @click="showAddModal = true" class="btn btn-primary flex items-center">
+                <i class="fas fa-plus-circle mr-2"></i>
+                إضافة عميل جديد
+            </button>
+        </div>
+    </div>
+
+    <!-- Search and filters -->
+    <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div class="flex flex-col md:flex-row md:items-center gap-4">
+            <div class="flex-1">
+                <div class="relative">
+                    <input type="text" x-model="searchQuery" @input="filterCustomers()" placeholder="البحث عن عميل..."
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <select x-model="filterStatus" @change="filterCustomers()" class="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">جميع العملاء</option>
+                    <option value="active">العملاء النشطين</option>
+                    <option value="inactive">العملاء غير النشطين</option>
+                </select>
+                <button @click="resetFilters()" class="btn bg-gray-200 hover:bg-gray-300 text-gray-700">
+                    <i class="fas fa-redo-alt mr-1"></i> إعادة ضبط
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customers list -->
+    <div class="card">
+        <div class="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+            <h2 class="font-semibold text-gray-800">
+                <span x-text="filteredCustomers.length"></span> عميل
+            </h2>
+            <div class="flex items-center text-sm text-gray-600">
+                <span>ترتيب حسب:</span>
+                <button @click="sortBy('name')" class="mr-3 flex items-center hover:text-blue-600" :class="{'text-blue-600 font-medium': sortField === 'name'}">
+                    الاسم
+                    <i class="fas fa-sort mr-1" :class="{'fa-sort-up': sortField === 'name' && !sortReverse, 'fa-sort-down': sortField === 'name' && sortReverse}"></i>
+                </button>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الاسم
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            معلومات الاتصال
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            عنوان الفواتير
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            عنوان الشحن
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="filteredCustomers.length === 0">
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                <div class="flex flex-col items-center justify-center py-6">
+                                    <i class="fas fa-users text-gray-300 text-5xl mb-4"></i>
+                                    <p class="text-lg font-medium">لا يوجد عملاء</p>
+                                    <p class="text-sm text-gray-500 mt-1">قم بإضافة عميل جديد للبدء</p>
+                                    <button @click="showAddModal = true" class="mt-4 btn btn-primary">
+                                        <i class="fas fa-plus-circle mr-2"></i>
+                                        إضافة عميل جديد
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="customer in filteredCustomers" :key="customer.id">
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white">
+                                        <span class="font-bold" x-text="customer.name ? customer.name.charAt(0).toUpperCase() : ''"></span>
+                                    </div>
+                                    <div class="mr-4">
+                                        <div class="text-sm font-medium text-gray-900" x-text="customer.name"></div>
+                                        <div class="text-xs text-gray-500" x-text="'العميل #' + customer.id"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900" x-text="customer.contact_info || 'غير متوفر'"></div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900" x-text="customer.billing_address || 'غير متوفر'"></div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900" x-text="customer.shipping_address || 'غير متوفر'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    نشط
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                                <div class="flex space-x-2 space-x-reverse">
+                                    <a :href="'/sales/customers/' + customer.id" class="text-indigo-600 hover:text-indigo-900" title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button @click="editCustomer(customer)" class="text-blue-600 hover:text-blue-900" title="تعديل">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <a :href="'/sales/orders?customer_id=' + customer.id" class="text-green-600 hover:text-green-900" title="طلبات العميل">
+                                        <i class="fas fa-shopping-cart"></i>
+                                    </a>
+                                    <button @click="confirmDelete(customer)" class="text-red-600 hover:text-red-900" title="حذف">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <div class="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+            <div class="text-sm text-gray-700">
+                عرض <span class="font-medium" x-text="filteredCustomers.length"></span> من أصل <span class="font-medium" x-text="customers.length"></span> عميل
+            </div>
+            <div class="flex space-x-2 space-x-reverse">
+                <button class="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50" disabled>
+                    السابق
+                </button>
+                <button class="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50" disabled>
+                    التالي
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Customer Modal -->
+    <div x-show="showAddModal || showEditModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900" x-text="showEditModal ? 'تعديل بيانات العميل' : 'إضافة عميل جديد'"></h3>
+                            <div class="mt-4 space-y-4">
+                                <div>
+                                    <label for="customer_name" class="block text-sm font-medium text-gray-700">اسم العميل <span class="text-red-500">*</span></label>
+                                    <input type="text" id="customer_name" x-model="currentCustomer.name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <p x-show="errors.name" x-text="errors.name" class="mt-1 text-sm text-red-600"></p>
+                                </div>
+                                <div>
+                                    <label for="contact_info" class="block text-sm font-medium text-gray-700">معلومات الاتصال</label>
+                                    <input type="text" id="contact_info" x-model="currentCustomer.contact_info" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label for="billing_address" class="block text-sm font-medium text-gray-700">عنوان الفواتير</label>
+                                    <textarea id="billing_address" x-model="currentCustomer.billing_address" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                                </div>
+                                <div>
+                                    <label for="shipping_address" class="block text-sm font-medium text-gray-700">عنوان الشحن</label>
+                                    <textarea id="shipping_address" x-model="currentCustomer.shipping_address" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="saveCustomer()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        حفظ
+                    </button>
+                    <button @click="closeModal()" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fas fa-exclamation-triangle text-red-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:mr-4 sm:text-right">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">تأكيد حذف العميل</h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500">
+                                    هل أنت متأكد من رغبتك في حذف العميل <span class="font-bold" x-text="currentCustomer.name"></span>؟ لا يمكن التراجع عن هذا الإجراء.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="deleteCustomer()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        حذف
+                    </button>
+                    <button @click="showDeleteModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function customersManager() {
+        return {
+            customers: [],
+            filteredCustomers: [],
+            searchQuery: '',
+            filterStatus: 'all',
+            sortField: 'name',
+            sortReverse: false,
+            currentCustomer: {
+                id: null,
+                name: '',
+                contact_info: '',
+                billing_address: '',
+                shipping_address: ''
+            },
+            showAddModal: false,
+            showEditModal: false,
+            showDeleteModal: false,
+            errors: {},
+            activeCustomers: 0,
+
+            init() {
+                this.fetchCustomers();
+            },
+
+            fetchCustomers() {
+                fetchAPI('/sales/api/customers')
+                    .then(data => {
+                        this.customers = data;
+                        this.filteredCustomers = data;
+                        this.activeCustomers = this.customers.length; // Assuming all customers are active for now
+                        this.sortCustomers();
+                    })
+                    .catch(error => {
+                        showNotification('فشل في تحميل بيانات العملاء', 'error');
+                    });
+            },
+
+            filterCustomers() {
+                const query = this.searchQuery.toLowerCase();
+                let filtered = this.customers;
+
+                // Apply search filter
+                if (query) {
+                    filtered = filtered.filter(customer =>
+                        (customer.name && customer.name.toLowerCase().includes(query)) ||
+                        (customer.contact_info && customer.contact_info.toLowerCase().includes(query)) ||
+                        (customer.billing_address && customer.billing_address.toLowerCase().includes(query)) ||
+                        (customer.shipping_address && customer.shipping_address.toLowerCase().includes(query))
+                    );
+                }
+
+                // Apply status filter
+                if (this.filterStatus !== 'all') {
+                    const isActive = this.filterStatus === 'active';
+                    filtered = filtered.filter(customer => {
+                        // Assuming all customers are active for now
+                        // This can be updated when customer status is implemented
+                        return isActive;
+                    });
+                }
+
+                this.filteredCustomers = filtered;
+                this.sortCustomers();
+            },
+
+            sortCustomers() {
+                const field = this.sortField;
+                const reverse = this.sortReverse;
+
+                this.filteredCustomers.sort((a, b) => {
+                    let valueA = a[field] || '';
+                    let valueB = b[field] || '';
+
+                    if (typeof valueA === 'string') valueA = valueA.toLowerCase();
+                    if (typeof valueB === 'string') valueB = valueB.toLowerCase();
+
+                    if (valueA < valueB) return reverse ? 1 : -1;
+                    if (valueA > valueB) return reverse ? -1 : 1;
+                    return 0;
+                });
+            },
+
+            sortBy(field) {
+                if (this.sortField === field) {
+                    this.sortReverse = !this.sortReverse;
+                } else {
+                    this.sortField = field;
+                    this.sortReverse = false;
+                }
+                this.sortCustomers();
+            },
+
+            resetFilters() {
+                this.searchQuery = '';
+                this.filterStatus = 'all';
+                this.filteredCustomers = [...this.customers];
+                this.sortCustomers();
+            },
+
+            editCustomer(customer) {
+                this.currentCustomer = { ...customer };
+                this.showEditModal = true;
+                this.errors = {};
+            },
+
+            confirmDelete(customer) {
+                this.currentCustomer = { ...customer };
+                this.showDeleteModal = true;
+            },
+
+            closeModal() {
+                this.showAddModal = false;
+                this.showEditModal = false;
+                this.currentCustomer = {
+                    id: null,
+                    name: '',
+                    contact_info: '',
+                    billing_address: '',
+                    shipping_address: ''
+                };
+                this.errors = {};
+            },
+
+            validateCustomer() {
+                this.errors = {};
+
+                if (!this.currentCustomer.name || !this.currentCustomer.name.trim()) {
+                    this.errors.name = 'اسم العميل مطلوب';
+                    return false;
+                }
+
+                return true;
+            },
+
+            saveCustomer() {
+                if (!this.validateCustomer()) {
+                    return;
+                }
+
+                const isEdit = !!this.currentCustomer.id;
+                const url = isEdit
+                    ? `/sales/customers/${this.currentCustomer.id}`
+                    : '/sales/customers';
+                const method = isEdit ? 'PUT' : 'POST';
+
+                // Convert name to customer_name for API compatibility
+                const customerData = {
+                    ...this.currentCustomer,
+                    customer_name: this.currentCustomer.name
+                };
+                fetchAPI(url, method, customerData)
+                    .then(response => {
+                        showNotification(
+                            isEdit
+                                ? 'تم تحديث بيانات العميل بنجاح'
+                                : 'تم إضافة العميل بنجاح',
+                            'success'
+                        );
+                        this.closeModal();
+                        this.fetchCustomers();
+                    })
+                    .catch(error => {
+                        showNotification('حدث خطأ أثناء حفظ بيانات العميل', 'error');
+                    });
+            },
+
+            deleteCustomer() {
+                fetchAPI(`/sales/customers/${this.currentCustomer.id}`, 'DELETE')
+                    .then(response => {
+                        showNotification('تم حذف العميل بنجاح', 'success');
+                        this.showDeleteModal = false;
+                        this.fetchCustomers();
+                    })
+                    .catch(error => {
+                        showNotification('حدث خطأ أثناء حذف العميل', 'error');
+                    });
+            },
+
+            // Export is now handled by the server-side route
+        };
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}إنشاء فحص جودة جديد - نظام قاتيلو{% endblock %}
+
+{% block page_header %}إنشاء فحص جودة جديد{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/qc/tests" class="text-blue-600 hover:text-blue-800">فحوصات الجودة</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">إنشاء فحص جديد</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-clipboard-check text-blue-600 ml-2"></i>
+                إنشاء فحص جودة جديد
+            </h3>
+        </div>
+        
+        <form method="POST" action="/production/qc/create_test" class="p-6 space-y-6">
+            <!-- Batch Selection -->
+            <div class="space-y-1">
+                <label for="batch_id" class="block text-sm font-medium text-gray-700">دفعة الإنتاج <span class="text-red-500">*</span></label>
+                <select id="batch_id" name="batch_id" required
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">-- اختر دفعة الإنتاج --</option>
+                    {% if batches %}
+                        {% for batch in batches %}
+                        <option value="{{ batch.id }}" data-product="{{ batch.item.name }}" data-lot="{{ batch.lot_number }}">
+                            {{ batch.lot_number }} - {{ batch.item.name }} ({{ batch.quantity }} {{ batch.item.unit_of_measure or 'وحدة' }})
+                        </option>
+                        {% endfor %}
+                    {% else %}
+                        <option value="" disabled>لا توجد دفعات إنتاج بحاجة للفحص</option>
+                    {% endif %}
+                </select>
+                <p class="text-sm text-gray-500 mt-1">يتم عرض الدفعات التي بحالة "بانتظار الفحص" فقط</p>
+            </div>
+            
+            <!-- Batch Details (shown after selection) -->
+            <div id="batch-details" class="p-4 bg-blue-50 rounded-lg border border-blue-100 hidden">
+                <h4 class="font-medium text-blue-800 mb-2">تفاصيل الدفعة</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600">رقم الدفعة:</p>
+                        <p id="lot-number" class="font-medium text-gray-800">-</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">المنتج:</p>
+                        <p id="product-name" class="font-medium text-gray-800">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Test Type -->
+            <div class="space-y-1">
+                <label for="test_type" class="block text-sm font-medium text-gray-700">نوع الفحص <span class="text-red-500">*</span></label>
+                <select id="test_type" name="test_type" required
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">-- اختر نوع الفحص --</option>
+                    <option value="Physical">فحص فيزيائي</option>
+                    <option value="Chemical">فحص كيميائي</option>
+                    <option value="Microbiological">فحص ميكروبيولوجي</option>
+                    <option value="Sensory">فحص حسي</option>
+                    <option value="Packaging">فحص التعبئة</option>
+                    <option value="Comprehensive">فحص شامل</option>
+                </select>
+            </div>
+            
+            <!-- Test Parameters (optional, can be added later) -->
+            <div class="space-y-3">
+                <label class="block text-sm font-medium text-gray-700">معايير الفحص (اختياري)</label>
+                
+                <div id="parameters-container" class="space-y-3">
+                    <!-- Initial parameter row -->
+                    <div class="parameter-row grid grid-cols-12 gap-3">
+                        <div class="col-span-5">
+                            <input type="text" name="param_name_1" placeholder="اسم المعيار" 
+                                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div class="col-span-5">
+                            <input type="text" name="expected_value_1" placeholder="القيمة المتوقعة" 
+                                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div class="col-span-2 flex items-center">
+                            <button type="button" class="text-red-500 hover:text-red-700 remove-param hidden">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="button" id="add-parameter" class="text-sm text-blue-600 hover:text-blue-800 flex items-center">
+                    <i class="fas fa-plus-circle ml-1"></i>
+                    إضافة معيار
+                </button>
+            </div>
+            
+            <!-- Notes -->
+            <div class="space-y-1">
+                <label for="notes" class="block text-sm font-medium text-gray-700">ملاحظات</label>
+                <textarea id="notes" name="notes" rows="3"
+                          class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          placeholder="أي ملاحظات إضافية حول الفحص..."></textarea>
+            </div>
+            
+            <!-- Form Actions -->
+            <div class="flex items-center justify-end space-x-3 space-x-reverse pt-4 border-t border-gray-200">
+                <a href="/production/qc/tests" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    إلغاء
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save ml-1"></i>
+                    إنشاء الفحص
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Help Card -->
+    <div class="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <h4 class="font-medium text-gray-800 mb-2 flex items-center">
+            <i class="fas fa-lightbulb text-yellow-500 ml-2"></i>
+            معلومات مساعدة
+        </h4>
+        <ul class="space-y-2 text-sm text-gray-600 list-disc list-inside mr-4">
+            <li>يتم إنشاء فحص جودة لكل دفعة إنتاج بعد اكتمال عملية الإنتاج</li>
+            <li>يمكنك إضافة معايير الفحص الآن أو لاحقاً عند تسجيل نتائج الفحص</li>
+            <li>بعد إنشاء الفحص، يمكنك تسجيل النتائج وتحديد ما إذا كانت الدفعة ناجحة أو فاشلة</li>
+            <li>الدفعات الناجحة فقط يمكن نقلها إلى مرحلة التعبئة والتغليف</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const batchSelect = document.getElementById('batch_id');
+        const batchDetails = document.getElementById('batch-details');
+        const lotNumber = document.getElementById('lot-number');
+        const productName = document.getElementById('product-name');
+        const addParameterBtn = document.getElementById('add-parameter');
+        const parametersContainer = document.getElementById('parameters-container');
+        
+        let paramCount = 1;
+        
+        // Show batch details when a batch is selected
+        if (batchSelect) {
+            batchSelect.addEventListener('change', function() {
+                if (this.value) {
+                    const selectedOption = this.options[this.selectedIndex];
+                    lotNumber.textContent = selectedOption.dataset.lot;
+                    productName.textContent = selectedOption.dataset.product;
+                    batchDetails.classList.remove('hidden');
+                } else {
+                    batchDetails.classList.add('hidden');
+                }
+            });
+        }
+        
+        // Add parameter row
+        if (addParameterBtn) {
+            addParameterBtn.addEventListener('click', function() {
+                paramCount++;
+                
+                const newRow = document.createElement('div');
+                newRow.className = 'parameter-row grid grid-cols-12 gap-3';
+                newRow.innerHTML = `
+                    <div class="col-span-5">
+                        <input type="text" name="param_name_${paramCount}" placeholder="اسم المعيار" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div class="col-span-5">
+                        <input type="text" name="expected_value_${paramCount}" placeholder="القيمة المتوقعة" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div class="col-span-2 flex items-center">
+                        <button type="button" class="text-red-500 hover:text-red-700 remove-param">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                
+                parametersContainer.appendChild(newRow);
+                
+                // Show remove button for first parameter if we have more than one
+                if (paramCount === 2) {
+                    document.querySelector('.parameter-row .remove-param').classList.remove('hidden');
+                }
+                
+                // Add event listener to remove button
+                newRow.querySelector('.remove-param').addEventListener('click', function() {
+                    newRow.remove();
+                    paramCount--;
+                    
+                    // Hide remove button for first parameter if it's the only one
+                    if (paramCount === 1) {
+                        document.querySelector('.parameter-row .remove-param').classList.add('hidden');
+                    }
+                });
+            });
+        }
+        
+        // Form validation
+        const form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function(event) {
+                const batchId = batchSelect.value;
+                const testType = document.getElementById('test_type').value;
+                
+                if (!batchId) {
+                    event.preventDefault();
+                    alert('يرجى اختيار دفعة الإنتاج');
+                    batchSelect.focus();
+                    return;
+                }
+                
+                if (!testType) {
+                    event.preventDefault();
+                    alert('يرجى اختيار نوع الفحص');
+                    document.getElementById('test_type').focus();
+                    return;
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

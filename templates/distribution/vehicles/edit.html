@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+
+{% block title %}تعديل المركبة - {{ vehicle.name }}{% endblock %}
+
+{% block styles %}
+<style>
+    .vehicle-image-preview {
+        height: 200px;
+        @apply bg-gray-100 flex items-center justify-center overflow-hidden rounded-lg;
+    }
+    .vehicle-image-preview img {
+        @apply object-cover w-full h-full;
+    }
+    .form-group {
+        @apply mb-4;
+    }
+    .form-label {
+        @apply block text-sm font-medium text-gray-700 mb-1;
+    }
+    .form-input {
+        @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+    }
+    .form-select {
+        @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+    }
+    .form-textarea {
+        @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="editVehicleApp()">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">تعديل المركبة - {{ vehicle.name }}</h1>
+        <div>
+            <a href="{{ url_for('distribution.view_vehicle', vehicle_id=vehicle.id) }}" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                <i class="fas fa-arrow-right ml-2"></i>
+                العودة إلى تفاصيل المركبة
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <form @submit.prevent="updateVehicle()" enctype="multipart/form-data" id="vehicleForm">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Basic Information -->
+                <div class="md:col-span-2">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">المعلومات الأساسية</h3>
+                </div>
+
+                <div class="form-group">
+                    <label for="name" class="form-label">اسم المركبة <span class="text-red-500">*</span></label>
+                    <input type="text" id="name" x-model="vehicleForm.name" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="plate_number" class="form-label">رقم اللوحة <span class="text-red-500">*</span></label>
+                    <input type="text" id="plate_number" x-model="vehicleForm.plate_number" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="vehicle_type" class="form-label">نوع المركبة <span class="text-red-500">*</span></label>
+                    <input type="text" id="vehicle_type" x-model="vehicleForm.vehicle_type" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="model" class="form-label">الموديل</label>
+                    <input type="text" id="model" x-model="vehicleForm.model" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label for="year" class="form-label">سنة الصنع</label>
+                    <input type="number" id="year" x-model="vehicleForm.year" class="form-input" min="1900" max="2100">
+                </div>
+
+                <div class="form-group">
+                    <label for="status" class="form-label">الحالة</label>
+                    <select id="status" x-model="vehicleForm.status" class="form-select">
+                        <option value="Active">نشط</option>
+                        <option value="Maintenance">قيد الصيانة</option>
+                        <option value="Inactive">غير نشط</option>
+                    </select>
+                </div>
+
+                <!-- Capacity Information -->
+                <div class="md:col-span-2 mt-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">معلومات السعة <span class="text-red-500">*</span></h3>
+                    <p class="text-sm text-gray-500 mb-4">يجب تحديد الوزن والحجم الأقصى للمركبة لحساب استخدام السعة بشكل صحيح</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="max_weight" class="form-label">الوزن الأقصى (كجم) <span class="text-red-500">*</span></label>
+                    <input type="number" id="max_weight" x-model="vehicleForm.max_weight" class="form-input" min="0" step="0.01" required>
+                    <p class="text-xs text-gray-500 mt-1">الحد الأقصى للوزن الذي يمكن للمركبة حمله</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="max_volume" class="form-label">الحجم الأقصى (متر مكعب) <span class="text-red-500">*</span></label>
+                    <input type="number" id="max_volume" x-model="vehicleForm.max_volume" class="form-input" min="0" step="0.01" required>
+                    <p class="text-xs text-gray-500 mt-1">الحد الأقصى للحجم الذي يمكن للمركبة حمله</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="max_length" class="form-label">الطول الأقصى (متر)</label>
+                    <input type="number" id="max_length" x-model="vehicleForm.max_length" class="form-input" min="0" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label for="max_height" class="form-label">الارتفاع الأقصى (متر)</label>
+                    <input type="number" id="max_height" x-model="vehicleForm.max_height" class="form-input" min="0" step="0.01">
+                </div>
+
+                <!-- Image Upload -->
+                <div class="md:col-span-2 mt-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">صورة المركبة</h3>
+
+                    <div class="vehicle-image-preview mb-4">
+                        <template x-if="imagePreview">
+                            <img :src="imagePreview" alt="Vehicle Preview" class="h-full w-full object-cover">
+                        </template>
+                        <template x-if="!imagePreview">
+                            <div class="text-gray-400 flex items-center justify-center h-full">
+                                <i class="fas fa-truck text-5xl"></i>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="vehicle_image" class="form-label">تحميل صورة جديدة</label>
+                        <input type="file" id="vehicle_image" @change="handleImageUpload" class="form-input" accept="image/*">
+                        <p class="text-sm text-gray-500 mt-1">الحد الأقصى لحجم الملف: 5 ميجابايت. الأنواع المدعومة: JPEG, PNG, GIF, WEBP</p>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="md:col-span-2 mt-4">
+                    <div class="form-group">
+                        <label for="notes" class="form-label">ملاحظات</label>
+                        <textarea id="notes" x-model="vehicleForm.notes" class="form-textarea" rows="4"></textarea>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="md:col-span-2 mt-6 flex justify-end">
+                    <button type="button" @click="cancelEdit()" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200 ml-3">
+                        إلغاء
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save ml-2"></i>
+                        حفظ التغييرات
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function editVehicleApp() {
+        return {
+            vehicleForm: {
+                id: {{ vehicle.id }},
+                name: '{{ vehicle.name }}',
+                plate_number: '{{ vehicle.plate_number }}',
+                vehicle_type: '{{ vehicle.vehicle_type }}',
+                model: '{{ vehicle.model or "" }}',
+                year: {{ vehicle.year or 'null' }},
+                status: '{{ vehicle.status }}',
+                max_weight: {{ vehicle.max_weight or 'null' }},
+                max_volume: {{ vehicle.max_volume or 'null' }},
+                max_length: {{ vehicle.max_length or 'null' }},
+                max_height: {{ vehicle.max_height or 'null' }},
+                notes: '{{ vehicle.notes or "" }}',
+                image_path: '{{ vehicle.image_path or "" }}',
+                image_data: null
+            },
+            imagePreview: null,
+
+            init() {
+                // Set initial image preview if available
+                if ('{{ vehicle.image_data }}') {
+                    this.imagePreview = 'data:image/jpeg;base64,{{ vehicle.image_data }}';
+                } else if (this.vehicleForm.image_path) {
+                    this.imagePreview = this.vehicleForm.image_path;
+                }
+            },
+
+            handleImageUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                // Check file size (limit to 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    this.showToast('حجم الصورة كبير جدًا. الحد الأقصى هو 5 ميجابايت', 'error');
+                    event.target.value = '';
+                    return;
+                }
+
+                // Check file type
+                const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!validTypes.includes(file.type)) {
+                    this.showToast('نوع الملف غير مدعوم. يرجى استخدام JPEG أو PNG أو GIF أو WEBP', 'error');
+                    event.target.value = '';
+                    return;
+                }
+
+                // Create preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.imagePreview = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            updateVehicle() {
+                // Check if we have an image file
+                const fileInput = document.getElementById('vehicle_image');
+                if (fileInput && fileInput.files.length > 0) {
+                    // Use FormData to send the file
+                    const formData = new FormData();
+
+                    // Add all form fields
+                    Object.keys(this.vehicleForm).forEach(key => {
+                        if (key !== 'image_data' && this.vehicleForm[key] !== null) {
+                            formData.append(key, this.vehicleForm[key]);
+                        }
+                    });
+
+                    // Add the file
+                    formData.append('vehicle_image', fileInput.files[0]);
+
+                    fetch(`{{ url_for('distribution.update_vehicle', vehicle_id=vehicle.id) }}`, {
+                        method: 'PUT',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.showToast('تم تحديث المركبة بنجاح', 'success');
+                            // Redirect to vehicle details page
+                            window.location.href = `{{ url_for('distribution.view_vehicle', vehicle_id=vehicle.id) }}`;
+                        } else {
+                            this.showToast(data.message || 'حدث خطأ أثناء تحديث المركبة', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating vehicle:', error);
+                        this.showToast('حدث خطأ أثناء تحديث المركبة', 'error');
+                    });
+                } else {
+                    // No file, use JSON
+                    fetch(`{{ url_for('distribution.update_vehicle', vehicle_id=vehicle.id) }}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.vehicleForm)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.showToast('تم تحديث المركبة بنجاح', 'success');
+                            // Redirect to vehicle details page
+                            window.location.href = `{{ url_for('distribution.view_vehicle', vehicle_id=vehicle.id) }}`;
+                        } else {
+                            this.showToast(data.message || 'حدث خطأ أثناء تحديث المركبة', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating vehicle:', error);
+                        this.showToast('حدث خطأ أثناء تحديث المركبة', 'error');
+                    });
+                }
+            },
+
+            cancelEdit() {
+                // Redirect back to vehicle details page
+                window.location.href = `{{ url_for('distribution.view_vehicle', vehicle_id=vehicle.id) }}`;
+            },
+
+            showToast(message, type = 'info') {
+                // Check if we have a toast container
+                let container = document.getElementById('toast-container');
+                if (!container) {
+                    container = document.createElement('div');
+                    container.id = 'toast-container';
+                    container.className = 'fixed bottom-4 right-4 z-50 flex flex-col space-y-2';
+                    document.body.appendChild(container);
+                }
+
+                // Create toast element
+                const toast = document.createElement('div');
+                toast.className = `px-4 py-3 rounded-lg shadow-lg text-white flex items-center transition-all duration-300 transform translate-x-full opacity-0`;
+
+                // Set background color based on type
+                if (type === 'success') {
+                    toast.classList.add('bg-green-600');
+                } else if (type === 'error') {
+                    toast.classList.add('bg-red-600');
+                } else if (type === 'warning') {
+                    toast.classList.add('bg-yellow-600');
+                } else {
+                    toast.classList.add('bg-blue-600');
+                }
+
+                // Add icon based on type
+                let icon = '';
+                if (type === 'success') {
+                    icon = '<i class="fas fa-check-circle ml-2"></i>';
+                } else if (type === 'error') {
+                    icon = '<i class="fas fa-exclamation-circle ml-2"></i>';
+                } else if (type === 'warning') {
+                    icon = '<i class="fas fa-exclamation-triangle ml-2"></i>';
+                } else {
+                    icon = '<i class="fas fa-info-circle ml-2"></i>';
+                }
+
+                toast.innerHTML = `${icon}<span>${message}</span>`;
+                container.appendChild(toast);
+
+                // Animate in
+                setTimeout(() => {
+                    toast.classList.remove('translate-x-full', 'opacity-0');
+                }, 10);
+
+                // Remove after 5 seconds
+                setTimeout(() => {
+                    toast.classList.add('translate-x-full', 'opacity-0');
+                    setTimeout(() => {
+                        container.removeChild(toast);
+                    }, 300);
+                }, 5000);
+            }
+        };
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}عرض المسار - {{ route.route_name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">{{ route.route_name }}</h1>
+        <div class="flex space-x-2 space-x-reverse">
+            <a href="{{ url_for('rep_routes.list_routes') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-right ml-1"></i>
+                <span>العودة</span>
+            </a>
+            <a href="{{ url_for('rep_routes.edit_route_form', route_id=route.id) }}" class="btn btn-primary">
+                <i class="fas fa-edit ml-1"></i>
+                <span>تعديل</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Route Details -->
+        <div class="card p-6">
+            <h2 class="text-lg font-semibold mb-4">تفاصيل المسار</h2>
+
+            <div class="space-y-4">
+                <div>
+                    <p class="text-sm text-gray-500">المندوب</p>
+                    <p class="font-medium">{{ route.representative.name if route.representative else 'غير محدد' }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">تاريخ المسار</p>
+                    <p class="font-medium">{{ route.route_date }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">الحالة</p>
+                    <div class="status-badge {{ 'status-' + route.status|lower|replace(' ', '-') if route.status else '' }}">
+                        {% if route.status == 'Planned' %}
+                            مخطط
+                        {% elif route.status == 'In Progress' %}
+                            قيد التنفيذ
+                        {% elif route.status == 'Completed' %}
+                            مكتمل
+                        {% elif route.status == 'Cancelled' %}
+                            ملغي
+                        {% else %}
+                            {{ route.status }}
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if route.notes %}
+                <div>
+                    <p class="text-sm text-gray-500">ملاحظات</p>
+                    <p class="font-medium">{{ route.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Map -->
+        <div class="md:col-span-2 card p-6">
+            <h2 class="text-lg font-semibold mb-4">خريطة المسار</h2>
+            <div id="map" class="h-96 rounded-lg border border-gray-200"></div>
+        </div>
+
+        <!-- Visits -->
+        <div class="md:col-span-3 card p-6">
+            <h2 class="text-lg font-semibold mb-4">الزيارات المخططة</h2>
+
+            {% if route.visits and route.visits|length > 0 %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">العميل</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الوقت المخطط</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الوقت الفعلي</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النتيجة</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for visit in route.visits %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ loop.index }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">
+                                    {% if visit.customer %}
+                                        {{ visit.customer.customer_name }}
+                                    {% else %}
+                                        عميل غير معروف
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ visit.scheduled_time|default('غير محدد', true) }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ visit.actual_visit_time|default('لم تتم بعد', true) }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    {% if visit.status == 'Pending' %}
+                                        bg-yellow-100 text-yellow-800
+                                    {% elif visit.status == 'Completed' %}
+                                        bg-green-100 text-green-800
+                                    {% elif visit.status == 'Cancelled' %}
+                                        bg-red-100 text-red-800
+                                    {% else %}
+                                        bg-gray-100 text-gray-800
+                                    {% endif %}
+                                ">
+                                    {% if visit.status == 'Pending' %}
+                                        قيد الانتظار
+                                    {% elif visit.status == 'Completed' %}
+                                        مكتملة
+                                    {% elif visit.status == 'Cancelled' %}
+                                        ملغية
+                                    {% else %}
+                                        {{ visit.status }}
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ visit.visit_outcome|default('غير متوفر', true) }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2 space-x-reverse">
+                                    {% if visit.status == 'Pending' %}
+                                    <a href="{{ url_for('rep_routes.record_visit_form', visit_id=visit.id) }}" class="text-indigo-600 hover:text-indigo-900">
+                                        <i class="fas fa-clipboard-check"></i>
+                                        <span>تسجيل</span>
+                                    </a>
+                                    {% endif %}
+
+                                    {% if visit.order_id %}
+                                    <a href="{{ url_for('sales.view_order', order_id=visit.order_id) }}" class="text-green-600 hover:text-green-900">
+                                        <i class="fas fa-shopping-cart"></i>
+                                        <span>الطلب</span>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="bg-gray-50 p-4 rounded-lg text-center">
+                <p class="text-gray-500">لا توجد زيارات مخططة لهذا المسار</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places,geometry&callback=initMap" async defer></script>
+<script>
+    let map;
+    let markers = [];
+    let directionsService;
+    let directionsRenderer;
+
+    function initMap() {
+        // Initialize map
+        map = new google.maps.Map(document.getElementById('map'), {
+            center: { lat: 30.0444, lng: 31.2357 }, // Cairo
+            zoom: 10
+        });
+
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map: map,
+            suppressMarkers: true
+        });
+
+        // Add markers for each visit
+        const visits = {{ route.visits|tojson }};
+
+        if (visits && visits.length > 0) {
+            const bounds = new google.maps.LatLngBounds();
+
+            visits.forEach((visit, index) => {
+                if (visit.location_latitude && visit.location_longitude) {
+                    // Make sure we have valid numbers
+                    const lat = typeof visit.location_latitude === 'string' ?
+                        parseFloat(visit.location_latitude) : visit.location_latitude;
+                    const lng = typeof visit.location_longitude === 'string' ?
+                        parseFloat(visit.location_longitude) : visit.location_longitude;
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        const position = {
+                            lat: lat,
+                            lng: lng
+                        };
+
+                        const marker = new google.maps.Marker({
+                            position: position,
+                            map: map,
+                            label: (index + 1).toString(),
+                            title: visit.customer ? visit.customer.customer_name : `Visit ${index + 1}`
+                        });
+
+                        markers.push(marker);
+                        bounds.extend(position);
+                    }
+                }
+            });
+
+            if (markers.length > 0) {
+                map.fitBounds(bounds);
+
+                // If we have more than one marker, calculate route
+                if (markers.length > 1) {
+                    calculateRoute(visits);
+                }
+            }
+        }
+    }
+
+    function calculateRoute(visits) {
+        const waypoints = [];
+        let origin = null;
+        let destination = null;
+
+        // Filter visits with valid coordinates
+        const validVisits = visits.filter(visit => {
+            if (!visit.location_latitude || !visit.location_longitude) return false;
+
+            // Make sure we have valid numbers
+            const lat = typeof visit.location_latitude === 'string' ?
+                parseFloat(visit.location_latitude) : visit.location_latitude;
+            const lng = typeof visit.location_longitude === 'string' ?
+                parseFloat(visit.location_longitude) : visit.location_longitude;
+
+            return !isNaN(lat) && !isNaN(lng);
+        });
+
+        if (validVisits.length < 2) return;
+
+        // Set origin as first visit
+        const originLat = typeof validVisits[0].location_latitude === 'string' ?
+            parseFloat(validVisits[0].location_latitude) : validVisits[0].location_latitude;
+        const originLng = typeof validVisits[0].location_longitude === 'string' ?
+            parseFloat(validVisits[0].location_longitude) : validVisits[0].location_longitude;
+
+        origin = {
+            lat: originLat,
+            lng: originLng
+        };
+
+        // Set destination as last visit
+        const destLat = typeof validVisits[validVisits.length - 1].location_latitude === 'string' ?
+            parseFloat(validVisits[validVisits.length - 1].location_latitude) : validVisits[validVisits.length - 1].location_latitude;
+        const destLng = typeof validVisits[validVisits.length - 1].location_longitude === 'string' ?
+            parseFloat(validVisits[validVisits.length - 1].location_longitude) : validVisits[validVisits.length - 1].location_longitude;
+
+        destination = {
+            lat: destLat,
+            lng: destLng
+        };
+
+        // Add intermediate visits as waypoints
+        for (let i = 1; i < validVisits.length - 1; i++) {
+            const wpLat = typeof validVisits[i].location_latitude === 'string' ?
+                parseFloat(validVisits[i].location_latitude) : validVisits[i].location_latitude;
+            const wpLng = typeof validVisits[i].location_longitude === 'string' ?
+                parseFloat(validVisits[i].location_longitude) : validVisits[i].location_longitude;
+
+            waypoints.push({
+                location: {
+                    lat: wpLat,
+                    lng: wpLng
+                },
+                stopover: true
+            });
+        }
+
+        // Request directions
+        directionsService.route({
+            origin: origin,
+            destination: destination,
+            waypoints: waypoints,
+            optimizeWaypoints: false,
+            travelMode: google.maps.TravelMode.DRIVING
+        }, (response, status) => {
+            if (status === 'OK') {
+                directionsRenderer.setDirections(response);
+            } else {
+                console.error('Directions request failed due to ' + status);
+            }
+        });
+    }
+</script>
+{% endblock %}

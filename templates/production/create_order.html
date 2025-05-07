@@ -1,0 +1,669 @@
+{% extends "base.html" %}
+
+{% block title %}إنشاء أمر إنتاج جديد | نظام قاتيلو{% endblock %}
+
+{% block page_header %}إنشاء أمر إنتاج جديد{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('production.production_dashboard') }}" class="text-blue-600 hover:text-blue-800">الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('production.production_orders') }}" class="text-blue-600 hover:text-blue-800">أوامر الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">إنشاء أمر جديد</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                <i class="fas fa-plus-circle text-blue-600 mr-2"></i>
+                إنشاء أمر إنتاج جديد
+            </h2>
+
+            <form action="{{ url_for('production.create_production_order') }}" method="POST" id="create-order-form">
+                <div class="space-y-6">
+                    <!-- Product Selection -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="product_id" class="block text-sm font-medium text-gray-700 mb-1">المنتج <span class="text-red-500">*</span></label>
+                            <select id="product_id" name="product_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                                <option value="">-- اختر المنتج --</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}" data-sku="{{ product.sku }}">{{ product.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <p class="mt-1 text-sm text-gray-500" id="product-sku"></p>
+                        </div>
+
+                        <div>
+                            <label for="quantity" class="block text-sm font-medium text-gray-700 mb-1">الكمية <span class="text-red-500">*</span></label>
+                            <input type="number" id="quantity" name="quantity" min="1" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                        </div>
+                    </div>
+
+                    <!-- Production Line and Warehouse -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="production_line_id" class="block text-sm font-medium text-gray-700 mb-1">خط الإنتاج</label>
+                            <select id="production_line_id" name="production_line_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">-- اختر خط الإنتاج --</option>
+                                {% for line in production_lines %}
+                                <option value="{{ line.id }}">{{ line.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <p class="mt-1 text-sm text-gray-500">يمكن تعيين خط الإنتاج لاحقاً</p>
+                        </div>
+
+                        <div>
+                            <label for="warehouse_id" class="block text-sm font-medium text-gray-700 mb-1">المستودع <span class="text-red-500">*</span></label>
+                            <select id="warehouse_id" name="warehouse_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                                <option value="">-- اختر المستودع --</option>
+                                {% for warehouse in warehouses %}
+                                <option value="{{ warehouse.id }}">{{ warehouse.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <p class="mt-1 text-sm text-gray-500">المستودع الذي سيتم سحب المواد الخام منه</p>
+                        </div>
+                    </div>
+
+                    <!-- Schedule -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="scheduled_start" class="block text-sm font-medium text-gray-700 mb-1">تاريخ ووقت البدء المخطط <span class="text-red-500">*</span></label>
+                            <input type="datetime-local" id="scheduled_start" name="scheduled_start" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                        </div>
+
+                        <div>
+                            <label for="scheduled_end" class="block text-sm font-medium text-gray-700 mb-1">تاريخ ووقت الانتهاء المخطط <span class="text-red-500">*</span></label>
+                            <input type="datetime-local" id="scheduled_end" name="scheduled_end" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                        </div>
+                    </div>
+
+                    <!-- BOM Check -->
+                    <div id="bom-check-container" class="hidden">
+                        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-info-circle text-blue-600"></i>
+                                </div>
+                                <div class="mr-3">
+                                    <h3 class="text-sm font-medium text-blue-800">قائمة المواد</h3>
+                                    <div class="mt-2 text-sm text-blue-700">
+                                        <p id="bom-status-message">جاري التحقق من توفر قائمة المواد...</p>
+                                    </div>
+                                    <div id="create-bom-button-container" class="mt-2 hidden">
+                                        <button type="button" id="create-bom-button" class="btn btn-primary text-sm">
+                                            <i class="fas fa-plus ml-1"></i> إنشاء قائمة مواد سريعة
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Materials Check -->
+                    <div id="materials-check-container" class="hidden">
+                        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-info-circle text-blue-600"></i>
+                                </div>
+                                <div class="mr-3">
+                                    <h3 class="text-sm font-medium text-blue-800">توفر المواد</h3>
+                                    <div class="mt-2 text-sm text-blue-700">
+                                        <p id="materials-status-message">سيتم التحقق من توفر المواد عند اختيار المنتج والمستودع.</p>
+                                    </div>
+                                    <div id="materials-list" class="mt-3 space-y-2 hidden">
+                                        <!-- Materials will be listed here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="flex justify-end space-x-3 space-x-reverse">
+                        <a href="{{ url_for('production.production_orders') }}" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            إلغاء
+                        </a>
+                        <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            إنشاء أمر الإنتاج
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const productSelect = document.getElementById('product_id');
+        const productSkuElement = document.getElementById('product-sku');
+        const warehouseSelect = document.getElementById('warehouse_id');
+        const quantityInput = document.getElementById('quantity');
+        const bomCheckContainer = document.getElementById('bom-check-container');
+        const bomStatusMessage = document.getElementById('bom-status-message');
+        const materialsCheckContainer = document.getElementById('materials-check-container');
+        const materialsStatusMessage = document.getElementById('materials-status-message');
+        const materialsList = document.getElementById('materials-list');
+
+        // Quick BOM Modal Elements
+        const quickBomModal = document.getElementById('quick-bom-modal');
+        const quickBomProductName = document.getElementById('quick-bom-product-name');
+        const quickBomProductSku = document.getElementById('quick-bom-product-sku');
+        const quickBomDescription = document.getElementById('quick-bom-description');
+        const componentsContainer = document.getElementById('components-container');
+        const noComponentsMessage = document.getElementById('no-components-message');
+        const addComponentButton = document.getElementById('add-component-button');
+        const saveQuickBomButton = document.getElementById('save-quick-bom-button');
+        const cancelQuickBomButton = document.getElementById('cancel-quick-bom-button');
+        const createBomButton = document.getElementById('create-bom-button');
+
+        // Component template
+        const componentTemplate = document.getElementById('component-template');
+
+        // Set default dates
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        // Format date for datetime-local input
+        function formatDateForInput(date) {
+            return date.toISOString().slice(0, 16);
+        }
+
+        document.getElementById('scheduled_start').value = formatDateForInput(now);
+        document.getElementById('scheduled_end').value = formatDateForInput(tomorrow);
+
+        // Check URL parameters for product_id
+        function getUrlParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            const results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        }
+
+        // Auto-select product if product_id is in URL
+        const productIdFromUrl = getUrlParameter('product_id');
+        if (productIdFromUrl) {
+            productSelect.value = productIdFromUrl;
+
+            // Trigger change event to update UI
+            const changeEvent = new Event('change');
+            productSelect.dispatchEvent(changeEvent);
+        }
+
+        // Product selection change
+        productSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const productId = this.value;
+
+            // Show SKU if product selected
+            if (productId) {
+                const sku = selectedOption.getAttribute('data-sku');
+                productSkuElement.textContent = `رمز المنتج: ${sku}`;
+
+                // Check BOM
+                checkBOM(productId);
+            } else {
+                productSkuElement.textContent = '';
+                bomCheckContainer.classList.add('hidden');
+                materialsCheckContainer.classList.add('hidden');
+            }
+
+            // Check materials if warehouse is also selected
+            if (productId && warehouseSelect.value) {
+                checkMaterials(productId, warehouseSelect.value, quantityInput.value || 1);
+            }
+        });
+
+        // Warehouse selection change
+        warehouseSelect.addEventListener('change', function() {
+            const warehouseId = this.value;
+            const productId = productSelect.value;
+
+            // Check materials if product is also selected
+            if (productId && warehouseId) {
+                checkMaterials(productId, warehouseId, quantityInput.value || 1);
+            } else {
+                materialsCheckContainer.classList.add('hidden');
+            }
+        });
+
+        // Quantity change
+        quantityInput.addEventListener('input', function() {
+            const quantity = this.value || 1;
+            const productId = productSelect.value;
+            const warehouseId = warehouseSelect.value;
+
+            // Check materials if product and warehouse are selected
+            if (productId && warehouseId) {
+                checkMaterials(productId, warehouseId, quantity);
+            }
+        });
+
+        // Check if BOM exists for product
+        async function checkBOM(productId) {
+            bomCheckContainer.classList.remove('hidden');
+            bomStatusMessage.innerHTML = 'جاري التحقق من توفر قائمة المواد...';
+            document.getElementById('create-bom-button-container').classList.add('hidden');
+
+            try {
+                const response = await fetch(`/production/api/bom/check/${productId}`);
+                const data = await response.json();
+
+                if (data.exists) {
+                    bomStatusMessage.innerHTML = `<span class="text-green-700"><i class="fas fa-check-circle mr-1"></i> قائمة المواد متوفرة للمنتج.</span>`;
+                } else {
+                    bomStatusMessage.innerHTML = `<span class="text-red-700"><i class="fas fa-exclamation-circle mr-1"></i> لا توجد قائمة مواد لهذا المنتج.</span>`;
+                    document.getElementById('create-bom-button-container').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error checking BOM:', error);
+                bomStatusMessage.innerHTML = `<span class="text-red-700"><i class="fas fa-exclamation-circle mr-1"></i> حدث خطأ أثناء التحقق من قائمة المواد.</span>`;
+            }
+        }
+
+        // Check if materials are available
+        async function checkMaterials(productId, warehouseId, quantity) {
+            materialsCheckContainer.classList.remove('hidden');
+            materialsStatusMessage.innerHTML = 'جاري التحقق من توفر المواد...';
+            materialsList.classList.add('hidden');
+
+            try {
+                const response = await fetch(`/production/api/materials/check?product_id=${productId}&warehouse_id=${warehouseId}&quantity=${quantity}`);
+                const data = await response.json();
+
+                if (data.available) {
+                    materialsStatusMessage.innerHTML = `<span class="text-green-700"><i class="fas fa-check-circle mr-1"></i> جميع المواد المطلوبة متوفرة في المستودع.</span>`;
+
+                    // Show materials list
+                    materialsList.innerHTML = '';
+                    materialsList.classList.remove('hidden');
+
+                    data.materials.forEach(material => {
+                        const materialItem = document.createElement('div');
+                        materialItem.className = 'flex justify-between items-center text-sm';
+                        materialItem.innerHTML = `
+                            <span>${material.name}</span>
+                            <span class="font-medium">المطلوب: ${material.required_qty} ${material.unit} / المتوفر: ${material.available_qty} ${material.unit}</span>
+                        `;
+                        materialsList.appendChild(materialItem);
+                    });
+                } else {
+                    materialsStatusMessage.innerHTML = `<span class="text-red-700"><i class="fas fa-exclamation-circle mr-1"></i> بعض المواد المطلوبة غير متوفرة بالكمية الكافية.</span>`;
+
+                    // Show materials list with shortages highlighted
+                    materialsList.innerHTML = '';
+                    materialsList.classList.remove('hidden');
+
+                    data.materials.forEach(material => {
+                        const materialItem = document.createElement('div');
+                        materialItem.className = 'flex justify-between items-center text-sm';
+
+                        const isShortage = material.available_qty < material.required_qty;
+                        const textColorClass = isShortage ? 'text-red-600' : 'text-green-600';
+
+                        materialItem.innerHTML = `
+                            <span>${material.name}</span>
+                            <span class="font-medium ${textColorClass}">
+                                المطلوب: ${material.required_qty} ${material.unit} /
+                                المتوفر: ${material.available_qty} ${material.unit}
+                                ${isShortage ? ' <i class="fas fa-exclamation-triangle"></i>' : ''}
+                            </span>
+                        `;
+                        materialsList.appendChild(materialItem);
+                    });
+                }
+            } catch (error) {
+                console.error('Error checking materials:', error);
+                materialsStatusMessage.innerHTML = `<span class="text-red-700"><i class="fas fa-exclamation-circle mr-1"></i> حدث خطأ أثناء التحقق من توفر المواد.</span>`;
+            }
+        }
+
+        // Form validation before submit
+        document.getElementById('create-order-form').addEventListener('submit', function(event) {
+            const productId = productSelect.value;
+            const warehouseId = warehouseSelect.value;
+
+            if (!productId || !warehouseId) {
+                event.preventDefault();
+                alert('يرجى اختيار المنتج والمستودع');
+                return;
+            }
+
+            // Check if scheduled end is after scheduled start
+            const startDate = new Date(document.getElementById('scheduled_start').value);
+            const endDate = new Date(document.getElementById('scheduled_end').value);
+
+            if (endDate <= startDate) {
+                event.preventDefault();
+                alert('يجب أن يكون تاريخ الانتهاء بعد تاريخ البدء');
+                return;
+            }
+
+            // Additional validation can be added here
+        });
+
+        // Quick BOM Creation Modal Functionality
+        let currentProductId = null;
+        let componentItems = [];
+        let componentCount = 0;
+
+        // Open Quick BOM Modal
+        createBomButton.addEventListener('click', async function() {
+            currentProductId = productSelect.value;
+            const selectedOption = productSelect.options[productSelect.selectedIndex];
+            const productName = selectedOption.text;
+            const productSku = selectedOption.getAttribute('data-sku');
+
+            // Set product info in modal
+            quickBomProductName.textContent = productName;
+            quickBomProductSku.textContent = `رمز المنتج: ${productSku}`;
+
+            // Clear previous data
+            quickBomDescription.value = '';
+            componentsContainer.innerHTML = '';
+            noComponentsMessage.classList.remove('hidden');
+            componentCount = 0;
+
+            // Load component items if not already loaded
+            if (componentItems.length === 0) {
+                try {
+                    const response = await fetch('/api/bom/components-by-type');
+                    if (response.ok) {
+                        componentItems = await response.json();
+                    } else {
+                        console.error('Failed to load component items');
+                    }
+                } catch (error) {
+                    console.error('Error loading component items:', error);
+                }
+            }
+
+            // Show modal
+            quickBomModal.classList.remove('hidden');
+        });
+
+        // Close Quick BOM Modal
+        cancelQuickBomButton.addEventListener('click', function() {
+            quickBomModal.classList.add('hidden');
+        });
+
+        // Add Component Row
+        addComponentButton.addEventListener('click', function() {
+            addComponentRow();
+        });
+
+        // Save Quick BOM
+        saveQuickBomButton.addEventListener('click', async function() {
+            if (!validateQuickBomForm()) {
+                return;
+            }
+
+            try {
+                // Create BOM
+                const bomResponse = await fetch('/api/bom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        final_product_id: currentProductId,
+                        description: quickBomDescription.value
+                    })
+                });
+
+                if (!bomResponse.ok) {
+                    const errorData = await bomResponse.json();
+                    throw new Error(errorData.message || 'Failed to create BOM');
+                }
+
+                const bomData = await bomResponse.json();
+                const bomId = bomData.id;
+
+                // Add components
+                const componentRows = document.querySelectorAll('.component-row');
+                for (const row of componentRows) {
+                    const componentSelect = row.querySelector('.component-select');
+                    const quantityInput = row.querySelector('.component-quantity');
+                    const unitInput = row.querySelector('.component-unit');
+
+                    await fetch(`/api/bom/${bomId}/details`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            component_item_id: componentSelect.value,
+                            quantity_required: quantityInput.value,
+                            unit_of_measure: unitInput.value
+                        })
+                    });
+                }
+
+                // Close modal and refresh BOM check
+                quickBomModal.classList.add('hidden');
+                checkBOM(currentProductId);
+
+                // Show success message
+                alert('تم إنشاء قائمة المواد بنجاح!');
+            } catch (error) {
+                console.error('Error saving BOM:', error);
+                alert(`حدث خطأ أثناء حفظ قائمة المواد: ${error.message}`);
+            }
+        });
+
+        // Add Component Row Function
+        function addComponentRow() {
+            // Clone template
+            const template = componentTemplate.content.cloneNode(true);
+            const componentRow = template.querySelector('.component-row');
+            const componentSelect = template.querySelector('.component-select');
+
+            // Set unique ID for tracking
+            componentCount++;
+            componentRow.dataset.id = componentCount;
+
+            // Populate component select options
+            populateComponentSelect(componentSelect);
+
+            // Add event listeners
+            template.querySelector('.remove-component-button').addEventListener('click', function() {
+                removeComponentRow(componentRow.dataset.id);
+            });
+
+            // Add to container
+            componentsContainer.appendChild(template);
+            noComponentsMessage.classList.add('hidden');
+        }
+
+        // Remove Component Row Function
+        function removeComponentRow(id) {
+            const row = document.querySelector(`.component-row[data-id="${id}"]`);
+            if (row) {
+                row.remove();
+
+                // Show "no components" message if no rows left
+                if (componentsContainer.children.length === 0) {
+                    noComponentsMessage.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Populate Component Select Function
+        function populateComponentSelect(select) {
+            // Clear existing options except the first one
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+
+            // Filter for allowed category types (exclude FinalProduct)
+            const allowedCategoryTypes = ['RawMaterial', 'IntermediateProduct', 'Packaging'];
+
+            // Add options from component items
+            componentItems.forEach(category => {
+                // Only include allowed category types
+                if (category.items && category.items.length > 0 && allowedCategoryTypes.includes(category.category_type)) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = getCategoryTypeLabel(category.category_type);
+
+                    category.items.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.id;
+                        option.textContent = item.name;
+                        option.dataset.unit = item.unit_of_measure || '';
+                        optgroup.appendChild(option);
+                    });
+
+                    select.appendChild(optgroup);
+                }
+            });
+
+            // Add change event to set unit of measure
+            select.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                if (selectedOption.dataset.unit) {
+                    const row = this.closest('.component-row');
+                    const unitInput = row.querySelector('.component-unit');
+                    unitInput.value = selectedOption.dataset.unit;
+                }
+            });
+        }
+
+        // Validate Quick BOM Form
+        function validateQuickBomForm() {
+            const componentRows = document.querySelectorAll('.component-row');
+
+            if (componentRows.length === 0) {
+                alert('يرجى إضافة مكون واحد على الأقل');
+                return false;
+            }
+
+            for (const row of componentRows) {
+                const componentSelect = row.querySelector('.component-select');
+                const quantityInput = row.querySelector('.component-quantity');
+
+                if (!componentSelect.value) {
+                    alert('يرجى اختيار المكون لجميع الصفوف');
+                    componentSelect.focus();
+                    return false;
+                }
+
+                if (!quantityInput.value || parseFloat(quantityInput.value) <= 0) {
+                    alert('يرجى إدخال كمية صالحة لجميع المكونات');
+                    quantityInput.focus();
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Helper function to get category type label
+        function getCategoryTypeLabel(type) {
+            switch (type) {
+                case 'RawMaterial': return 'مواد خام';
+                case 'Packaging': return 'مواد تغليف';
+                case 'IntermediateProduct': return 'منتجات وسيطة';
+                case 'FinalProduct': return 'منتجات نهائية';
+                default: return 'أخرى';
+            }
+        }
+    });
+</script>
+
+<!-- Quick BOM Creation Modal -->
+<div id="quick-bom-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">إنشاء قائمة مواد سريعة</h3>
+                        <div class="mt-4">
+                            <form id="quick-bom-form">
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">المنتج النهائي</label>
+                                    <div class="p-3 bg-gray-50 rounded-lg">
+                                        <div id="quick-bom-product-name" class="font-medium text-gray-800"></div>
+                                        <div id="quick-bom-product-sku" class="text-sm text-gray-500"></div>
+                                    </div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
+                                    <textarea id="quick-bom-description" rows="2"
+                                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="وصف اختياري لقائمة المواد"></textarea>
+                                </div>
+
+                                <div class="mb-4">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <label class="block text-sm font-medium text-gray-700">المكونات</label>
+                                        <button type="button" id="add-component-button" class="text-sm text-blue-600 hover:text-blue-800">
+                                            <i class="fas fa-plus ml-1"></i> إضافة مكون
+                                        </button>
+                                    </div>
+                                    <div id="components-container" class="space-y-3">
+                                        <!-- Component rows will be added here dynamically -->
+                                    </div>
+                                    <div id="no-components-message" class="text-center py-4 text-gray-500">
+                                        <p>لم تتم إضافة أي مكونات بعد</p>
+                                    </div>
+                                </div>
+
+                                <div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                                    <button type="button" id="save-quick-bom-button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                                        حفظ وإكمال
+                                    </button>
+                                    <button type="button" id="cancel-quick-bom-button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm">
+                                        إلغاء
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Component Template (hidden, used for cloning) -->
+<template id="component-template">
+    <div class="component-row bg-gray-50 p-3 rounded-lg">
+        <div class="flex justify-between mb-2">
+            <div class="font-medium text-gray-800">مكون جديد</div>
+            <button type="button" class="remove-component-button text-red-600 hover:text-red-800">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">المكون</label>
+                <select class="component-select w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <option value="">اختر المكون</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">الكمية</label>
+                <input type="number" class="component-quantity w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" min="0.01" step="0.01" required>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">وحدة القياس</label>
+                <input type="text" class="component-unit w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="كجم، لتر، قطعة، ...">
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+

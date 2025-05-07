@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}استيراد العملاء - نظام قاتيلو{% endblock %}
+
+{% block page_header %}استيراد العملاء{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales/customers" class="text-blue-600 hover:text-blue-800">العملاء</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">استيراد العملاء</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+    <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="bg-blue-100 p-2 rounded-lg">
+                <i class="fas fa-file-import text-blue-600 text-lg"></i>
+            </div>
+            <h2 class="text-lg font-bold text-gray-800">استيراد العملاء من ملف Excel أو CSV</h2>
+        </div>
+        <a href="/sales/customers" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700">
+            <i class="fas fa-arrow-right ml-1"></i> العودة إلى قائمة العملاء
+        </a>
+    </div>
+
+    <div class="p-6">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                </div>
+                <div class="mr-3">
+                    <h3 class="text-sm font-medium text-blue-800">تعليمات الاستيراد</h3>
+                    <div class="mt-2 text-sm text-blue-700 space-y-1">
+                        <p>1. قم بتحميل ملف Excel (.xlsx أو .xls) أو CSV (.csv) يحتوي على بيانات العملاء.</p>
+                        <p>2. يجب أن يحتوي الملف على عمود واحد على الأقل لاسم العميل.</p>
+                        <p>3. يمكنك أيضًا تضمين أعمدة لمعلومات الاتصال وعنوان الفواتير وعنوان الشحن.</p>
+                        <p>4. سيتم عرض معاينة للبيانات قبل الاستيراد النهائي.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form action="{{ url_for('sales.upload_customers_file') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+            <div>
+                <label for="customers_file" class="block text-sm font-medium text-gray-700 mb-1">
+                    <i class="fas fa-file-excel text-green-500 ml-1"></i> اختر ملف Excel أو CSV
+                </label>
+                <input type="file" id="customers_file" name="customers_file" accept=".xlsx,.xls,.csv" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-md file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-blue-50 file:text-blue-700
+                    hover:file:bg-blue-100
+                    cursor-pointer">
+                <p class="mt-1 text-sm text-gray-500">يجب أن يكون الملف بصيغة Excel (.xlsx أو .xls) أو CSV (.csv)</p>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload ml-1"></i> رفع الملف
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-8 border-t border-gray-200 pt-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">نموذج ملف الاستيراد</h3>
+            <p class="mb-4 text-sm text-gray-600">يمكنك تحميل نموذج ملف Excel لاستيراد العملاء من الرابط أدناه:</p>
+            <a href="/static/uploads/templates/customers_import_template.csv" class="btn bg-green-600 hover:bg-green-700 text-white inline-flex items-center">
+                <i class="fas fa-download ml-2"></i>
+                تحميل نموذج ملف الاستيراد (CSV)
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

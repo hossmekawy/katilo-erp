@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الخزينة - دفعات الموردين{% endblock %}
+
+{% block page_header %}دفعات الموردين{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="flex justify-between items-center p-6 border-b">
+            <h2 class="text-lg font-semibold text-gray-800">سجل دفعات الموردين</h2>
+            <a href="{{ url_for('cash.add_supplier_payment') }}" class="btn btn-primary">
+                <i class="fas fa-plus ml-2"></i>
+                إضافة دفعة جديدة
+            </a>
+        </div>
+
+        <!-- Filters -->
+        <div class="p-6 border-b bg-gray-50" x-data="{ showFilters: false }">
+            <button @click="showFilters = !showFilters" class="flex items-center text-gray-600 hover:text-gray-800">
+                <i class="fas fa-filter ml-2"></i>
+                <span>تصفية الدفعات</span>
+                <i class="fas ml-2" :class="showFilters ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </button>
+
+            <div x-show="showFilters" x-cloak class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="supplier_filter" class="block text-sm font-medium text-gray-700 mb-1">المورد</label>
+                    <select id="supplier_filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">جميع الموردين</option>
+                        {% for voucher in vouchers %}
+                        {% if voucher.supplier %}
+                        <option value="{{ voucher.supplier.id }}">{{ voucher.supplier.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="account_filter" class="block text-sm font-medium text-gray-700 mb-1">الحساب</label>
+                    <select id="account_filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">جميع الحسابات</option>
+                        {% for voucher in vouchers %}
+                        {% if voucher.from_account %}
+                        <option value="{{ voucher.from_account.id }}">{{ voucher.from_account.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="date_filter" class="block text-sm font-medium text-gray-700 mb-1">التاريخ</label>
+                    <select id="date_filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">جميع التواريخ</option>
+                        <option value="today">اليوم</option>
+                        <option value="week">هذا الأسبوع</option>
+                        <option value="month">هذا الشهر</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-right">
+                <thead class="bg-gray-50 text-gray-600 font-medium">
+                    <tr>
+                        <th class="px-6 py-4">رقم السند</th>
+                        <th class="px-6 py-4">التاريخ</th>
+                        <th class="px-6 py-4">المورد</th>
+                        <th class="px-6 py-4">من حساب</th>
+                        <th class="px-6 py-4">المبلغ</th>
+                        <th class="px-6 py-4">الملاحظات</th>
+                        <th class="px-6 py-4">بواسطة</th>
+                        <th class="px-6 py-4">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for voucher in vouchers %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 font-medium text-gray-800">{{ voucher.voucher_number }}</td>
+                        <td class="px-6 py-4">{{ voucher.transfer_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td class="px-6 py-4">
+                            {% if voucher.supplier %}
+                            {{ voucher.supplier.name }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if voucher.from_account %}
+                            {{ voucher.from_account.name }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 font-medium text-gray-800">
+                            {{ voucher.amount|round(2) }}
+                            {% if voucher.from_account %}
+                            {{ voucher.from_account.currency }}
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-600">{{ voucher.notes or '-' }}</td>
+                        <td class="px-6 py-4 text-gray-600">
+                            {% if voucher.creator %}
+                            {{ voucher.creator.username }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex space-x-2 space-x-reverse">
+                                <a href="{{ url_for('cash.view_transfer', voucher_id=voucher.id) }}" class="text-blue-600 hover:text-blue-800" title="عرض التفاصيل">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button onclick="printVoucher('{{ voucher.voucher_number }}')" class="text-gray-600 hover:text-gray-800" title="طباعة السند">
+                                    <i class="fas fa-print"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {% if vouchers|length == 0 %}
+                    <tr>
+                        <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-truck text-gray-300 text-4xl mb-3"></i>
+                            <p>لا توجد دفعات مسجلة للموردين</p>
+                            <div class="mt-4">
+                                <a href="{{ url_for('cash.add_supplier_payment') }}" class="btn btn-primary">
+                                    <i class="fas fa-plus ml-2"></i>
+                                    إضافة دفعة جديدة
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const supplierFilter = document.getElementById('supplier_filter');
+        const accountFilter = document.getElementById('account_filter');
+        const dateFilter = document.getElementById('date_filter');
+
+        // Remove duplicate options from filters
+        function removeDuplicateOptions(selectElement) {
+            const optionValues = {};
+            const options = selectElement.options;
+
+            for (let i = options.length - 1; i >= 0; i--) {
+                const value = options[i].value;
+                const text = options[i].text;
+
+                if (value && optionValues[value]) {
+                    selectElement.remove(i);
+                } else {
+                    optionValues[value] = text;
+                }
+            }
+        }
+
+        removeDuplicateOptions(supplierFilter);
+        removeDuplicateOptions(accountFilter);
+
+        // Filter table rows based on selected filters
+        function filterTable() {
+            const supplierValue = supplierFilter.value;
+            const accountValue = accountFilter.value;
+            const dateValue = dateFilter.value;
+
+            const rows = document.querySelectorAll('tbody tr');
+
+            rows.forEach(row => {
+                let showRow = true;
+
+                // Filter by supplier
+                if (supplierValue && row.cells[2].textContent.trim() !== supplierValue) {
+                    showRow = false;
+                }
+
+                // Filter by account
+                if (accountValue && row.cells[3].textContent.trim() !== accountValue) {
+                    showRow = false;
+                }
+
+                // Filter by date
+                if (dateValue) {
+                    const rowDate = new Date(row.cells[1].textContent.trim());
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    if (dateValue === 'today') {
+                        const todayEnd = new Date(today);
+                        todayEnd.setHours(23, 59, 59, 999);
+
+                        if (rowDate < today || rowDate > todayEnd) {
+                            showRow = false;
+                        }
+                    } else if (dateValue === 'week') {
+                        const weekStart = new Date(today);
+                        weekStart.setDate(today.getDate() - today.getDay());
+
+                        const weekEnd = new Date(weekStart);
+                        weekEnd.setDate(weekStart.getDate() + 6);
+                        weekEnd.setHours(23, 59, 59, 999);
+
+                        if (rowDate < weekStart || rowDate > weekEnd) {
+                            showRow = false;
+                        }
+                    } else if (dateValue === 'month') {
+                        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+
+                        if (rowDate < monthStart || rowDate > monthEnd) {
+                            showRow = false;
+                        }
+                    }
+                }
+
+                row.style.display = showRow ? '' : 'none';
+            });
+        }
+
+        // Add event listeners to filters
+        supplierFilter.addEventListener('change', filterTable);
+        accountFilter.addEventListener('change', filterTable);
+        dateFilter.addEventListener('change', filterTable);
+    });
+
+    function printVoucher(voucherNumber) {
+        // Implement print functionality
+        alert(`طباعة سند رقم: ${voucherNumber}`);
+        // You can implement actual printing functionality here
+    }
+</script>
+{% endblock %}

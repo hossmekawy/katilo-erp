@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}سجل أنشطة المبيعات | نظام قاتيلو{% endblock %}
+
+{% block page_header %}سجل أنشطة المبيعات{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-semibold text-gray-800">سجل أنشطة المبيعات</h2>
+        </div>
+
+        {% if logs %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-200 text-right">
+                        <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">التاريخ والوقت</th>
+                        <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">نوع النشاط</th>
+                        <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">الوصف</th>
+                        <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">رقم الطلب</th>
+                        <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">رقم الفاتورة</th>
+                        <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">تم بواسطة</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for log in logs %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {% set activity_type_ar = {
+                                'Created': 'إنشاء',
+                                'Updated': 'تحديث',
+                                'Deleted': 'حذف',
+                                'Payment Processed': 'معالجة الدفع',
+                                'Invoice Generated': 'إنشاء فاتورة',
+                                'Status Updated': 'تحديث الحالة',
+                                'Customer Created': 'إنشاء عميل',
+                                'Customer Updated': 'تحديث عميل',
+                                'Representative Created': 'إنشاء مندوب',
+                                'Representative Updated': 'تحديث مندوب',
+                                'Order Cancelled': 'إلغاء طلب'
+                            } %}
+                            <span class="px-2 py-1 rounded-full text-xs 
+                                {% if log.activity_type == 'Created' %}bg-green-100 text-green-800
+                                {% elif log.activity_type == 'Updated' %}bg-blue-100 text-blue-800
+                                {% elif log.activity_type == 'Deleted' %}bg-red-100 text-red-800
+                                {% elif log.activity_type == 'Payment Processed' %}bg-purple-100 text-purple-800
+                                {% elif log.activity_type == 'Invoice Generated' %}bg-yellow-100 text-yellow-800
+                                {% elif log.activity_type == 'Status Updated' %}bg-indigo-100 text-indigo-800
+                                {% elif log.activity_type == 'Customer Created' %}bg-green-100 text-green-800
+                                {% elif log.activity_type == 'Customer Updated' %}bg-blue-100 text-blue-800
+                                {% elif log.activity_type == 'Order Cancelled' %}bg-red-100 text-red-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ activity_type_ar.get(log.activity_type, log.activity_type) }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">
+                            {% set description = log.description %}
+                            {% if log.activity_type == 'Created' %}
+                                {% set description = description.replace('Sales order created for customer', 'تم إنشاء طلب مبيعات للعميل') %}
+                                {% set description = description.replace('with total amount', 'بإجمالي مبلغ') %}
+                            {% elif log.activity_type == 'Updated' %}
+                                {% set description = description.replace('Sales order updated with new total amount', 'تم تحديث طلب المبيعات بإجمالي مبلغ جديد') %}
+                            {% elif log.activity_type == 'Deleted' %}
+                                {% set description = description.replace('Sales order', 'طلب المبيعات') %}
+                                {% set description = description.replace('for customer', 'للعميل') %}
+                                {% set description = description.replace('was deleted', 'تم حذفه') %}
+                            {% elif log.activity_type == 'Invoice Generated' %}
+                                {% set description = description.replace('Invoice', 'فاتورة') %}
+                                {% set description = description.replace('generated for order', 'تم إنشاؤها للطلب') %}
+                                {% set description = description.replace('with total amount', 'بإجمالي مبلغ') %}
+                            {% elif log.activity_type == 'Status Updated' %}
+                                {% set description = description.replace('Order status updated from', 'تم تحديث حالة الطلب من') %}
+                                {% set description = description.replace('to', 'إلى') %}
+                                {% set description = description.replace('Pending', 'قيد الانتظار') %}
+                                {% set description = description.replace('Processing', 'قيد المعالجة') %}
+                                {% set description = description.replace('Delivered', 'تم التسليم') %}
+                                {% set description = description.replace('Cancelled', 'ملغي') %}
+                                {% set description = description.replace('Inventory has been deducted.', 'تم خصم المخزون.') %}
+                                {% set description = description.replace('Notes:', 'ملاحظات:') %}
+                            {% elif log.activity_type == 'Customer Created' %}
+                                {% set description = description.replace('Customer', 'العميل') %}
+                                {% set description = description.replace('created', 'تم إنشاؤه') %}
+                                {% set description = description.replace('from sales order form', 'من نموذج طلب المبيعات') %}
+                            {% elif log.activity_type == 'Customer Updated' %}
+                                {% set description = description.replace('Customer', 'العميل') %}
+                                {% set description = description.replace('updated', 'تم تحديثه') %}
+                            {% elif log.activity_type == 'Payment Processed' %}
+                                {% set description = description.replace('Payment of', 'تم معالجة دفعة بقيمة') %}
+                                {% set description = description.replace('processed for invoice', 'للفاتورة') %}
+                                {% set description = description.replace('via', 'عن طريق') %}
+                            
+                            {% endif %}
+                            {{ description }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {% if log.sales_order_id %}
+                            <a href="{{ url_for('sales.view_order', order_id=log.sales_order_id) }}" class="text-blue-600 hover:text-blue-800">
+                                {{ log.sales_order_id }}
+                            </a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {% if log.invoice_id %}
+                            <a href="{{ url_for('sales.view_invoice', invoice_id=log.invoice_id) }}" class="text-blue-600 hover:text-blue-800">
+                                {{ log.invoice_id }}
+                            </a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ log.performed_by_user.username if log.performed_by_user else 'غير معروف' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <div class="text-gray-400 mb-2">
+                <i class="fas fa-history text-4xl"></i>
+            </div>
+            <p class="text-gray-500">لا توجد أنشطة مسجلة حتى الآن</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

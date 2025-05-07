@@ -1,0 +1,561 @@
+{% extends "base.html" %}
+
+{% block title %}تعيين طلبات للمسار | نظام قاتيلو{% endblock %}
+
+{% block page_header %}تعيين طلبات للمسار{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.sales_dashboard') }}" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('rep_routes.list_representatives') }}" class="text-blue-600 hover:text-blue-800">مندوبي المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('rep_routes.list_routes') }}" class="text-blue-600 hover:text-blue-800">خطط المسارات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('rep_routes.view_route', route_id=route.id) }}" class="text-blue-600 hover:text-blue-800">{{ route.route_name }}</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">تعيين طلبات</span>
+</li>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .order-card {
+        transition: all 0.2s ease;
+    }
+    .order-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .visit-card {
+        transition: all 0.2s ease;
+    }
+    .visit-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .visit-card.has-order {
+        border-right: 4px solid #10b981;
+    }
+    .status-badge {
+        @apply text-xs font-medium px-2.5 py-0.5 rounded-full;
+    }
+    .status-pending {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .status-processing {
+        @apply bg-blue-100 text-blue-800;
+    }
+    .status-completed {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-cancelled {
+        @apply bg-red-100 text-red-800;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="assignOrdersApp()" class="mb-10">
+    <!-- Header Section -->
+    <div class="mb-6 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">تعيين طلبات للمسار: {{ route.route_name }}</h1>
+            <p class="text-gray-600">تاريخ المسار: {{ route.route_date }} | المندوب: {{ route.representative.name }}</p>
+        </div>
+        <div class="flex space-x-2 rtl:space-x-reverse">
+            <button @click="saveAssignments()" class="btn btn-primary flex items-center" :disabled="isLoading">
+                <i class="fas fa-save ml-2"></i>
+                <span x-text="isLoading ? 'جاري الحفظ...' : 'حفظ التعيينات'"></span>
+            </button>
+            <a href="{{ url_for('rep_routes.view_route', route_id=route.id) }}" class="btn btn-secondary flex items-center">
+                <i class="fas fa-arrow-right ml-2"></i>
+                <span>العودة للمسار</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Left Column - Available Orders -->
+        <div>
+            <div class="card p-6 mb-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">الطلبات المتاحة</h2>
+                    <div class="relative">
+                        <input type="text" x-model="orderSearch" placeholder="بحث..." class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 pl-10">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="flex flex-wrap gap-2">
+                        <button @click="orderFilters.status = 'all'" class="px-3 py-1 text-xs rounded-full" :class="orderFilters.status === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-800'">
+                            الكل
+                        </button>
+                        <button @click="orderFilters.status = 'Pending'" class="px-3 py-1 text-xs rounded-full" :class="orderFilters.status === 'Pending' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-800'">
+                            قيد الانتظار
+                        </button>
+                        <button @click="orderFilters.status = 'Processing'" class="px-3 py-1 text-xs rounded-full" :class="orderFilters.status === 'Processing' ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-800'">
+                            قيد المعالجة
+                        </button>
+                    </div>
+                </div>
+
+                <div class="max-h-[600px] overflow-y-auto">
+                    <template x-if="filteredOrders.length === 0">
+                        <div class="text-center py-8">
+                            <div class="text-gray-400 mb-2">
+                                <i class="fas fa-shopping-cart text-4xl"></i>
+                            </div>
+                            <p class="text-gray-500">لا توجد طلبات متاحة تطابق معايير البحث</p>
+                        </div>
+                    </template>
+
+                    <div class="space-y-3">
+                        <template x-for="order in filteredOrders" :key="order.id">
+                            <div class="order-card bg-white border border-gray-200 rounded-lg p-4" :class="{'opacity-50': isOrderAssigned(order.id)}">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div class="flex items-center">
+                                            <span class="text-sm font-medium text-gray-900" x-text="'#' + order.id"></span>
+                                            <span class="status-badge ml-2" :class="getStatusClass(order.status)" x-text="getStatusText(order.status)"></span>
+                                        </div>
+                                        <p class="text-sm text-gray-600" x-text="formatDate(order.order_date)"></p>
+                                    </div>
+                                    <span class="text-lg font-bold text-gray-900" x-text="formatCurrency(order.total_amount)"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-user text-gray-400 ml-2"></i>
+                                        <span class="text-sm text-gray-800" x-text="order.customer && order.customer.customer_name ? order.customer.customer_name : 'Unknown Customer'"></span>
+                                    </div>
+                                    <div class="flex items-center mt-1">
+                                        <i class="fas fa-map-marker-alt text-gray-400 ml-2"></i>
+                                        <span class="text-sm text-gray-600" x-text="order.customer && order.customer.shipping_address ? order.customer.shipping_address : 'لا يوجد عنوان شحن'"></span>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-gray-500" x-text="(order.details && order.details.length ? order.details.length : 0) + ' منتج'"></span>
+                                    <button
+                                        @click="assignOrder(order)"
+                                        class="text-sm px-3 py-1 rounded-lg"
+                                        :class="isOrderAssigned(order.id) ? 'bg-gray-200 text-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700'"
+                                        :disabled="isOrderAssigned(order.id)"
+                                    >
+                                        <span x-text="isOrderAssigned(order.id) ? 'تم التعيين' : 'تعيين'"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column - Route Visits -->
+        <div>
+            <div class="card p-6">
+                <h2 class="text-lg font-semibold mb-4">زيارات المسار</h2>
+
+                <div class="max-h-[700px] overflow-y-auto">
+                    <template x-if="route.visits.length === 0">
+                        <div class="text-center py-8">
+                            <div class="text-gray-400 mb-2">
+                                <i class="fas fa-map-marked-alt text-4xl"></i>
+                            </div>
+                            <p class="text-gray-500">لا توجد زيارات مخططة في هذا المسار</p>
+                        </div>
+                    </template>
+
+                    <div class="space-y-4">
+                        <template x-for="(visit, index) in route.visits" :key="visit.id">
+                            <div class="visit-card bg-white border border-gray-200 rounded-lg p-4" :class="{'has-order': visit.assigned_order}">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div class="flex items-center">
+                                        <span class="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full text-xs font-medium ml-2" x-text="index + 1"></span>
+                                        <div>
+                                            <h3 class="text-sm font-medium text-gray-900" x-text="visit.customer && visit.customer.customer_name ? visit.customer.customer_name : 'Unknown Customer'"></h3>
+                                            <p class="text-xs text-gray-500" x-text="formatTime(visit.scheduled_time)"></p>
+                                        </div>
+                                    </div>
+                                    <span class="status-badge" :class="getVisitStatusClass(visit.status)" x-text="getVisitStatusText(visit.status)"></span>
+                                </div>
+
+                                <template x-if="visit.assigned_order">
+                                    <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <div class="flex items-center">
+                                                    <i class="fas fa-shopping-cart text-green-600 ml-2"></i>
+                                                    <span class="text-sm font-medium text-gray-900" x-text="'طلب #' + visit.assigned_order.id"></span>
+                                                </div>
+                                                <p class="text-sm text-gray-600 mt-1" x-text="formatCurrency(visit.assigned_order.total_amount)"></p>
+                                            </div>
+                                            <button @click="removeOrderAssignment(visit)" class="text-red-500 hover:text-red-700">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <template x-if="!visit.assigned_order">
+                                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 text-center">
+                                        <p class="text-sm text-gray-500">لا يوجد طلب معين لهذه الزيارة</p>
+                                        <button
+                                            @click="showOrderSelectionModal(visit)"
+                                            class="mt-2 text-sm bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700"
+                                        >
+                                            تعيين طلب
+                                        </button>
+                                    </div>
+                                </template>
+
+                                <div class="text-xs text-gray-500">
+                                    <template x-if="visit.visit_notes">
+                                        <div class="mb-1">
+                                            <i class="fas fa-sticky-note ml-1"></i>
+                                            <span x-text="visit.visit_notes"></span>
+                                        </div>
+                                    </template>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-map-marker-alt ml-1"></i>
+                                        <span x-text="visit.customer && visit.customer.shipping_address ? visit.customer.shipping_address : 'لا يوجد عنوان'"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Selection Modal -->
+    <div x-show="showOrderModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div x-show="showOrderModal" @click="showOrderModal = false" class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div x-show="showOrderModal" class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:text-right sm:w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="modal-title">
+                                اختيار طلب للزيارة
+                            </h3>
+                            <div class="mt-2">
+                                <div class="mb-4">
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                        <h4 class="text-sm font-medium text-gray-900 mb-1" x-text="selectedVisit && selectedVisit.customer && selectedVisit.customer.customer_name ? selectedVisit.customer.customer_name : 'Unknown Customer'"></h4>
+                                        <p class="text-xs text-gray-600" x-text="selectedVisit && selectedVisit.customer && selectedVisit.customer.shipping_address ? selectedVisit.customer.shipping_address : 'لا يوجد عنوان'"></p>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">اختر طلباً</label>
+                                    <div class="relative">
+                                        <select x-model="selectedOrderId" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+                                            <option value="">-- اختر طلباً --</option>
+                                            <template x-for="order in customerOrders" :key="order.id">
+                                                <option :value="order.id" x-text="'#' + order.id + ' - ' + formatCurrency(order.total_amount) + ' - ' + getStatusText(order.status)"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <template x-if="selectedOrderId">
+                                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                        <h4 class="text-sm font-medium text-gray-900 mb-2">تفاصيل الطلب</h4>
+                                        <template x-for="detail in getOrderDetails(selectedOrderId)" :key="detail.id">
+                                            <div class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                                <span class="text-sm text-gray-800" x-text="detail.item_name"></span>
+                                                <div class="text-sm">
+                                                    <span class="text-gray-600" x-text="detail.quantity + ' × ' + formatCurrency(detail.unit_price)"></span>
+                                                    <span class="font-medium text-gray-900 mr-2" x-text="formatCurrency(detail.quantity * detail.unit_price)"></span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                        @click="assignSelectedOrder()"
+                        type="button"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                        :disabled="!selectedOrderId"
+                    >
+                        تعيين
+                    </button>
+                    <button @click="showOrderModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function assignOrdersApp() {
+    return {
+        route: {{ route|tojson|safe }},
+        orders: {{ orders|tojson|safe }},
+        orderSearch: '',
+        orderFilters: {
+            status: 'all'
+        },
+        showOrderModal: false,
+        selectedVisit: null,
+        selectedOrderId: '',
+        isLoading: false,
+        changes: [],
+
+        get filteredOrders() {
+            return this.orders.filter(order => {
+                // Filter by search
+                if (this.orderSearch) {
+                    const search = this.orderSearch.toLowerCase();
+                    const matchesId = order.id.toString().includes(search);
+                    const matchesCustomer = order.customer && order.customer.customer_name ?
+                        order.customer.customer_name.toLowerCase().includes(search) : false;
+
+                    if (!matchesId && !matchesCustomer) {
+                        return false;
+                    }
+                }
+
+                // Filter by status
+                if (this.orderFilters.status !== 'all' && order.status !== this.orderFilters.status) {
+                    return false;
+                }
+
+                return true;
+            });
+        },
+
+        get customerOrders() {
+            if (!this.selectedVisit) return [];
+
+            return this.orders.filter(order =>
+                order.customer_id === this.selectedVisit.customer_id &&
+                !this.isOrderAssigned(order.id)
+            );
+        },
+
+        formatDate(dateString) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString('ar-EG', options);
+        },
+
+        formatTime(timeString) {
+            if (!timeString) return '';
+
+            try {
+                const date = new Date(timeString);
+                return date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                return timeString;
+            }
+        },
+
+        formatCurrency(amount) {
+            return new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP' }).format(amount);
+        },
+
+        getStatusClass(status) {
+            switch (status) {
+                case 'Pending': return 'status-pending';
+                case 'Processing': return 'status-processing';
+                case 'Completed': return 'status-completed';
+                case 'Cancelled': return 'status-cancelled';
+                default: return '';
+            }
+        },
+
+        getStatusText(status) {
+            switch (status) {
+                case 'Pending': return 'قيد الانتظار';
+                case 'Processing': return 'قيد المعالجة';
+                case 'Completed': return 'مكتمل';
+                case 'Cancelled': return 'ملغي';
+                default: return status;
+            }
+        },
+
+        getVisitStatusClass(status) {
+            switch (status) {
+                case 'Pending': return 'status-pending';
+                case 'Completed': return 'status-completed';
+                case 'Missed': return 'status-cancelled';
+                case 'Rescheduled': return 'status-processing';
+                default: return '';
+            }
+        },
+
+        getVisitStatusText(status) {
+            switch (status) {
+                case 'Pending': return 'قيد الانتظار';
+                case 'Completed': return 'مكتملة';
+                case 'Missed': return 'فائتة';
+                case 'Rescheduled': return 'معاد جدولتها';
+                default: return status;
+            }
+        },
+
+        isOrderAssigned(orderId) {
+            // Check if the order is already assigned to a visit
+            return this.route.visits.some(visit =>
+                visit.assigned_order && visit.assigned_order.id === orderId
+            );
+        },
+
+        getOrderDetails(orderId) {
+            const order = this.orders.find(o => o.id == orderId);
+            return order && order.details ? order.details : [];
+        },
+
+        assignOrder(order) {
+            // Find the first visit for this customer without an assigned order
+            const visit = this.route.visits.find(v =>
+                v.customer_id === order.customer_id && !v.assigned_order
+            );
+
+            if (visit) {
+                this.assignOrderToVisit(visit, order);
+            } else {
+                showNotification('لا توجد زيارة متاحة لهذا العميل', 'warning');
+            }
+        },
+
+        showOrderSelectionModal(visit) {
+            this.selectedVisit = visit;
+            this.selectedOrderId = '';
+            this.showOrderModal = true;
+        },
+
+        assignSelectedOrder() {
+            if (!this.selectedVisit || !this.selectedOrderId) return;
+
+            const order = this.orders.find(o => o.id == this.selectedOrderId);
+            if (order) {
+                this.assignOrderToVisit(this.selectedVisit, order);
+                this.showOrderModal = false;
+            }
+        },
+
+        assignOrderToVisit(visit, order) {
+            // Assign the order to the visit
+            visit.assigned_order = order;
+            visit.order_id = order.id;
+
+            // Record the change
+            this.recordChange(visit.id, order.id);
+
+            showNotification(`تم تعيين الطلب #${order.id} للزيارة بنجاح`, 'success');
+        },
+
+        removeOrderAssignment(visit) {
+            if (!visit.assigned_order) return;
+
+            const orderId = visit.assigned_order.id;
+
+            // Remove the assignment
+            visit.assigned_order = null;
+            visit.order_id = null;
+
+            // Record the change
+            this.recordChange(visit.id, null);
+
+            showNotification(`تم إلغاء تعيين الطلب #${orderId} من الزيارة`, 'info');
+        },
+
+        recordChange(visitId, orderId) {
+            // Check if we already have a change for this visit
+            const existingIndex = this.changes.findIndex(c => c.visit_id === visitId);
+
+            if (existingIndex !== -1) {
+                // Update existing change
+                this.changes[existingIndex].order_id = orderId;
+            } else {
+                // Add new change
+                this.changes.push({
+                    visit_id: visitId,
+                    order_id: orderId
+                });
+            }
+        },
+
+        saveAssignments() {
+            if (this.changes.length === 0) {
+                showNotification('لم تقم بأي تغييرات', 'info');
+                return;
+            }
+
+            this.isLoading = true;
+
+            fetch(`/sales/representatives/routes/${this.route.id}/assign-orders`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    assignments: this.changes
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to save assignments');
+                }
+                return response.json();
+            })
+            .then(data => {
+                showNotification('تم حفظ تعيينات الطلبات بنجاح', 'success');
+
+                // Redirect back to route view
+                setTimeout(() => {
+                    window.location.href = `/sales/representatives/routes/${this.route.id}`;
+                }, 1000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('حدث خطأ أثناء حفظ التعيينات', 'error');
+            })
+            .finally(() => {
+                this.isLoading = false;
+            });
+        }
+    };
+}
+
+// Helper function to show notifications
+function showNotification(message, type = 'info') {
+    const event = new CustomEvent('show-notification', {
+        detail: { message, type }
+    });
+    window.dispatchEvent(event);
+}
+</script>
+{% endblock %}

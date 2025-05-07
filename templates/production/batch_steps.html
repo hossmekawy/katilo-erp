@@ -1,0 +1,592 @@
+{% extends "base.html" %}
+
+{% block title %}مراحل إنتاج الدفعة - نظام قاتيلو{% endblock %}
+
+{% block page_header %}مراحل إنتاج الدفعة #{{ batch.id }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/orders/{{ batch.production_order_id }}" class="text-blue-600 hover:text-blue-800">أمر الإنتاج #{{ batch.production_order_id }}</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">مراحل الدفعة #{{ batch.id }}</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Batch Information Card -->
+    <div class="card p-6">
+        <div class="flex flex-wrap md:flex-nowrap justify-between items-center">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800 mb-2">معلومات الدفعة</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-600">رقم الدفعة:</p>
+                        <p class="font-medium">{{ batch.lot_number }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600">المنتج:</p>
+                        <p class="font-medium">{{ batch.item.name }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600">الكمية:</p>
+                        <p class="font-medium">{{ batch.quantity }} {{ batch.item.unit_of_measure }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600">تاريخ الإنتاج:</p>
+                        <p class="font-medium">{{ batch.production_date.strftime('%Y-%m-%d') }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-4 md:mt-0">
+                <div class="flex flex-col items-end">
+                    <div class="mb-2">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium
+                            {% if batch.status == 'Created' %} bg-gray-100 text-gray-800
+                            {% elif batch.status == 'InProduction' %} bg-blue-100 text-blue-800
+                            {% elif batch.status == 'QCPending' %} bg-yellow-100 text-yellow-800
+                            {% elif batch.status == 'QCPassed' %} bg-green-100 text-green-800
+                            {% elif batch.status == 'QCFailed' %} bg-red-100 text-red-800
+                            {% elif batch.status == 'Packaged' %} bg-purple-100 text-purple-800
+                            {% elif batch.status == 'Stored' %} bg-indigo-100 text-indigo-800
+                            {% elif batch.status == 'Cancelled' %} bg-gray-100 text-gray-800
+                            {% endif %}">
+                            {{ batch.status }}
+                        </span>
+                    </div>
+                    
+                    {% if batch.status == 'InProduction' %}
+                    <form action="{{ url_for('production.complete_batch', batch_id=batch.id) }}" method="POST" class="mt-2">
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('هل أنت متأكد من إكمال جميع مراحل الإنتاج لهذه الدفعة؟')">
+                            <i class="fas fa-check-circle ml-1"></i> إكمال الإنتاج
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Steps Timeline -->
+    <div class="card p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-800">مراحل الإنتاج</h2>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="openManageStepsModal()">
+                <i class="fas fa-cog ml-1"></i> إدارة المراحل
+            </button>
+        </div>
+        {% if steps %}
+        <div class="relative">
+            <!-- Vertical Timeline Line -->
+            <div class="absolute top-0 bottom-0 right-6 w-0.5 bg-gray-200 z-0"></div>
+            
+            <!-- Steps -->
+            <div class="space-y-8 relative z-10">
+                {% for step in steps %}
+                <div class="flex items-start">
+                    <!-- Timeline Dot -->
+                    <div class="flex-shrink-0 ml-4 relative">
+                        <div class="h-12 w-12 rounded-full flex items-center justify-center z-10
+                            {% if step.id in completed_steps %}
+                                bg-green-500 text-white
+                            {% elif loop.index0 == 0 and not completed_steps %}
+                                bg-blue-500 text-white
+                            {% elif step.id == (completed_steps|last + 1 if completed_steps else -1) %}
+                                bg-blue-500 text-white
+                            {% else %}
+                                bg-gray-200 text-gray-500
+                            {% endif %}">
+                            {% if step.id in completed_steps %}
+                                <i class="fas fa-check"></i>
+                            {% else %}
+                                {{ loop.index }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Step Content -->
+                    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 flex-grow">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold text-lg text-gray-800">{{ step.name }}</h3>
+                                <p class="text-gray-600 mt-1">{{ step.description }}</p>
+                                
+                                {% if step.id in completed_steps %}
+                                    {% for record in step_records %}
+                                        {% if record.step_id == step.id %}
+                                        <div class="mt-3 pt-3 border-t border-gray-100">
+                                            <div class="text-sm text-gray-500">
+                                                <p><span class="font-medium">تاريخ البدء:</span> {{ record.start_time.strftime('%Y-%m-%d %H:%M') }}</p>
+                                                {% if record.end_time %}
+                                                <p><span class="font-medium">تاريخ الانتهاء:</span> {{ record.end_time.strftime('%Y-%m-%d %H:%M') }}</p>
+                                                {% endif %}
+                                                {% if record.notes %}
+                                                <p><span class="font-medium">ملاحظات:</span> {{ record.notes }}</p>
+                                                {% endif %}
+                                                
+                                                {% if record.parameters %}
+                                                <div class="mt-2">
+                                                    <p class="font-medium">المعايير المسجلة:</p>
+                                                    <ul class="list-disc list-inside mr-4 mt-1">
+                                                        {% for param_name, param_value in record.parameters.items() %}
+                                                        <li><span class="text-gray-600">{{ param_name }}:</span> {{ param_value }}</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            
+                            <div class="flex-shrink-0">
+                                <span class="text-sm text-gray-500">
+                                    المدة المعيارية: {{ step.standard_duration }} دقيقة
+                                </span>
+                            </div>
+                        </div>
+                        
+                        {% if step.id not in completed_steps and (loop.index0 == 0 or steps[loop.index0-1].id in completed_steps) %}
+                        <div class="mt-4 pt-4 border-t border-gray-100">
+                            <button type="button" class="btn btn-primary" onclick="openStepModal({{ step.id }}, '{{ step.name }}')">
+                                <i class="fas fa-play-circle ml-1"></i> تسجيل المرحلة
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <div class="text-gray-400 mb-3">
+                <i class="fas fa-clipboard-list text-5xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-500">لا توجد مراحل إنتاج محددة</h3>
+            <p class="text-gray-400 mt-1">يرجى إضافة مراحل الإنتاج أولاً</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Record Step Modal -->
+<div id="record-step-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4 overflow-hidden">
+        <div class="bg-blue-600 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="text-lg font-bold" id="step-modal-title">تسجيل مرحلة الإنتاج</h3>
+            <button type="button" class="text-white hover:text-blue-100" onclick="closeStepModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="record-step-form" action="{{ url_for('production.record_step', batch_id=batch.id) }}" method="POST" class="p-6">
+            <input type="hidden" id="step_id" name="step_id" value="">
+            
+            <div class="space-y-4">
+                <!-- Parameters Section -->
+                <div class="mb-4">
+                    <h4 class="font-medium text-gray-700 mb-2">معايير المرحلة</h4>
+                    <div id="parameters-container" class="space-y-3">
+                        <!-- Parameters will be added dynamically based on step -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">درجة الحرارة</label>
+                                <input type="text" name="param_temperature" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">الرطوبة</label>
+                                <input type="text" name="param_humidity" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">الوقت المستغرق (دقائق)</label>
+                            <input type="number" name="param_duration" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Notes -->
+                <div>
+                    <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                    <textarea name="notes" id="notes" rows="3" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"></textarea>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                <button type="button" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" onclick="closeStepModal()">
+                    إلغاء
+                </button>
+                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    تسجيل المرحلة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- Manage Production Steps Modal -->
+<div id="manage-steps-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg shadow-lg w-full max-w-4xl mx-4 overflow-hidden">
+        <div class="bg-blue-600 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="text-lg font-bold">إدارة مراحل الإنتاج</h3>
+            <button type="button" class="text-white hover:text-blue-100" onclick="closeManageStepsModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="p-6">
+            <div class="mb-6 flex justify-between items-center">
+                <h4 class="text-lg font-medium text-gray-800">قائمة مراحل الإنتاج</h4>
+                <button type="button" class="btn btn-sm btn-primary" onclick="showAddStepForm()">
+                    <i class="fas fa-plus ml-1"></i> إضافة مرحلة جديدة
+                </button>
+            </div>
+            
+            <!-- Steps List -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-md">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b">الترتيب</th>
+                            <th class="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b">اسم المرحلة</th>
+                            <th class="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b">الوصف</th>
+                            <th class="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b">المدة (دقيقة)</th>
+                            <th class="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b">الحالة</th>
+                            <th class="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="steps-table-body">
+                        <!-- Steps will be loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Add/Edit Step Form (initially hidden) -->
+            <div id="step-form-container" class="mt-6 border border-gray-200 rounded-md p-4 bg-gray-50 hidden">
+                <h5 class="text-md font-medium text-gray-800 mb-4" id="step-form-title">إضافة مرحلة جديدة</h5>
+                
+                <form id="step-form" action="{{ url_for('production.api_save_production_step') }}" method="POST">
+                    <input type="hidden" id="edit_step_id" name="step_id" value="">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="step_name" class="block text-sm font-medium text-gray-700 mb-1">اسم المرحلة</label>
+                            <input type="text" id="step_name" name="name" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" required>
+                        </div>
+                        
+                        <div>
+                            <label for="sequence_number" class="block text-sm font-medium text-gray-700 mb-1">ترتيب المرحلة</label>
+                            <input type="number" id="sequence_number" name="sequence_number" min="1" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">وصف المرحلة</label>
+                        <textarea id="description" name="description" rows="2" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"></textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="standard_duration" class="block text-sm font-medium text-gray-700 mb-1">المدة المعيارية (دقيقة)</label>
+                            <input type="number" id="standard_duration" name="standard_duration" min="1" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                        </div>
+                        
+                        <div class="flex items-center h-full pt-6">
+                            <input type="checkbox" id="is_active" name="is_active" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                            <label for="is_active" class="mr-2 block text-sm text-gray-900">نشط</label>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 space-x-reverse">
+                        <button type="button" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" onclick="hideStepForm()">
+                            إلغاء
+                        </button>
+                        <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            حفظ المرحلة
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+<script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
+
+{% block scripts %}
+<script>
+    // Record Step Modal Functions
+    function openStepModal(stepId, stepName) {
+        document.getElementById('step_id').value = stepId;
+        document.getElementById('step-modal-title').textContent = 'تسجيل مرحلة: ' + stepName;
+        document.getElementById('record-step-modal').classList.remove('hidden');
+        
+        // You can customize parameters based on step ID if needed
+        customizeParametersForStep(stepId);
+    }
+    
+    function closeStepModal() {
+        document.getElementById('record-step-modal').classList.add('hidden');
+        document.getElementById('record-step-form').reset();
+    }
+    
+    function customizeParametersForStep(stepId) {
+        // This function can be expanded to show different parameters for different steps
+        // For now, we'll use the default parameters
+        
+        // Example of how to customize:
+        /*
+        const parametersContainer = document.getElementById('parameters-container');
+        
+        // Clear existing parameters
+        parametersContainer.innerHTML = '';
+        
+        if (stepId === 1) {  // Mixing step
+            parametersContainer.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">درجة الحرارة (°C)</label>
+                        <input type="text" name="param_temperature" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">سرعة الخلط (دورة/دقيقة)</label>
+                        <input type="text" name="param_mixing_speed" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">مدة الخلط (دقائق)</label>
+                    <input type="number" name="param_mixing_duration" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                </div>
+            `;
+        } else if (stepId === 2) {  // Heating step
+            parametersContainer.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">درجة الحرارة المستهدفة (°C)</label>
+                        <input type="text" name="param_target_temperature" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">درجة الحرارة النهائية (°C)</label>
+                        <input type="text" name="param_final_temperature" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">مدة التسخين (دقائق)</label>
+                    <input type="number" name="param_heating_duration" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                </div>
+            `;
+        }
+        */
+    }
+    
+    // Manage Production Steps Modal Functions
+    function openManageStepsModal() {
+        document.getElementById('manage-steps-modal').classList.remove('hidden');
+        loadProductionSteps();
+    }
+    
+    function closeManageStepsModal() {
+        document.getElementById('manage-steps-modal').classList.add('hidden');
+        hideStepForm();
+        
+        // Reload the page to reflect any changes to the steps
+        window.location.reload();
+    }
+    
+    function showAddStepForm() {
+        // Reset form for adding a new step
+        document.getElementById('step-form').reset();
+        document.getElementById('edit_step_id').value = '';
+        document.getElementById('step-form-title').textContent = 'إضافة مرحلة جديدة';
+        
+        // Get the highest sequence number and add 1
+        const rows = document.querySelectorAll('#steps-table-body tr');
+        let maxSequence = 0;
+        rows.forEach(row => {
+            const seqNum = parseInt(row.querySelector('td:first-child').textContent);
+            if (seqNum > maxSequence) maxSequence = seqNum;
+        });
+        
+        document.getElementById('sequence_number').value = maxSequence + 1;
+        document.getElementById('step-form-container').classList.remove('hidden');
+    }
+    
+    function showEditStepForm(stepId, name, description, duration, sequence, isActive) {
+        document.getElementById('edit_step_id').value = stepId;
+        document.getElementById('step_name').value = name;
+        document.getElementById('description').value = description || '';
+        document.getElementById('standard_duration').value = duration || '';
+        document.getElementById('sequence_number').value = sequence;
+        document.getElementById('is_active').checked = isActive;
+        
+        document.getElementById('step-form-title').textContent = 'تعديل المرحلة';
+        document.getElementById('step-form-container').classList.remove('hidden');
+    }
+    
+    function hideStepForm() {
+        document.getElementById('step-form-container').classList.add('hidden');
+        document.getElementById('step-form').reset();
+    }
+    
+    function loadProductionSteps() {
+        fetch('/production/api/steps')
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById('steps-table-body');
+                tableBody.innerHTML = '';
+                
+                data.steps.forEach(step => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50';
+                    
+                    row.innerHTML = `
+                        <td class="py-3 px-4 border-b">${step.sequence_number}</td>
+                        <td class="py-3 px-4 border-b">${step.name}</td>
+                        <td class="py-3 px-4 border-b">${step.description || '-'}</td>
+                        <td class="py-3 px-4 border-b">${step.standard_duration || '-'}</td>
+                        <td class="py-3 px-4 border-b">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                ${step.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                ${step.is_active ? 'نشط' : 'غير نشط'}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 border-b">
+                            <div class="flex items-center space-x-3 space-x-reverse">
+                                <button type="button" class="text-blue-600 hover:text-blue-900" 
+                                    onclick="showEditStepForm(${step.id}, '${step.name}', '${step.description || ''}', ${step.standard_duration || 0}, ${step.sequence_number}, ${step.is_active})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button type="button" class="text-red-600 hover:text-red-900" 
+                                    onclick="deleteStep(${step.id}, '${step.name}')">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading production steps:', error);
+                alert('حدث خطأ أثناء تحميل مراحل الإنتاج');
+            });
+    }
+    
+    function deleteStep(stepId, stepName) {
+        if (confirm(`هل أنت متأكد من حذف المرحلة "${stepName}"؟`)) {
+            fetch(`/production/api/steps/delete/${stepId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadProductionSteps();
+                } else {
+                    alert(data.message || 'حدث خطأ أثناء حذف المرحلة');
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting step:', error);
+                alert('حدث خطأ أثناء حذف المرحلة');
+            });
+        }
+    }
+    
+    // Close modals when clicking outside
+    document.addEventListener('click', function(event) {
+        const recordModal = document.getElementById('record-step-modal');
+        const manageModal = document.getElementById('manage-steps-modal');
+        
+        if (recordModal && !recordModal.classList.contains('hidden') && event.target === recordModal) {
+            closeStepModal();
+        }
+        
+        if (manageModal && !manageModal.classList.contains('hidden') && event.target === manageModal) {
+            closeManageStepsModal();
+        }
+    });
+    
+    // Initialize forms and event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Record step form handling
+        // Record step form handling
+const stepForm = document.getElementById('record-step-form');
+if (stepForm) {
+    stepForm.addEventListener('submit', function(event) {
+        event.preventDefault(); // Prevent default form submission
+        
+        // Get form data
+        const formData = new FormData(stepForm);
+        
+        // Submit via fetch API
+        fetch(stepForm.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                // Close the modal
+                closeStepModal();
+                // Reload the page to show the updated steps
+                window.location.reload();
+            } else {
+                alert('حدث خطأ أثناء تسجيل المرحلة');
+            }
+        })
+        .catch(error => {
+            console.error('Error recording step:', error);
+            alert('حدث خطأ أثناء تسجيل المرحلة');
+        });
+    });
+}
+
+        
+        // Manage steps form handling
+        const manageStepForm = document.getElementById('step-form');
+        if (manageStepForm) {
+            manageStepForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                const formData = new FormData(manageStepForm);
+                const stepId = formData.get('step_id');
+                const url = stepId ? `/production/api/steps/update/${stepId}` : '/production/api/steps/create';
+                
+                fetch(url, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        hideStepForm();
+                        loadProductionSteps();
+                    } else {
+                        alert(data.message || 'حدث خطأ أثناء حفظ المرحلة');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving step:', error);
+                    alert('حدث خطأ أثناء حفظ المرحلة');
+                });
+            });
+        }
+    });
+</script>
+
+{% endblock %}
+

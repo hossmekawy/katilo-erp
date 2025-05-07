@@ -1,0 +1,829 @@
+{% extends 'base.html' %}
+
+{% block title %}اقتراحات الذكاء الاصطناعي{% endblock %}
+
+{% block page_header %}اقتراحات الذكاء الاصطناعي{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/dashboard" class="text-blue-600 hover:text-blue-800">لوحة التحكم</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">اقتراحات الذكاء الاصطناعي</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="aiSuggestions()" x-init="init()">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <!-- Summary Cards -->
+        <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+                <div class="flex items-center space-x-3 space-x-reverse">
+                    <div class="bg-blue-100 p-2 rounded-lg">
+                        <i class="fas fa-lightbulb text-blue-600 text-lg"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-gray-800">اقتراحات معلقة</h2>
+                </div>
+                <span class="text-2xl font-bold text-blue-600" x-text="pendingCount"></span>
+            </div>
+        </div>
+
+        <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-green-50 to-teal-50">
+                <div class="flex items-center space-x-3 space-x-reverse">
+                    <div class="bg-green-100 p-2 rounded-lg">
+                        <i class="fas fa-check text-green-600 text-lg"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-gray-800">اقتراحات مطبقة</h2>
+                </div>
+                <span class="text-2xl font-bold text-green-600" x-text="appliedCount"></span>
+            </div>
+        </div>
+
+        <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-red-50 to-orange-50">
+                <div class="flex items-center space-x-3 space-x-reverse">
+                    <div class="bg-red-100 p-2 rounded-lg">
+                        <i class="fas fa-times text-red-600 text-lg"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-gray-800">اقتراحات مرفوضة</h2>
+                </div>
+                <span class="text-2xl font-bold text-red-600" x-text="dismissedCount"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card bg-white shadow-sm rounded-xl overflow-hidden mb-6">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-purple-100 p-2 rounded-lg">
+                    <i class="fas fa-filter text-purple-600 text-lg"></i>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800">تصفية الاقتراحات</h2>
+            </div>
+        </div>
+        <div class="p-5">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                    <select id="statusFilter" x-model="filters.status" @change="loadSuggestions()" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="Pending">معلق</option>
+                        <option value="Applied">مطبق</option>
+                        <option value="Dismissed">مرفوض</option>
+                        <option value="">الكل</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="typeFilter" class="block text-sm font-medium text-gray-700 mb-1">نوع الاقتراح</label>
+                    <select id="typeFilter" x-model="filters.type" @change="loadSuggestions()" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">الكل</option>
+                        <option value="NameImprovement">تحسين الاسم</option>
+                        <option value="CategoryMismatch">تصنيف غير مناسب</option>
+                        <option value="ReorderLevelAdjustment">تعديل مستوى إعادة الطلب</option>
+                        <option value="InventoryAnomaly">شذوذ في المخزون</option>
+                    </select>
+                </div>
+                <div class="flex items-end space-x-2 space-x-reverse">
+                    <button @click="triggerAnalysis()" class="btn bg-blue-600 hover:bg-blue-700 text-white flex-1 flex items-center justify-center">
+                        <i class="fas fa-robot ml-2 text-lg"></i>
+                        <span class="font-bold">تحليل جديد</span>
+                    </button>
+                    <button @click="exportToExcel()" class="btn bg-green-600 hover:bg-green-700 text-white flex-1">
+                        <i class="fas fa-file-excel ml-1"></i> تصدير Excel
+                    </button>
+                </div>
+                <div class="mt-3 bg-blue-50 p-3 rounded-lg border border-blue-200 text-blue-800">
+                    <div class="flex items-start">
+                        <i class="fas fa-info-circle text-blue-500 mt-1 ml-2 text-lg"></i>
+                        <div>
+                            <p class="font-semibold">ملاحظة هامة:</p>
+                            <p>يتم تشغيل تحليل الذكاء الاصطناعي <span class="font-bold underline">فقط</span> عند النقر على زر "تحليل جديد". قد يستغرق التحليل بضع دقائق لإكماله.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Suggestions List -->
+    <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-blue-100 p-2 rounded-lg">
+                    <i class="fas fa-list text-blue-600 text-lg"></i>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800">قائمة الاقتراحات</h2>
+            </div>
+            <div x-show="isLoading">
+                <i class="fas fa-spinner fa-spin text-blue-600"></i>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">العنصر</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نوع الاقتراح</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاقتراح</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">القيمة المقترحة</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التاريخ</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="suggestion in suggestions" :key="suggestion.id">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900" x-text="suggestion.item ? suggestion.item.name : 'غير معروف'"></div>
+                                        <div class="text-sm text-gray-500" x-text="suggestion.item ? suggestion.item.sku : ''"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="{
+                                        'bg-blue-100 text-blue-800': suggestion.suggestion_type === 'NameImprovement',
+                                        'bg-yellow-100 text-yellow-800': suggestion.suggestion_type === 'CategoryMismatch',
+                                        'bg-green-100 text-green-800': suggestion.suggestion_type === 'ReorderLevelAdjustment',
+                                        'bg-red-100 text-red-800': suggestion.suggestion_type === 'InventoryAnomaly'
+                                      }"
+                                      x-text="getSuggestionTypeName(suggestion.suggestion_type)"></span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900" x-text="suggestion.suggestion_text"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="suggestion.suggested_value || '-'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="formatDate(suggestion.created_at)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                                <div x-show="suggestion.status === 'Pending'" class="flex space-x-2 space-x-reverse">
+                                    <!-- Edit button based on suggestion type -->
+                                    <button @click="openEditModal(suggestion)"
+                                            x-show="suggestion.suggestion_type === 'NameImprovement' ||
+                                                    suggestion.suggestion_type === 'CategoryMismatch' ||
+                                                    suggestion.suggestion_type === 'ReorderLevelAdjustment' ||
+                                                    suggestion.suggestion_type === 'InventoryAnomaly'"
+                                            class="text-blue-600 hover:text-blue-900 ml-2">
+                                        <i class="fas fa-edit"></i> تعديل
+                                    </button>
+                                    <button @click="applySuggestion(suggestion.id)" class="text-green-600 hover:text-green-900">
+                                        <i class="fas fa-check"></i> تطبيق
+                                    </button>
+                                    <button @click="dismissSuggestion(suggestion.id)" class="text-red-600 hover:text-red-900">
+                                        <i class="fas fa-times"></i> رفض
+                                    </button>
+                                </div>
+                                <div x-show="suggestion.status === 'Applied'" class="text-green-600">
+                                    <i class="fas fa-check-circle"></i> تم التطبيق
+                                </div>
+                                <div x-show="suggestion.status === 'Dismissed'" class="text-red-600">
+                                    <i class="fas fa-times-circle"></i> تم الرفض
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="suggestions.length === 0">
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            لا توجد اقتراحات متاحة
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="px-6 py-4 bg-white border-t border-gray-200 flex items-center justify-between" x-show="pagination.total > 0">
+            <div class="flex-1 flex justify-between sm:hidden">
+                <button @click="changePage(pagination.prev_num)"
+                        :disabled="!pagination.has_prev"
+                        :class="{'opacity-50 cursor-not-allowed': !pagination.has_prev}"
+                        class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    السابق
+                </button>
+                <button @click="changePage(pagination.next_num)"
+                        :disabled="!pagination.has_next"
+                        :class="{'opacity-50 cursor-not-allowed': !pagination.has_next}"
+                        class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    التالي
+                </button>
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        عرض
+                        <span class="font-medium" x-text="(pagination.page - 1) * pagination.per_page + 1"></span>
+                        إلى
+                        <span class="font-medium" x-text="Math.min(pagination.page * pagination.per_page, pagination.total)"></span>
+                        من
+                        <span class="font-medium" x-text="pagination.total"></span>
+                        نتيجة
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <button @click="changePage(pagination.prev_num)"
+                                :disabled="!pagination.has_prev"
+                                :class="{'opacity-50 cursor-not-allowed': !pagination.has_prev}"
+                                class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">السابق</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+
+                        <template x-for="page in getPageNumbers()" :key="page">
+                            <button @click="changePage(page)"
+                                    :class="{'bg-blue-50 border-blue-500 text-blue-600': pagination.page === page, 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50': pagination.page !== page}"
+                                    class="relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                <span x-text="page"></span>
+                            </button>
+                        </template>
+
+                        <button @click="changePage(pagination.next_num)"
+                                :disabled="!pagination.has_next"
+                                :class="{'opacity-50 cursor-not-allowed': !pagination.has_next}"
+                                class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">التالي</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modals -->
+    <!-- Name Improvement Modal -->
+    <div id="nameImprovementModal" x-show="showNameImprovementModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" x-cloak>
+        <div class="bg-white rounded-xl shadow-lg w-11/12 max-w-lg" @click.away="showNameImprovementModal = false">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">تحسين اسم العنصر</h3>
+                <button @click="showNameImprovementModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <label for="currentName" class="block text-sm font-medium text-gray-700 mb-1">الاسم الحالي</label>
+                    <input type="text" id="currentName" x-model="currentItem.name" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" disabled>
+                </div>
+                <div class="mb-4">
+                    <label for="suggestedName" class="block text-sm font-medium text-gray-700 mb-1">الاسم المقترح</label>
+                    <input type="text" id="suggestedName" x-model="editForm.newValue" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div class="flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showNameImprovementModal = false" class="btn btn-secondary">
+                        إلغاء
+                    </button>
+                    <button @click="saveEdit('NameImprovement')" class="btn btn-primary">
+                        <i class="fas fa-save ml-1"></i> حفظ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Mismatch Modal -->
+    <div id="categoryMismatchModal" x-show="showCategoryMismatchModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" x-cloak>
+        <div class="bg-white rounded-xl shadow-lg w-11/12 max-w-lg" @click.away="showCategoryMismatchModal = false">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">تعديل تصنيف العنصر</h3>
+                <button @click="showCategoryMismatchModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <label for="itemName" class="block text-sm font-medium text-gray-700 mb-1">اسم العنصر</label>
+                    <input type="text" id="itemName" x-model="currentItem.name" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" disabled>
+                </div>
+                <div class="mb-4">
+                    <label for="currentCategory" class="block text-sm font-medium text-gray-700 mb-1">التصنيف الحالي</label>
+                    <input type="text" id="currentCategory" x-model="currentItem.category" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" disabled>
+                </div>
+                <div class="mb-4">
+                    <label for="suggestedCategory" class="block text-sm font-medium text-gray-700 mb-1">التصنيف المقترح</label>
+                    <input type="text" id="suggestedCategory" x-model="editForm.newValue" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div class="flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showCategoryMismatchModal = false" class="btn btn-secondary">
+                        إلغاء
+                    </button>
+                    <button @click="saveEdit('CategoryMismatch')" class="btn btn-primary">
+                        <i class="fas fa-save ml-1"></i> حفظ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reorder Level Modal -->
+    <div id="reorderLevelModal" x-show="showReorderLevelModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" x-cloak>
+        <div class="bg-white rounded-xl shadow-lg w-11/12 max-w-lg" @click.away="showReorderLevelModal = false">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">تعديل مستوى إعادة الطلب</h3>
+                <button @click="showReorderLevelModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <label for="reorderItemName" class="block text-sm font-medium text-gray-700 mb-1">اسم العنصر</label>
+                    <input type="text" id="reorderItemName" x-model="currentItem.name" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" disabled>
+                </div>
+                <div class="mb-4">
+                    <label for="currentReorderLevel" class="block text-sm font-medium text-gray-700 mb-1">مستوى إعادة الطلب الحالي</label>
+                    <input type="number" id="currentReorderLevel" x-model="currentItem.reorderLevel" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" disabled>
+                </div>
+                <div class="mb-4">
+                    <label for="suggestedReorderLevel" class="block text-sm font-medium text-gray-700 mb-1">مستوى إعادة الطلب المقترح</label>
+                    <input type="number" id="suggestedReorderLevel" x-model="editForm.newValue" min="1" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div class="flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showReorderLevelModal = false" class="btn btn-secondary">
+                        إلغاء
+                    </button>
+                    <button @click="saveEdit('ReorderLevelAdjustment')" class="btn btn-primary">
+                        <i class="fas fa-save ml-1"></i> حفظ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory Anomaly Modal -->
+    <div id="inventoryAnomalyModal" x-show="showInventoryAnomalyModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" x-cloak>
+        <div class="bg-white rounded-xl shadow-lg w-11/12 max-w-lg" @click.away="showInventoryAnomalyModal = false">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">معالجة شذوذ في المخزون</h3>
+                <button @click="showInventoryAnomalyModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <label for="anomalyItemName" class="block text-sm font-medium text-gray-700 mb-1">اسم العنصر</label>
+                    <input type="text" id="anomalyItemName" x-model="currentItem.name" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" disabled>
+                </div>
+                <div class="mb-4">
+                    <label for="anomalyDescription" class="block text-sm font-medium text-gray-700 mb-1">وصف المشكلة</label>
+                    <textarea id="anomalyDescription" x-model="currentSuggestion.suggestion_text" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" rows="3" disabled></textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="suggestedFix" class="block text-sm font-medium text-gray-700 mb-1">الإصلاح المقترح</label>
+                    <input type="text" id="suggestedFix" x-model="editForm.newValue" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div class="flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showInventoryAnomalyModal = false" class="btn btn-secondary">
+                        إلغاء
+                    </button>
+                    <button @click="saveEdit('InventoryAnomaly')" class="btn btn-primary">
+                        <i class="fas fa-save ml-1"></i> حفظ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function aiSuggestions() {
+    return {
+        suggestions: [],
+        pendingCount: 0,
+        appliedCount: 0,
+        dismissedCount: 0,
+        isLoading: true,
+        filters: {
+            status: 'Pending',
+            type: ''
+        },
+
+        // Pagination
+        pagination: {
+            page: 1,
+            per_page: 20,
+            total: 0,
+            pages: 0,
+            has_next: false,
+            has_prev: false,
+            next_num: null,
+            prev_num: null
+        },
+
+        // Modal states
+        showNameImprovementModal: false,
+        showCategoryMismatchModal: false,
+        showReorderLevelModal: false,
+        showInventoryAnomalyModal: false,
+
+        // Current item and suggestion being edited
+        currentItem: {
+            id: null,
+            name: '',
+            sku: '',
+            category: '',
+            reorderLevel: 0
+        },
+        currentSuggestion: {
+            id: null,
+            suggestion_type: '',
+            suggestion_text: '',
+            suggested_value: ''
+        },
+
+        // Edit form data
+        editForm: {
+            itemId: null,
+            suggestionId: null,
+            editType: '',
+            newValue: ''
+        },
+
+        async init() {
+            await this.loadSuggestions();
+            await this.loadCounts();
+
+            // Check if there's a suggestion_id in the URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const suggestionId = urlParams.get('suggestion_id');
+
+            if (suggestionId) {
+                // Find the suggestion in the loaded suggestions
+                const suggestion = this.suggestions.find(s => s.id == suggestionId);
+                if (suggestion) {
+                    // Open the appropriate modal
+                    this.openEditModal(suggestion);
+                }
+            }
+        },
+
+        async loadSuggestions() {
+            this.isLoading = true;
+            try {
+                const queryParams = new URLSearchParams();
+                if (this.filters.status) queryParams.append('status', this.filters.status);
+                if (this.filters.type) queryParams.append('type', this.filters.type);
+                queryParams.append('page', this.pagination.page);
+                queryParams.append('per_page', this.pagination.per_page);
+
+                const response = await fetch(`/api/ai-suggestions?${queryParams.toString()}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.suggestions = data.items;
+                    this.pagination = data.pagination;
+                } else {
+                    console.error('Failed to load suggestions');
+                }
+            } catch (error) {
+                console.error('Error loading suggestions:', error);
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        async loadCounts() {
+            try {
+                // Get pending count
+                const pendingResponse = await fetch('/api/ai-suggestions?status=Pending&per_page=1');
+                if (pendingResponse.ok) {
+                    const data = await pendingResponse.json();
+                    this.pendingCount = data.pagination.total;
+                }
+
+                // Get applied count
+                const appliedResponse = await fetch('/api/ai-suggestions?status=Applied&per_page=1');
+                if (appliedResponse.ok) {
+                    const data = await appliedResponse.json();
+                    this.appliedCount = data.pagination.total;
+                }
+
+                // Get dismissed count
+                const dismissedResponse = await fetch('/api/ai-suggestions?status=Dismissed&per_page=1');
+                if (dismissedResponse.ok) {
+                    const data = await dismissedResponse.json();
+                    this.dismissedCount = data.pagination.total;
+                }
+            } catch (error) {
+                console.error('Error loading counts:', error);
+            }
+        },
+
+        async applySuggestion(id) {
+            if (!confirm('هل أنت متأكد من تطبيق هذا الاقتراح؟')) return;
+
+            try {
+                const response = await fetch(`/api/ai-suggestions/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: 'Applied' })
+                });
+
+                if (response.ok) {
+                    await this.loadSuggestions();
+                    await this.loadCounts();
+                } else {
+                    alert('فشل في تطبيق الاقتراح');
+                }
+            } catch (error) {
+                console.error('Error applying suggestion:', error);
+                alert('حدث خطأ أثناء تطبيق الاقتراح');
+            }
+        },
+
+        async dismissSuggestion(id) {
+            if (!confirm('هل أنت متأكد من رفض هذا الاقتراح؟')) return;
+
+            try {
+                const response = await fetch(`/api/ai-suggestions/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: 'Dismissed' })
+                });
+
+                if (response.ok) {
+                    await this.loadSuggestions();
+                    await this.loadCounts();
+                } else {
+                    alert('فشل في رفض الاقتراح');
+                }
+            } catch (error) {
+                console.error('Error dismissing suggestion:', error);
+                alert('حدث خطأ أثناء رفض الاقتراح');
+            }
+        },
+
+        async triggerAnalysis() {
+            if (!confirm('هل أنت متأكد من بدء تحليل جديد للمخزون؟ قد يستغرق هذا بضع دقائق.')) {
+                return;
+            }
+
+            try {
+                this.isLoading = true;
+
+                // Show analysis in progress message
+                const analysisStartTime = new Date();
+                const notificationElement = document.createElement('div');
+                notificationElement.className = 'fixed top-4 right-4 bg-blue-600 text-white p-4 rounded-lg shadow-lg z-50 flex items-center';
+                notificationElement.innerHTML = `
+                    <i class="fas fa-spinner fa-spin ml-2 text-lg"></i>
+                    <div>
+                        <p class="font-bold">جاري التحليل...</p>
+                        <p class="text-sm">يرجى الانتظار بينما يقوم الذكاء الاصطناعي بتحليل بيانات المخزون</p>
+                    </div>
+                `;
+                document.body.appendChild(notificationElement);
+
+                const response = await fetch('/api/ai-suggestions/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+
+                // Remove the notification
+                document.body.removeChild(notificationElement);
+
+                if (response.ok) {
+                    // Calculate elapsed time
+                    const elapsedTime = Math.round((new Date() - analysisStartTime) / 1000);
+
+                    // Show success message
+                    const successElement = document.createElement('div');
+                    successElement.className = 'fixed top-4 right-4 bg-green-600 text-white p-4 rounded-lg shadow-lg z-50 flex items-center';
+                    successElement.innerHTML = `
+                        <i class="fas fa-check-circle ml-2 text-lg"></i>
+                        <div>
+                            <p class="font-bold">تم بدء التحليل بنجاح!</p>
+                            <p class="text-sm">استغرق الطلب ${elapsedTime} ثانية. سيتم تحديث النتائج قريبًا.</p>
+                        </div>
+                    `;
+                    document.body.appendChild(successElement);
+
+                    // Remove success message after 5 seconds
+                    setTimeout(() => {
+                        document.body.removeChild(successElement);
+                    }, 5000);
+
+                    // Reload suggestions after a short delay
+                    setTimeout(async () => {
+                        await this.loadSuggestions();
+                        await this.loadCounts();
+                    }, 2000);
+                } else {
+                    alert('فشل في بدء التحليل. يرجى المحاولة مرة أخرى لاحقًا.');
+                }
+            } catch (error) {
+                console.error('Error triggering analysis:', error);
+                alert('حدث خطأ أثناء بدء التحليل. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.');
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        // Pagination methods
+        changePage(page) {
+            if (page && page !== this.pagination.page) {
+                this.pagination.page = page;
+                this.loadSuggestions();
+            }
+        },
+
+        getPageNumbers() {
+            const pages = [];
+            const totalPages = this.pagination.pages;
+            const currentPage = this.pagination.page;
+
+            // Always show first page, last page, current page, and 1 page before and after current
+            const pagesToShow = new Set([1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
+
+            // Remove invalid pages (less than 1 or greater than total)
+            for (let page of [...pagesToShow]) {
+                if (page < 1 || page > totalPages) {
+                    pagesToShow.delete(page);
+                }
+            }
+
+            // Convert to sorted array
+            return [...pagesToShow].sort((a, b) => a - b);
+        },
+
+        // Modal methods
+        openEditModal(suggestion) {
+            if (!suggestion || !suggestion.item) return;
+
+            // Set current item and suggestion
+            this.currentItem = {
+                id: suggestion.item.id,
+                name: suggestion.item.name,
+                sku: suggestion.item.sku,
+                category: suggestion.item.category_name,
+                reorderLevel: suggestion.item.reorder_level
+            };
+
+            this.currentSuggestion = suggestion;
+
+            // Set edit form data
+            this.editForm = {
+                itemId: suggestion.item.id,
+                suggestionId: suggestion.id,
+                editType: suggestion.suggestion_type,
+                newValue: suggestion.suggested_value || ''
+            };
+
+            // Open the appropriate modal based on suggestion type
+            if (suggestion.suggestion_type === 'NameImprovement') {
+                this.showNameImprovementModal = true;
+            } else if (suggestion.suggestion_type === 'CategoryMismatch') {
+                this.showCategoryMismatchModal = true;
+            } else if (suggestion.suggestion_type === 'ReorderLevelAdjustment') {
+                this.showReorderLevelModal = true;
+            } else if (suggestion.suggestion_type === 'InventoryAnomaly') {
+                this.showInventoryAnomalyModal = true;
+            }
+        },
+
+        async saveEdit(editType) {
+            if (!this.editForm.newValue) {
+                alert('يرجى إدخال قيمة صحيحة');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/ai-suggestions/edit-item', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        item_id: this.editForm.itemId,
+                        edit_type: editType,
+                        new_value: this.editForm.newValue,
+                        suggestion_id: this.editForm.suggestionId
+                    })
+                });
+
+                if (response.ok) {
+                    // Close all modals
+                    this.showNameImprovementModal = false;
+                    this.showCategoryMismatchModal = false;
+                    this.showReorderLevelModal = false;
+                    this.showInventoryAnomalyModal = false;
+
+                    // Reload data
+                    await this.loadSuggestions();
+                    await this.loadCounts();
+
+                    alert('تم تحديث العنصر بنجاح');
+                } else {
+                    const error = await response.json();
+                    alert(`فشل في تحديث العنصر: ${error.error}`);
+                }
+            } catch (error) {
+                console.error('Error saving edit:', error);
+                alert('حدث خطأ أثناء تحديث العنصر');
+            }
+        },
+
+        getSuggestionTypeName(type) {
+            const types = {
+                'NameImprovement': 'تحسين الاسم',
+                'CategoryMismatch': 'تصنيف غير مناسب',
+                'ReorderLevelAdjustment': 'تعديل مستوى إعادة الطلب',
+                'InventoryAnomaly': 'شذوذ في المخزون'
+            };
+            return types[type] || type;
+        },
+
+        formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return new Intl.DateTimeFormat('ar-EG', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        },
+
+        async exportToExcel() {
+            try {
+                // Show loading state
+                this.isLoading = true;
+
+                // Build query parameters including filters
+                const queryParams = new URLSearchParams();
+                if (this.filters.status) queryParams.append('status', this.filters.status);
+                if (this.filters.type) queryParams.append('type', this.filters.type);
+
+                // Make the request to the export endpoint
+                const response = await fetch(`/api/ai-suggestions/export?${queryParams.toString()}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    }
+                });
+
+                if (response.ok) {
+                    // Create a blob from the response
+                    const blob = await response.blob();
+
+                    // Create a temporary URL for the blob
+                    const url = window.URL.createObjectURL(blob);
+
+                    // Create a temporary link element
+                    const a = document.createElement('a');
+                    a.href = url;
+
+                    // Set the filename from the Content-Disposition header or use a default
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'ai_suggestions.xlsx';
+
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+
+                    a.download = filename;
+
+                    // Append the link to the body, click it, and remove it
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    // Clean up the URL
+                    window.URL.revokeObjectURL(url);
+
+                    // Show success message
+                    alert('تم تصدير البيانات بنجاح');
+                } else {
+                    const error = await response.text();
+                    console.error('Error exporting data:', error);
+                    alert('فشل في تصدير البيانات');
+                }
+            } catch (error) {
+                console.error('Error exporting to Excel:', error);
+                alert('حدث خطأ أثناء تصدير البيانات');
+            } finally {
+                this.isLoading = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

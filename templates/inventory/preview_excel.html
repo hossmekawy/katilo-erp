@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+
+{% block title %}مراجعة بيانات Excel{% endblock %}
+
+{% block page_header %}مراجعة بيانات Excel{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/dashboard" class="text-blue-600 hover:text-blue-800">لوحة التحكم</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/items-management" class="text-blue-600 hover:text-blue-800">إدارة العناصر</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('inventory.import_excel_form') }}" class="text-blue-600 hover:text-blue-800">استيراد من Excel</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">مراجعة البيانات</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="excelPreviewApp()" class="space-y-6">
+    <!-- Header with actions -->
+    <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-blue-100 p-2 rounded-lg">
+                    <i class="fas fa-file-excel text-blue-600 text-lg"></i>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800">مراجعة بيانات Excel</h2>
+            </div>
+            <div class="flex space-x-2 space-x-reverse">
+                <a href="{{ url_for('inventory.import_excel_form') }}" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700">
+                    <i class="fas fa-arrow-right ml-1"></i> رجوع
+                </a>
+                <button @click="processItems()" class="btn btn-primary" :disabled="isProcessing">
+                    <template x-if="!isProcessing">
+                        <span><i class="fas fa-save ml-1"></i> حفظ البيانات</span>
+                    </template>
+                    <template x-if="isProcessing">
+                        <span class="flex items-center">
+                            <svg class="animate-spin ml-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            جاري المعالجة...
+                        </span>
+                    </template>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-6">
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                    </div>
+                    <div class="mr-3">
+                        <p class="text-sm text-yellow-700">
+                            يرجى مراجعة البيانات أدناه واختيار الإجراء المناسب لكل عنصر. يمكنك إضافة العنصر كمنتج، أو إضافته كتصنيف، أو تخطيه.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Summary (hidden until processing is complete) -->
+            <div x-show="showResults" class="mb-6 p-4 bg-green-50 rounded-md">
+                <h3 class="text-lg font-semibold text-green-800 mb-2">تمت المعالجة بنجاح</h3>
+                <ul class="list-disc list-inside text-green-700">
+                    <li>تمت إضافة <span x-text="results.added_items"></span> عنصر</li>
+                    <li>تمت إضافة <span x-text="results.added_categories"></span> تصنيف</li>
+                    <li>تم تخطي <span x-text="results.skipped_items"></span> عنصر</li>
+                </ul>
+            </div>
+
+            <!-- Error Message (hidden until an error occurs) -->
+            <div x-show="showError" class="mb-6 p-4 bg-red-50 rounded-md">
+                <h3 class="text-lg font-semibold text-red-800 mb-2">حدث خطأ أثناء المعالجة</h3>
+                <p class="text-red-700" x-text="errorMessage"></p>
+            </div>
+
+            <!-- Default Category Display -->
+            <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div class="flex items-center">
+                    <i class="fas fa-folder text-blue-500 ml-2 text-lg"></i>
+                    <div>
+                        <h3 class="font-medium text-blue-800">التصنيف الافتراضي للعناصر</h3>
+                        <p class="text-blue-600">{{ default_category.name }}</p>
+                    </div>
+                </div>
+                <p class="mt-2 text-sm text-gray-600">سيتم استخدام هذا التصنيف للعناصر التي تم اختيار إضافتها كمنتجات</p>
+            </div>
+
+            <!-- What is "Add as Category" Explanation -->
+            <div class="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <div class="flex items-start">
+                    <i class="fas fa-info-circle text-yellow-500 ml-2 mt-1 text-lg"></i>
+                    <div>
+                        <h3 class="font-medium text-yellow-800">ما معنى "إضافته كتصنيف"؟</h3>
+                        <p class="text-gray-700">عند اختيار "إضافته كتصنيف"، سيتم إنشاء تصنيف جديد في النظام باسم العنصر بدلاً من إضافته كمنتج. يمكنك استخدام هذا الخيار إذا كان العنصر في الحقيقة يمثل تصنيفاً وليس منتجاً.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bulk Actions -->
+            <div class="mb-6 flex flex-wrap gap-2">
+                <button @click="setAllActions('item')" class="btn bg-blue-100 hover:bg-blue-200 text-blue-700">
+                    <i class="fas fa-box ml-1"></i> تعيين الكل كمنتجات
+                </button>
+                <button @click="setAllActions('category')" class="btn bg-yellow-100 hover:bg-yellow-200 text-yellow-700">
+                    <i class="fas fa-folder ml-1"></i> تعيين الكل كتصنيفات
+                </button>
+                <button @click="setAllActions('skip')" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700">
+                    <i class="fas fa-ban ml-1"></i> تخطي الكل
+                </button>
+            </div>
+
+            <!-- Items Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاسم</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الوصف</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وحدة القياس</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التكلفة</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">السعر</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نوع المنتج</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="(item, index) in items" :key="index">
+                            <tr :class="{'bg-gray-50': item.action === 'skip', 'bg-blue-50': item.action === 'item', 'bg-yellow-50': item.action === 'category'}">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="index + 1"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="item.name || 'غير محدد'"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <input type="text" x-model="item.description" class="form-input w-full text-sm" placeholder="أدخل الوصف">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <input type="text" x-model="item.unit_of_measure" class="form-input w-full text-sm" placeholder="وحدة">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <input type="number" x-model="item.cost" class="form-input w-full text-sm" min="0" step="0.01">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <input type="number" x-model="item.price" class="form-input w-full text-sm" min="0" step="0.01">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <select x-model="item.category_type" class="form-select w-full text-sm" :disabled="item.action !== 'item'">
+                                        <option value="FinalProduct">منتج نهائي</option>
+                                        <option value="RawMaterial">مادة خام</option>
+                                        <option value="Packaging">مواد تغليف</option>
+                                        <option value="IntermediateProduct">منتج وسيط</option>
+                                    </select>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div class="flex space-x-2 space-x-reverse">
+                                        <button @click="setItemAction(index, 'item')"
+                                                :class="{'bg-blue-600 text-white': item.action === 'item', 'bg-blue-100 text-blue-700': item.action !== 'item'}"
+                                                class="px-3 py-1 rounded-md text-xs font-medium">
+                                            <i class="fas fa-box ml-1"></i> منتج
+                                        </button>
+                                        <button @click="setItemAction(index, 'category')"
+                                                :class="{'bg-yellow-600 text-white': item.action === 'category', 'bg-yellow-100 text-yellow-700': item.action !== 'category'}"
+                                                class="px-3 py-1 rounded-md text-xs font-medium">
+                                            <i class="fas fa-folder ml-1"></i> تصنيف
+                                        </button>
+                                        <button @click="setItemAction(index, 'skip')"
+                                                :class="{'bg-gray-600 text-white': item.action === 'skip', 'bg-gray-100 text-gray-700': item.action !== 'skip'}"
+                                                class="px-3 py-1 rounded-md text-xs font-medium">
+                                            <i class="fas fa-ban ml-1"></i> تخطي
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('excelPreviewApp', () => ({
+            items: {{ items|tojson }},
+            defaultCategoryId: '{{ default_category.id }}',
+            isProcessing: false,
+            showResults: false,
+            showError: false,
+            errorMessage: '',
+            results: {
+                added_items: 0,
+                added_categories: 0,
+                skipped_items: 0
+            },
+
+            init() {
+                // Initialize all items with 'item' action and RawMaterial type by default
+                this.items.forEach(item => {
+                    item.action = 'item';
+                    item.category_type = 'RawMaterial'; // Default category type
+                });
+            },
+
+            setItemAction(index, action) {
+                this.items[index].action = action;
+            },
+
+            setAllActions(action) {
+                this.items.forEach(item => {
+                    item.action = action;
+                });
+            },
+
+            processItems() {
+                this.isProcessing = true;
+                this.showResults = false;
+                this.showError = false;
+
+                // Prepare data for submission
+                const processData = {
+                    items: this.items.map(item => {
+                        // Add category_id to items that will be added as items
+                        if (item.action === 'item' && this.defaultCategoryId) {
+                            return {
+                                ...item,
+                                category_id: this.defaultCategoryId
+                            };
+                        }
+                        return item;
+                    }),
+                    default_category_id: this.defaultCategoryId
+                };
+
+                // Send data to server
+                fetch('{{ url_for("inventory.process_excel") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(processData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'حدث خطأ أثناء معالجة البيانات');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.isProcessing = false;
+                    this.showResults = true;
+                    this.results = {
+                        added_items: data.added_items,
+                        added_categories: data.added_categories,
+                        skipped_items: data.skipped_items
+                    };
+
+                    // Scroll to top to show results
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                })
+                .catch(error => {
+                    this.isProcessing = false;
+                    this.showError = true;
+                    this.errorMessage = error.message;
+
+                    // Scroll to top to show error
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            }
+        }));
+    });
+</script>
+{% endblock %}

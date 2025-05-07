@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}إعدادات النظام{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800 dark:text-white">إعدادات النظام</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- System Settings Card -->
+            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg shadow p-6 border border-blue-100 dark:border-blue-800">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-cogs text-blue-500 text-2xl mr-3"></i>
+                    <h2 class="text-xl font-semibold text-blue-700 dark:text-blue-300">إعدادات النظام</h2>
+                </div>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">تخصيص عنوان النظام وإعدادات النظام الأساسية.</p>
+                <a href="{{ url_for('settings.system_settings') }}" class="inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                    <i class="fas fa-wrench mr-1"></i> تعديل الإعدادات
+                </a>
+            </div>
+
+            <!-- Theme Settings Card -->
+            <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg shadow p-6 border border-indigo-100 dark:border-indigo-800">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-palette text-indigo-500 text-2xl mr-3"></i>
+                    <h2 class="text-xl font-semibold text-indigo-700 dark:text-indigo-300">إعدادات المظهر</h2>
+                </div>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">تخصيص الألوان، الخط، وضع الليل/النهار، وإعدادات واجهة المستخدم.</p>
+                <a href="{{ url_for('settings.themes_settings') }}" class="inline-block px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors">
+                    <i class="fas fa-paint-brush mr-1"></i> تخصيص المظهر
+                </a>
+            </div>
+
+            <!-- API Keys Card -->
+            <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg shadow p-6 border border-purple-100 dark:border-purple-800">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-key text-purple-500 text-2xl mr-3"></i>
+                    <h2 class="text-xl font-semibold text-purple-700 dark:text-purple-300">مفاتيح API</h2>
+                </div>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">إدارة مفاتيح API للخدمات الخارجية مثل Google Maps و Gemini AI.</p>
+                <a href="{{ url_for('settings.api_keys_settings') }}" class="inline-block px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors">
+                    <i class="fas fa-key mr-1"></i> إدارة المفاتيح
+                </a>
+            </div>
+
+            <!-- Database Management Card -->
+            <div class="bg-green-50 dark:bg-green-900/20 rounded-lg shadow p-6 border border-green-100 dark:border-green-800">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-database text-green-500 text-2xl mr-3"></i>
+                    <h2 class="text-xl font-semibold text-green-700 dark:text-green-300">إدارة قاعدة البيانات</h2>
+                </div>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">استيراد وتصدير قاعدة البيانات، وإنشاء نسخ احتياطية واستعادتها.</p>
+                <a href="{{ url_for('settings.database_settings') }}" class="inline-block px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
+                    <i class="fas fa-database mr-1"></i> إدارة قاعدة البيانات
+                </a>
+            </div>
+
+            <!-- Permissions Management Card -->
+            <div class="bg-orange-50 dark:bg-orange-900/20 rounded-lg shadow p-6 border border-orange-100 dark:border-orange-800">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-user-shield text-orange-500 text-2xl mr-3"></i>
+                    <h2 class="text-xl font-semibold text-orange-700 dark:text-orange-300">إدارة الصلاحيات</h2>
+                </div>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">إدارة صلاحيات النظام والأدوار المختلفة للمستخدمين.</p>
+                <a href="{{ url_for('settings.permissions_settings') }}" class="inline-block px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors">
+                    <i class="fas fa-user-lock mr-1"></i> إدارة الصلاحيات
+                </a>
+            </div>
+
+            <!-- Company Settings Card -->
+            <div class="bg-teal-50 dark:bg-teal-900/20 rounded-lg shadow p-6 border border-teal-100 dark:border-teal-800">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-building text-teal-500 text-2xl mr-3"></i>
+                    <h2 class="text-xl font-semibold text-teal-700 dark:text-teal-300">إعدادات الشركة</h2>
+                </div>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">تعديل معلومات الشركة وشروط الدفع التي تظهر في الفواتير.</p>
+                <a href="{{ url_for('settings.company_settings') }}" class="inline-block px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors">
+                    <i class="fas fa-edit mr-1"></i> تعديل معلومات الشركة
+                </a>
+            </div>
+
+            <!-- System Information Card -->
+            <div class="bg-red-50 dark:bg-red-900/20 rounded-lg shadow p-6 border border-red-100 dark:border-red-800">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-info-circle text-red-500 text-2xl mr-3"></i>
+                    <h2 class="text-xl font-semibold text-red-700 dark:text-red-300">معلومات النظام</h2>
+                </div>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">عرض معلومات النظام، الإصدار، استخدام الموارد، والسجلات.</p>
+                <a href="#" class="inline-block px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">
+                    <i class="fas fa-server mr-1"></i> عرض المعلومات
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('settingsApp', () => ({
+            init() {
+                // Initialization code if needed
+            }
+        }));
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+
+{% block title %}إنشاء ملصق منتج - نظام قاتيلو{% endblock %}
+
+{% block page_header %}إنشاء ملصق منتج للدفعة {{ batch.lot_number }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/batches/{{ batch.id }}" class="text-blue-600 hover:text-blue-800">الدفعة {{ batch.lot_number }}</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">إنشاء ملصق منتج</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Label Generation Form -->
+        <div class="md:col-span-2">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-tag text-blue-600 ml-2"></i>
+                        إنشاء ملصق منتج
+                    </h3>
+                </div>
+
+                <form method="POST" action="/production/labels/generate/{{ batch.id }}" class="p-6 space-y-6">
+                    <!-- Batch Information -->
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h4 class="font-medium text-blue-800 mb-2">معلومات الدفعة</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-sm text-gray-600">رقم الدفعة:</p>
+                                <p class="font-medium text-gray-800">{{ batch.lot_number }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">المنتج:</p>
+                                <p class="font-medium text-gray-800">{{ batch.item.name }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">الكمية:</p>
+                                <p class="font-medium text-gray-800">{{ batch.quantity }} {{ batch.item.unit_of_measure or 'وحدة' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">تاريخ الإنتاج:</p>
+                                <p class="font-medium text-gray-800">{{ batch.production_date.strftime('%Y-%m-%d') }}</p>
+                            </div>
+                            {% if batch.expiry_date %}
+                            <div>
+                                <p class="text-sm text-gray-600">تاريخ انتهاء الصلاحية:</p>
+                                <p class="font-medium text-gray-800">{{ batch.expiry_date.strftime('%Y-%m-%d') }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Label Options -->
+                    <div class="space-y-4">
+                        <h4 class="font-medium text-gray-800">خيارات الملصق</h4>
+
+                        <!-- Label Template -->
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">نوع الملصق</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="relative">
+                                    <input type="radio" id="template_standard" name="template" value="standard" checked
+                                           class="hidden peer">
+                                    <label for="template_standard"
+                                           class="block p-4 border border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 peer-checked:border-blue-500 peer-checked:ring-2 peer-checked:ring-blue-500">
+                                        <div class="flex items-center">
+                                            <div class="ml-3 flex-shrink-0 bg-blue-100 p-2 rounded-md">
+                                                <i class="fas fa-tag text-blue-600"></i>
+                                            </div>
+                                            <div>
+                                                <h5 class="font-medium">ملصق قياسي</h5>
+                                                <p class="text-sm text-gray-500">يتضمن معلومات المنتج الأساسية والباركود</p>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div class="relative">
+                                    <input type="radio" id="template_detailed" name="template" value="detailed"
+                                           class="hidden peer">
+                                    <label for="template_detailed"
+                                           class="block p-4 border border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 peer-checked:border-blue-500 peer-checked:ring-2 peer-checked:ring-blue-500">
+                                        <div class="flex items-center">
+                                            <div class="ml-3 flex-shrink-0 bg-purple-100 p-2 rounded-md">
+                                                <i class="fas fa-tags text-purple-600"></i>
+                                            </div>
+                                            <div>
+                                                <h5 class="font-medium">ملصق مفصل</h5>
+                                                <p class="text-sm text-gray-500">يتضمن معلومات إضافية مثل المكونات والتغذية</p>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Label Size -->
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">حجم الملصق</label>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="relative">
+                                    <input type="radio" id="size_small" name="size" value="small"
+                                           class="hidden peer">
+                                    <label for="size_small"
+                                           class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 peer-checked:border-blue-500 peer-checked:ring-2 peer-checked:ring-blue-500 text-center">
+                                        <i class="fas fa-tag text-sm mb-1"></i>
+                                        <p class="font-medium">صغير</p>
+                                        <p class="text-xs text-gray-500">50×30 مم</p>
+                                    </label>
+                                </div>
+                                <div class="relative">
+                                    <input type="radio" id="size_medium" name="size" value="medium" checked
+                                           class="hidden peer">
+                                    <label for="size_medium"
+                                           class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 peer-checked:border-blue-500 peer-checked:ring-2 peer-checked:ring-blue-500 text-center">
+                                        <i class="fas fa-tag text-base mb-1"></i>
+                                        <p class="font-medium">متوسط</p>
+                                        <p class="text-xs text-gray-500">70×50 مم</p>
+                                    </label>
+                                </div>
+                                <div class="relative">
+                                    <input type="radio" id="size_large" name="size" value="large"
+                                           class="hidden peer">
+                                    <label for="size_large"
+                                           class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 peer-checked:border-blue-500 peer-checked:ring-2 peer-checked:ring-blue-500 text-center">
+                                        <i class="fas fa-tag text-lg mb-1"></i>
+                                        <p class="font-medium">كبير</p>
+                                        <p class="text-xs text-gray-500">100×70 مم</p>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quantity -->
+                        <div class="space-y-2">
+                            <label for="quantity" class="block text-sm font-medium text-gray-700">عدد الملصقات <span class="text-red-500">*</span></label>
+                            <input type="number" id="quantity" name="quantity" required min="1" value="1"
+                                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <p class="text-sm text-gray-500">عدد نسخ الملصق المطلوب طباعتها</p>
+                        </div>
+
+                        <!-- Additional Information -->
+                        <div class="space-y-2">
+                            <label for="additional_info" class="block text-sm font-medium text-gray-700">معلومات إضافية</label>
+                            <textarea id="additional_info" name="additional_info" rows="3"
+                                      class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                      placeholder="أي معلومات إضافية ترغب في إضافتها للملصق..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="flex justify-end space-x-3 space-x-reverse pt-4 border-t border-gray-200">
+                        <a href="/production/batches/{{ batch.id }}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                            إلغاء
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-print ml-1"></i>
+                            إنشاء الملصق
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Label Preview -->
+        <div class="md:col-span-1">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden sticky top-6">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-eye text-blue-600 ml-2"></i>
+                        معاينة الملصق
+                    </h3>
+                </div>
+
+                <div class="p-6">
+                    <div id="label-preview" class="border border-gray-300 rounded-lg p-4 bg-white shadow-sm">
+                        <!-- Standard Label Preview -->
+                        <div id="standard-preview">
+                            <div class="text-center mb-3">
+                                <h4 class="font-bold text-lg">{{ batch.item.name }}</h4>
+                                <p class="text-sm">{{ batch.item.description|truncate(50) if batch.item.description else '' }}</p>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+                                <div>
+                                    <p class="text-gray-600">رقم الدفعة:</p>
+                                    <p class="font-medium">{{ batch.lot_number }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">تاريخ الإنتاج:</p>
+                                    <p class="font-medium">{{ batch.production_date.strftime('%Y-%m-%d') }}</p>
+                                </div>
+                                {% if batch.expiry_date %}
+                                <div>
+                                    <p class="text-gray-600">تاريخ الانتهاء:</p>
+                                    <p class="font-medium">{{ batch.expiry_date.strftime('%Y-%m-%d') }}</p>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <p class="text-gray-600">الوزن:</p>
+                                    <p class="font-medium">{{ batch.item.weight if batch.item.weight else '---' }} {{ batch.item.unit_of_measure or 'جم' }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Barcode Placeholder -->
+                            <div class="bg-gray-100 p-2 text-center rounded">
+                                <div style="max-width: 100%; overflow: hidden;">
+                                    <svg id="barcode-preview" style="max-width: 100%;"></svg>
+                                </div>
+                                <p class="text-xs text-gray-600 mt-1">{{ batch.item.sku }}-{{ batch.lot_number }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Detailed Label Preview (Hidden by default) -->
+                        <div id="detailed-preview" class="hidden">
+                            <div class="text-center mb-3">
+                                <h4 class="font-bold text-lg">{{ batch.item.name }}</h4>
+                                <p class="text-sm">{{ batch.item.description|truncate(50) if batch.item.description else '' }}</p>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+                                <div>
+                                    <p class="text-gray-600">رقم الدفعة:</p>
+                                    <p class="font-medium">{{ batch.lot_number }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">تاريخ الإنتاج:</p>
+                                    <p class="font-medium">{{ batch.production_date.strftime('%Y-%m-%d') }}</p>
+                                </div>
+                                {% if batch.expiry_date %}
+                                <div>
+                                    <p class="text-gray-600">تاريخ الانتهاء:</p>
+                                    <p class="font-medium">{{ batch.expiry_date.strftime('%Y-%m-%d') }}</p>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <p class="text-gray-600">الوزن:</p>
+                                    <p class="font-medium">{{ batch.item.weight if batch.item.weight else '---' }} {{ batch.item.unit_of_measure or 'جم' }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Additional Details for Detailed Label -->
+                            <div class="text-sm mb-3 border-t border-gray-200 pt-2">
+                                <h5 class="font-medium mb-1">المكونات:</h5>
+                                <p class="text-gray-600 text-xs">
+                                    {{ batch.item.ingredients if batch.item.ingredients else 'لا توجد معلومات عن المكونات' }}
+                                </p>
+                            </div>
+
+                            <div class="text-sm mb-3 border-t border-gray-200 pt-2">
+                                <h5 class="font-medium mb-1">معلومات التغذية:</h5>
+                                <div class="grid grid-cols-2 gap-1 text-xs">
+                                    <div>
+                                        <p class="text-gray-600">السعرات الحرارية:</p>
+                                        <p class="font-medium">{{ batch.item.calories if batch.item.calories else '---' }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-600">البروتين:</p>
+                                        <p class="font-medium">{{ batch.item.protein if batch.item.protein else '---' }} جم</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-600">الدهون:</p>
+                                        <p class="font-medium">{{ batch.item.fat if batch.item.fat else '---' }} جم</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-600">الكربوهيدرات:</p>
+                                        <p class="font-medium">{{ batch.item.carbs if batch.item.carbs else '---' }} جم</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Barcode Placeholder -->
+                            <div class="bg-gray-100 p-2 text-center rounded">
+                                <div style="max-width: 100%; overflow: hidden;">
+                                    <svg id="barcode-preview-detailed" style="max-width: 100%;"></svg>
+                                </div>
+                                <p class="text-xs text-gray-600 mt-1">{{ batch.item.sku }}-{{ batch.lot_number }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Label Size Preview -->
+                    <div class="mt-4 text-center">
+                        <p class="text-sm text-gray-600 mb-2">حجم الملصق:</p>
+                        <div id="size-preview" class="inline-block border border-gray-300 bg-gray-50 rounded p-1">
+                            <div id="size-indicator" class="bg-white border border-dashed border-gray-400 rounded mx-auto" style="width: 70px; height: 50px;">
+                                <div class="h-full flex items-center justify-center">
+                                    <span class="text-xs text-gray-500">70×50 مم</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Generate barcodes
+        const barcodeValue = "{{ batch.item.sku }}-{{ batch.lot_number }}";
+        try {
+            JsBarcode("#barcode-preview", barcodeValue, {
+                format: "CODE128",
+                lineColor: "#000",
+                width: 1.5,
+                height: 40,
+                displayValue: true
+            });
+
+            JsBarcode("#barcode-preview-detailed", barcodeValue, {
+                format: "CODE128",
+                lineColor: "#000",
+                width: 1.5,
+                height: 40,
+                displayValue: true
+            });
+            console.log("Barcodes generated successfully");
+        } catch (error) {
+            console.error("Error generating barcodes:", error);
+            // Fallback to text if barcode generation fails
+            document.getElementById('barcode-preview').outerHTML = '<div class="text-center"><i class="fas fa-barcode text-gray-700 text-2xl"></i><p class="text-xs mt-1">' + barcodeValue + '</p></div>';
+            document.getElementById('barcode-preview-detailed').outerHTML = '<div class="text-center"><i class="fas fa-barcode text-gray-700 text-2xl"></i><p class="text-xs mt-1">' + barcodeValue + '</p></div>';
+        }
+        // Template selection
+        const templateStandard = document.getElementById('template_standard');
+        const templateDetailed = document.getElementById('template_detailed');
+        const standardPreview = document.getElementById('standard-preview');
+        const detailedPreview = document.getElementById('detailed-preview');
+
+        templateStandard.addEventListener('change', function() {
+            if (this.checked) {
+                standardPreview.classList.remove('hidden');
+                detailedPreview.classList.add('hidden');
+            }
+        });
+
+        templateDetailed.addEventListener('change', function() {
+            if (this.checked) {
+                standardPreview.classList.add('hidden');
+                detailedPreview.classList.remove('hidden');
+            }
+        });
+
+        // Size selection
+        const sizeSmall = document.getElementById('size_small');
+        const sizeMedium = document.getElementById('size_medium');
+        const sizeLarge = document.getElementById('size_large');
+        const sizeIndicator = document.getElementById('size-indicator');
+
+        sizeSmall.addEventListener('change', function() {
+            if (this.checked) {
+                sizeIndicator.style.width = '50px';
+                sizeIndicator.style.height = '30px';
+                sizeIndicator.querySelector('span').textContent = '50×30 مم';
+            }
+        });
+
+        sizeMedium.addEventListener('change', function() {
+            if (this.checked) {
+                sizeIndicator.style.width = '70px';
+                sizeIndicator.style.height = '50px';
+                sizeIndicator.querySelector('span').textContent = '70×50 مم';
+            }
+        });
+
+        sizeLarge.addEventListener('change', function() {
+            if (this.checked) {
+                sizeIndicator.style.width = '100px';
+                sizeIndicator.style.height = '70px';
+                sizeIndicator.querySelector('span').textContent = '100×70 مم';
+            }
+        });
+
+        // Additional info updates preview
+        const additionalInfo = document.getElementById('additional_info');
+
+        additionalInfo.addEventListener('input', function() {
+            // For simplicity, we're not updating the preview with additional info
+            // In a real implementation, you might want to show this in the preview
+        });
+
+        // Quantity validation
+        const quantity = document.getElementById('quantity');
+
+        quantity.addEventListener('input', function() {
+            if (this.value < 1) {
+                this.value = 1;
+            }
+        });
+    });
+</script>
+{% endblock %}

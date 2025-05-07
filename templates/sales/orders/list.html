@@ -1,0 +1,383 @@
+{% extends 'base.html' %}
+
+{% block title %}قائمة طلبات المبيعات{% endblock %}
+
+{% block page_header %}قائمة طلبات المبيعات{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.sales_dashboard') }}" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">الطلبات</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="ordersListApp()" class="space-y-6">
+    <!-- Header with actions -->
+    <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-2 space-x-reverse">
+            <div class="bg-blue-100 p-2 rounded-lg">
+                <i class="fas fa-file-invoice text-blue-600 text-lg"></i>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800">طلبات المبيعات</h2>
+            <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                {{ orders|length }} طلب
+            </span>
+        </div>
+        <a href="{{ url_for('sales.new_order_form') }}" class="btn btn-primary flex items-center transition-all duration-300 transform hover:scale-105">
+            <i class="fas fa-plus ml-1"></i> طلب جديد
+        </a>
+    </div>
+
+    <!-- Orders Card -->
+    <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-blue-100 p-2 rounded-lg">
+                    <i class="fas fa-list text-blue-600"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">جميع الطلبات</h3>
+            </div>
+            <div class="flex items-center space-x-2 space-x-reverse">
+                <div class="relative">
+                    <input type="text" x-model="searchTerm" @input="filterOrders()"
+                           placeholder="بحث..."
+                           class="rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10 text-sm">
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+                <select x-model="statusFilter" @change="filterOrders()"
+                        class="rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                    <option value="">جميع الحالات</option>
+                    <option value="Pending">قيد الانتظار</option>
+                    <option value="Processing">قيد المعالجة</option>
+                    <option value="Shipped">تم الشحن</option>
+                    <option value="Delivered">تم التسليم</option>
+                    <option value="Cancelled">ملغي</option>
+                </select>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الطلب
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            العميل
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            التاريخ
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المبلغ الإجمالي
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="filteredOrders.length === 0">
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center">
+                                <div class="flex flex-col items-center justify-center text-gray-500">
+                                    <i class="fas fa-search text-4xl mb-3 text-gray-300"></i>
+                                    <p class="text-sm">لا توجد طلبات مطابقة للبحث</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="order in filteredOrders" :key="order.id">
+                        <tr class="hover:bg-blue-50 transition-colors duration-150">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="'#' + order.id"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="order.customer_name"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-500" x-text="formatDate(order.order_date)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="formatCurrency(order.total_amount)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="getStatusClass(order.status)">
+                                    <span x-text="getStatusText(order.status)"></span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2 space-x-reverse">
+                                    <a :href="'/sales/orders/' + order.id" class="text-blue-600 hover:text-blue-900" title="عرض">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a :href="'/sales/orders/' + order.id + '/edit'" class="text-yellow-600 hover:text-yellow-900" title="تعديل">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button @click="confirmDelete(order)" class="text-red-600 hover:text-red-900" title="حذف">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <!-- Pagination -->
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        عرض
+                        <span class="font-medium" x-text="filteredOrders.length"></span>
+                        من أصل
+                        <span class="font-medium" x-text="orders.length"></span>
+                        طلب
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4" x-cloak>
+        <div @click.away="showDeleteModal = false"
+             class="bg-white rounded-lg shadow-xl max-w-md w-full"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform scale-95"
+             x-transition:enter-end="opacity-100 transform scale-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform scale-100"
+             x-transition:leave-end="opacity-0 transform scale-95">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-red-50 to-pink-50">
+                <div class="flex items-center space-x-2 space-x-reverse">
+                    <div class="bg-red-100 p-1.5 rounded-lg">
+                        <i class="fas fa-exclamation-triangle text-red-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-800">تأكيد الحذف</h3>
+                </div>
+                <button @click="showDeleteModal = false" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5">
+                <p class="text-gray-700">
+                    هل أنت متأكد من رغبتك في حذف هذا الطلب؟ لا يمكن التراجع عن هذا الإجراء.
+                </p>
+                <div x-show="orderToDelete" class="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">رقم الطلب:</span>
+                        <span class="text-sm font-medium" x-text="'#' + orderToDelete?.id"></span>
+                    </div>
+                    <div class="flex justify-between mt-1">
+                        <span class="text-sm text-gray-600">العميل:</span>
+                        <span class="text-sm font-medium" x-text="orderToDelete?.customer_name"></span>
+                    </div>
+                    <div class="flex justify-between mt-1">
+                        <span class="text-sm text-gray-600">المبلغ:</span>
+                        <span class="text-sm font-medium" x-text="formatCurrency(orderToDelete?.total_amount)"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 border-t border-gray-100 flex justify-end space-x-3 space-x-reverse bg-gray-50">
+                <button @click="showDeleteModal = false"
+                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                    إلغاء
+                </button>
+                <button @click="deleteOrder()"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        :disabled="isDeleting">
+                    <i class="fas fa-trash-alt ml-1"></i>
+                    <span x-text="isDeleting ? 'جاري الحذف...' : 'حذف'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global currency formatter function
+    function formatCurrency(amount) {
+        if (amount === undefined || amount === null) return '';
+        return new Intl.NumberFormat('ar-EG', {
+            style: 'currency',
+            currency: 'EGP'
+        }).format(amount);
+    }
+
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('ordersListApp', () => ({
+            orders: [],
+            filteredOrders: [],
+            searchTerm: '',
+            statusFilter: '',
+            showDeleteModal: false,
+            orderToDelete: null,
+            isDeleting: false,
+
+            init() {
+                // Initialize with orders data from the server
+                this.orders = [
+                    {% for order in orders %}
+                    {
+                        id: {{ order.id }},
+                        customer_name: "{{ order.customer.customer_name }}",
+                        order_date: "{{ order.order_date }}",
+                        total_amount: {{ order.total_amount }},
+                        status: "{{ order.status }}"
+                    },
+                    {% endfor %}
+                ];
+
+                this.filteredOrders = [...this.orders];
+            },
+
+            // Format currency - using the global function
+            formatCurrency(amount) {
+                // Use the global formatCurrency function
+                return formatCurrency(amount);
+            },
+
+            // Format date
+            formatDate(dateString) {
+                const options = { year: 'numeric', month: 'short', day: 'numeric' };
+                return new Date(dateString).toLocaleDateString('ar-EG', options);
+            },
+
+            // Get status class based on status
+            getStatusClass(status) {
+                const statusClasses = {
+                    'Pending': 'bg-yellow-100 text-yellow-800',
+                    'Processing': 'bg-blue-100 text-blue-800',
+                    'Shipped': 'bg-indigo-100 text-indigo-800',
+                    'Delivered': 'bg-green-100 text-green-800',
+                    'Cancelled': 'bg-red-100 text-red-800'
+                };
+
+                return statusClasses[status] || 'bg-gray-100 text-gray-800';
+            },
+
+            // Get status text in Arabic
+            getStatusText(status) {
+                const statusTexts = {
+                    'Pending': 'قيد الانتظار',
+                    'Processing': 'قيد المعالجة',
+                    'Shipped': 'تم الشحن',
+                    'Delivered': 'تم التسليم',
+                    'Cancelled': 'ملغي'
+                };
+
+                return statusTexts[status] || status;
+            },
+
+            // Filter orders based on search term and status filter
+            filterOrders() {
+                if (!this.searchTerm && !this.statusFilter) {
+                    this.filteredOrders = [...this.orders];
+                    return;
+                }
+
+                const searchLower = this.searchTerm.toLowerCase();
+
+                this.filteredOrders = this.orders.filter(order => {
+                    // Filter by search term
+                    const matchesSearch = !this.searchTerm ||
+                        order.id.toString().includes(searchLower) ||
+                        order.customer_name.toLowerCase().includes(searchLower);
+
+                    // Filter by status
+                    const matchesStatus = !this.statusFilter || order.status === this.statusFilter;
+
+                    return matchesSearch && matchesStatus;
+                });
+            },
+
+            // Show delete confirmation modal
+            confirmDelete(order) {
+                this.orderToDelete = order;
+                this.showDeleteModal = true;
+            },
+
+            // Delete order
+            deleteOrder() {
+                if (!this.orderToDelete) return;
+
+                this.isDeleting = true;
+
+                fetch(`/sales/orders/${this.orderToDelete.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'حدث خطأ أثناء حذف الطلب');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Show success notification
+                    showNotification(data.message, 'success');
+
+                    // Remove the deleted order from the arrays
+                    this.orders = this.orders.filter(o => o.id !== this.orderToDelete.id);
+                    this.filterOrders(); // Re-apply filters
+
+                    // Close modal
+                    this.showDeleteModal = false;
+                    this.orderToDelete = null;
+                    this.isDeleting = false;
+                })
+                .catch(error => {
+                    console.error('Error deleting order:', error);
+                    showNotification(error.message, 'error');
+                    this.isDeleting = false;
+                });
+            }
+        }));
+    });
+
+    // Helper function to show notifications
+    function showNotification(message, type = 'info') {
+        // Check if Toastify is available
+        if (typeof Toastify === 'function') {
+            const bgColors = {
+                'success': 'linear-gradient(to right, #00b09b, #96c93d)',
+                'error': 'linear-gradient(to right, #ff5f6d, #ffc371)',
+                'warning': 'linear-gradient(to right, #f7b733, #fc4a1a)',
+                'info': 'linear-gradient(to right, #2193b0, #6dd5ed)'
+            };
+
+            Toastify({
+                text: message,
+                duration: 3000,
+                gravity: "top",
+                position: 'center',
+                backgroundColor: bgColors[type],
+                className: "rounded-lg",
+                stopOnFocus: true
+            }).showToast();
+        } else {
+            // Fallback to alert if Toastify is not available
+            alert(message);
+        }
+    }
+</script>
+{% endblock %}

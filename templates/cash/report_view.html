@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}عرض التقرير{% endblock %}
+
+{% block page_header %}عرض التقرير{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-6 border-b flex justify-between items-center">
+            <h2 class="text-lg font-semibold text-gray-800">عرض التقرير</h2>
+            <div class="flex space-x-2 space-x-reverse">
+                <button onclick="window.print()" class="btn bg-gray-200 hover:bg-gray-300 text-gray-800">
+                    <i class="fas fa-print ml-1"></i>
+                    طباعة
+                </button>
+                <a href="{{ url_for('cash.reports') }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-right ml-1"></i>
+                    العودة للتقارير
+                </a>
+            </div>
+        </div>
+
+        <div class="p-6 overflow-x-auto print:p-0">
+            {{ report_html|safe }}
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .container, .container * {
+            visibility: visible;
+        }
+        .container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .btn, .border-b {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}مرتجعات المبيعات{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">مرتجعات المبيعات</h1>
+        <a href="{{ url_for('sales.new_return_form') }}" class="btn btn-primary">
+            <i class="fas fa-plus ml-2"></i>
+            إضافة مرتجع جديد
+        </a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-right">
+                <thead class="bg-gray-50 text-gray-600 font-medium border-b">
+                    <tr>
+                        <th class="px-4 py-3">رقم المرتجع</th>
+                        <th class="px-4 py-3">رقم الطلب</th>
+                        <th class="px-4 py-3">العميل</th>
+                        <th class="px-4 py-3">تاريخ المرتجع</th>
+                        <th class="px-4 py-3">المبلغ المسترد</th>
+                        <th class="px-4 py-3">الحالة</th>
+                        <th class="px-4 py-3">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% if returns %}
+                        {% for return in returns %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-medium">{{ return.id }}</td>
+                                <td class="px-4 py-3">{{ return.sales_order_id }}</td>
+                                <td class="px-4 py-3">{{ return.sales_order.customer.customer_name }}</td>
+                                <td class="px-4 py-3">{{ return.return_date.strftime('%Y-%m-%d') }}</td>
+                                <td class="px-4 py-3 font-medium">{{ return.total_refund_amount }}</td>
+                                <td class="px-4 py-3">
+                                    {% if return.return_status == 'Pending' %}
+                                        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">قيد الانتظار</span>
+                                    {% elif return.return_status == 'Approved' %}
+                                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">تمت الموافقة</span>
+                                    {% elif return.return_status == 'Denied' %}
+                                        <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">مرفوض</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center space-x-3 rtl:space-x-reverse">
+                                        <a href="{{ url_for('sales.view_return', return_id=return.id) }}" class="text-blue-600 hover:text-blue-800">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if return.return_status == 'Pending' %}
+                                            <button onclick="approveReturn({{ return.id }})" class="text-green-600 hover:text-green-800">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                                لا توجد مرتجعات حتى الآن
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function approveReturn(returnId) {
+        if (confirm('هل أنت متأكد من الموافقة على هذا المرتجع؟')) {
+            fetchAPI(`/sales/returns/${returnId}/approve`, 'POST')
+                .then(response => {
+                    showNotification('تمت الموافقة على المرتجع بنجاح', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                })
+                .catch(error => {
+                    showNotification('حدث خطأ أثناء الموافقة على المرتجع', 'error');
+                });
+        }
+    }
+</script>
+{% endblock %}

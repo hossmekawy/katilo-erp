@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}فحوصات الجودة - نظام قاتيلو{% endblock %}
+
+{% block page_header %}فحوصات الجودة{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">فحوصات الجودة</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with Actions -->
+    <div class="flex justify-between items-center">
+        <h2 class="text-xl font-bold text-gray-800">
+            <i class="fas fa-clipboard-check text-blue-600 mr-2"></i>
+            فحوصات الجودة
+        </h2>
+        <div class="flex space-x-3 space-x-reverse">
+            <a href="/production/qc/create_test" class="btn btn-primary flex items-center">
+                <i class="fas fa-plus ml-2"></i>
+                فحص جديد
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+        <div class="flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[200px]">
+                <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">حالة الفحص</label>
+                <select id="status-filter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">جميع الحالات</option>
+                    <option value="Pending">قيد الانتظار</option>
+                    <option value="InProgress">قيد التنفيذ</option>
+                    <option value="Passed">ناجح</option>
+                    <option value="Failed">فاشل</option>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <label for="date-filter" class="block text-sm font-medium text-gray-700 mb-1">تاريخ الفحص</label>
+                <input type="date" id="date-filter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">بحث</label>
+                <div class="relative">
+                    <input type="text" id="search" placeholder="بحث عن رقم الدفعة، المنتج..." 
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10">
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <button id="apply-filters" class="btn btn-primary">
+                    <i class="fas fa-filter ml-1"></i>
+                    تطبيق
+                </button>
+            </div>
+            <div>
+                <button id="reset-filters" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                    إعادة ضبط
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QC Tests Table -->
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الفحص
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            رقم الدفعة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المنتج
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            نوع الفحص
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            تاريخ الإنشاء
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            المفتش
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الحالة
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            الإجراءات
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="tests-table-body">
+                    {% if tests %}
+                        {% for test in tests %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                #{{ test.id }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ test.batch.lot_number }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ test.batch.item.name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ test.test_type }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ test.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ test.inspector.username if test.inspector else 'غير محدد' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if test.status == 'Pending' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    قيد الانتظار
+                                </span>
+                                {% elif test.status == 'InProgress' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    قيد التنفيذ
+                                </span>
+                                {% elif test.status == 'Passed' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    ناجح
+                                </span>
+                                {% elif test.status == 'Failed' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    فاشل
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    {{ test.status }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex items-center space-x-3 space-x-reverse">
+                                    {% if test.status == 'Pending' %}
+                                    <a href="/production/qc/tests/{{ test.id }}/results" class="text-blue-600 hover:text-blue-900" title="تسجيل نتائج الفحص">
+                                        <i class="fas fa-clipboard-list"></i>
+                                    </a>
+                                    {% else %}
+                                    <a href="/production/qc/tests/{{ test.id }}/results" class="text-blue-600 hover:text-blue-900" title="عرض نتائج الفحص">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% endif %}
+                                    
+                                    {% if test.status == 'Pending' %}
+                                    <button onclick="approveTest({{ test.id }})" class="text-green-600 hover:text-green-900" title="قبول الدفعة">
+                                        <i class="fas fa-check-circle"></i>
+                                    </button>
+                                    <button onclick="openRejectModal({{ test.id }})" class="text-red-600 hover:text-red-900" title="رفض الدفعة">
+                                        <i class="fas fa-times-circle"></i>
+                                    </button>
+                                    {% endif %}
+                                    
+                                    <a href="/production/qc/report/{{ test.batch_id }}" class="text-gray-600 hover:text-gray-900" title="تقرير الفحص">
+                                        <i class="fas fa-file-alt"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">
+                                لا توجد فحوصات جودة مسجلة
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if tests and tests|length > 10 %}
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        عرض
+                        <span class="font-medium">1</span>
+                        إلى
+                        <span class="font-medium">{{ tests|length }}</span>
+                        من
+                        <span class="font-medium">{{ tests|length }}</span>
+                        نتيجة
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">Previous</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        <a href="#" aria-current="page" class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                            1
+                        </a>
+                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">Next</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Reject Test Modal -->
+<div id="reject-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">رفض دفعة الإنتاج</h3>
+        </div>
+        <form id="reject-form" method="POST" action="">
+            <div class="px-6 py-4">
+                <div class="mb-4">
+                    <label for="reason" class="block text-sm font-medium text-gray-700 mb-1">سبب الرفض</label>
+                    <textarea id="reason" name="reason" rows="3" required
+                              class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              placeholder="يرجى ذكر سبب رفض دفعة الإنتاج..."></textarea>
+                </div>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 flex justify-end space-x-3 space-x-reverse rounded-b-lg">
+                <button type="button" onclick="closeRejectModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    إلغاء
+                </button>
+                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                    تأكيد الرفض
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Filter functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const applyFiltersBtn = document.getElementById('apply-filters');
+        const resetFiltersBtn = document.getElementById('reset-filters');
+        const statusFilter = document.getElementById('status-filter');
+        const dateFilter = document.getElementById('date-filter');
+        const searchInput = document.getElementById('search');
+        
+        if (applyFiltersBtn) {
+            applyFiltersBtn.addEventListener('click', function() {
+                filterTable();
+            });
+        }
+        
+        if (resetFiltersBtn) {
+            resetFiltersBtn.addEventListener('click', function() {
+                statusFilter.value = '';
+                dateFilter.value = '';
+                searchInput.value = '';
+                filterTable();
+            });
+        }
+        
+        function filterTable() {
+            const status = statusFilter.value.toLowerCase();
+            const date = dateFilter.value;
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            const rows = document.querySelectorAll('#tests-table-body tr');
+            
+            rows.forEach(row => {
+                let showRow = true;
+                
+                // Status filter
+                if (status && !row.querySelector('td:nth-child(7)').textContent.toLowerCase().includes(status)) {
+                    showRow = false;
+                }
+                
+                // Date filter
+                if (date) {
+                    const rowDate = row.querySelector('td:nth-child(5)').textContent.trim().split(' ')[0];
+                    if (rowDate !== date) {
+                        showRow = false;
+                    }
+                }
+                
+                // Search filter
+                if (searchTerm) {
+                    const batchNumber = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+                    const productName = row.querySelector('td:nth-child(3)').textContent.toLowerCase();
+                    const testType = row.querySelector('td:nth-child(4)').textContent.toLowerCase();
+                    
+                    if (!batchNumber.includes(searchTerm) && 
+                        !productName.includes(searchTerm) && 
+                        !testType.includes(searchTerm)) {
+                        showRow = false;
+                    }
+                }
+                
+                // Show or hide row
+                row.style.display = showRow ? '' : 'none';
+            });
+        }
+    });
+    
+    // Approve test functionality
+    function approveTest(testId) {
+        if (confirm('هل أنت متأكد من قبول هذه الدفعة؟')) {
+            // Create a form and submit it
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/production/qc/tests/${testId}/approve`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    
+    // Reject modal functionality
+    let currentTestId = null;
+    
+    function openRejectModal(testId) {
+        currentTestId = testId;
+        document.getElementById('reject-form').action = `/production/qc/tests/${testId}/reject`;
+        document.getElementById('reject-modal').classList.remove('hidden');
+    }
+    
+    function closeRejectModal() {
+        document.getElementById('reject-modal').classList.add('hidden');
+        document.getElementById('reject-form').reset();
+    }
+    
+    // Close modal when clicking outside
+    document.addEventListener('click', function(event) {
+        const modal = document.getElementById('reject-modal');
+        if (modal && !modal.classList.contains('hidden') && event.target === modal) {
+            closeRejectModal();
+        }
+    });
+    
+    // Form validation
+    document.addEventListener('DOMContentLoaded', function() {
+        const rejectForm = document.getElementById('reject-form');
+        
+        if (rejectForm) {
+            rejectForm.addEventListener('submit', function(event) {
+                const reasonField = document.getElementById('reason');
+                
+                if (!reasonField.value.trim()) {
+                    event.preventDefault();
+                    alert('يرجى إدخال سبب الرفض');
+                    reasonField.focus();
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            direction: rtl;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .logo {
+            height: 50px;
+        }
+        .company-info {
+            text-align: center;
+        }
+        .company-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+        }
+        .report-title {
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0 0 0;
+        }
+        .date-info {
+            text-align: left;
+            font-size: 12px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <img src="file:///{{ company_logo_path }}" alt="Katilo Logo" class="logo">
+        </div>
+        <div class="company-info">
+            <p class="company-name">{{ company_name }}</p>
+            <p class="report-title">{{ report_title }}</p>
+        </div>
+        <div class="date-info">
+            <p>تاريخ التقرير: {{ report_generated_at.strftime('%Y-%m-%d') }}</p>
+        </div>
+    </div>
+</body>
+</html>

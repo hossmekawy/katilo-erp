@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+
+{% block title %}مسارات التوصيل{% endblock %}
+
+{% block styles %}
+<style>
+    .route-card {
+        @apply bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-200;
+    }
+    .route-card:hover {
+        @apply shadow-md transform -translate-y-1;
+    }
+    .route-status {
+        @apply px-2 py-1 text-xs font-semibold rounded-full;
+    }
+    .status-planned {
+        @apply bg-blue-100 text-blue-800;
+    }
+    .status-in-progress {
+        @apply bg-indigo-100 text-indigo-800;
+    }
+    .status-completed {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-cancelled {
+        @apply bg-red-100 text-red-800;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8" x-data="routesApp()">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">مسارات التوصيل</h1>
+        <div>
+            <a href="{{ url_for('distribution.new_route') }}" class="btn btn-primary">
+                <i class="fas fa-plus ml-2"></i>
+                إنشاء مسار جديد
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div class="flex flex-wrap gap-4">
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">البحث</label>
+                <input type="text" x-model="filters.search" placeholder="البحث باسم المسار"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                <select x-model="filters.status"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">جميع الحالات</option>
+                    <option value="Planned">مخطط</option>
+                    <option value="InProgress">قيد التنفيذ</option>
+                    <option value="Completed">مكتمل</option>
+                    <option value="Cancelled">ملغي</option>
+                </select>
+            </div>
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">المركبة</label>
+                <select x-model="filters.vehicle"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">جميع المركبات</option>
+                    <template x-for="vehicle in vehicles" :key="vehicle.id">
+                        <option :value="vehicle.id" x-text="vehicle.name"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="w-full md:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">التاريخ</label>
+                <input type="date" x-model="filters.date"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+        </div>
+    </div>
+
+    <!-- Routes Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <template x-for="route in filteredRoutes" :key="route.id">
+            <div class="route-card">
+                <div class="p-4 border-b border-gray-100">
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-semibold text-lg text-gray-900" x-text="route.name"></h3>
+                        <span class="route-status"
+                            :class="{
+                                'status-planned': route.status === 'Planned',
+                                'status-in-progress': route.status === 'InProgress',
+                                'status-completed': route.status === 'Completed',
+                                'status-cancelled': route.status === 'Cancelled'
+                            }"
+                            x-text="getStatusText(route.status)"></span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1">
+                        <i class="fas fa-truck ml-1"></i>
+                        <span x-text="route.vehicle_name || 'غير معين'"></span>
+                    </p>
+                    <p class="text-sm text-gray-600 mt-1">
+                        <i class="fas fa-calendar ml-1"></i>
+                        <span x-text="formatDate(route.planned_date)"></span>
+                    </p>
+                </div>
+
+                <div class="p-4">
+                    <div class="flex justify-between text-sm text-gray-600 mb-3">
+                        <span>
+                            <i class="fas fa-map-marker-alt ml-1"></i>
+                            <span x-text="route.stops_count + ' محطة'"></span>
+                        </span>
+                        <span>
+                            <i class="fas fa-check-circle ml-1"></i>
+                            <span x-text="route.completed_stops_count + ' مكتملة'"></span>
+                        </span>
+                    </div>
+
+                    <div class="flex justify-between text-sm text-gray-600 mb-4">
+                        <span>
+                            <i class="fas fa-road ml-1"></i>
+                            <span x-text="(route.total_distance || 0) + ' كم'"></span>
+                        </span>
+                        <span>
+                            <i class="fas fa-clock ml-1"></i>
+                            <span x-text="formatDuration(route.estimated_duration)"></span>
+                        </span>
+                    </div>
+
+                    <div class="mt-4 flex justify-between">
+                        <a :href="'/distribution/routes/' + route.id" class="text-sm text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-eye ml-1"></i> عرض التفاصيل
+                        </a>
+
+                        <div class="flex space-x-2 space-x-reverse">
+                            <button @click="startRoute(route)" x-show="route.status === 'Planned'"
+                                class="text-sm text-green-600 hover:text-green-800">
+                                <i class="fas fa-play ml-1"></i> بدء
+                            </button>
+
+                            <button @click="completeRoute(route)" x-show="route.status === 'InProgress'"
+                                class="text-sm text-indigo-600 hover:text-indigo-800">
+                                <i class="fas fa-check ml-1"></i> إنهاء
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Empty State -->
+        <template x-if="filteredRoutes.length === 0">
+            <div class="col-span-full text-center py-12">
+                <div class="text-gray-400 mb-4">
+                    <i class="fas fa-route text-6xl"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">لا توجد مسارات</h3>
+                <p class="text-gray-500" x-show="!isFiltering()">لم يتم إنشاء أي مسارات بعد. أنشئ مسارًا جديدًا للبدء.</p>
+                <p class="text-gray-500" x-show="isFiltering()">لا توجد مسارات تطابق معايير البحث. حاول تغيير المعايير.</p>
+                <a href="{{ url_for('distribution.new_route') }}" class="mt-4 inline-block btn btn-primary">
+                    <i class="fas fa-plus ml-2"></i>
+                    إنشاء مسار جديد
+                </a>
+            </div>
+        </template>
+    </div>
+
+    <!-- Confirmation Modals -->
+    <div x-show="showStartModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div @click.outside="showStartModal = false" class="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">تأكيد بدء المسار</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700">
+                    هل أنت متأكد من رغبتك في بدء المسار
+                    <span class="font-semibold" x-text="selectedRoute?.name"></span>؟
+                </p>
+                <p class="text-sm text-gray-600 mt-2">
+                    <i class="fas fa-info-circle ml-1"></i>
+                    سيتم تحديث حالة المسار إلى "قيد التنفيذ" وتحديث حالة جميع الشحنات المرتبطة به إلى "قيد التوصيل".
+                </p>
+
+                <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showStartModal = false" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                        إلغاء
+                    </button>
+                    <button @click="confirmStartRoute()" class="btn btn-primary">
+                        <i class="fas fa-play ml-2"></i>
+                        بدء المسار
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showCompleteModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div @click.outside="showCompleteModal = false" class="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">تأكيد إنهاء المسار</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700">
+                    هل أنت متأكد من رغبتك في إنهاء المسار
+                    <span class="font-semibold" x-text="selectedRoute?.name"></span>؟
+                </p>
+                <p class="text-sm text-gray-600 mt-2">
+                    <i class="fas fa-info-circle ml-1"></i>
+                    سيتم تحديث حالة المسار إلى "مكتمل" وتحديث حالة أي محطات متبقية إلى "تم تخطيها".
+                </p>
+
+                <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                    <button @click="showCompleteModal = false" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                        إلغاء
+                    </button>
+                    <button @click="confirmCompleteRoute()" class="btn btn-success">
+                        <i class="fas fa-check ml-2"></i>
+                        إنهاء المسار
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function routesApp() {
+        return {
+            routes: [],
+            filteredRoutes: [],
+            vehicles: [],
+            filters: {
+                search: '',
+                status: '',
+                vehicle: '',
+                date: ''
+            },
+            showStartModal: false,
+            showCompleteModal: false,
+            selectedRoute: null,
+
+            init() {
+                this.loadRoutes();
+                this.loadVehicles();
+
+                this.$watch('filters', () => {
+                    this.applyFilters();
+                }, { deep: true });
+            },
+
+            loadRoutes() {
+                fetch('{{ url_for("distribution.get_routes") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.routes = data;
+                        this.filteredRoutes = [...data];
+                    })
+                    .catch(error => {
+                        console.error('Error loading routes:', error);
+                        this.showToast('حدث خطأ أثناء تحميل بيانات المسارات', 'error');
+                    });
+            },
+
+            loadVehicles() {
+                fetch('{{ url_for("distribution.get_vehicles") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.vehicles = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading vehicles:', error);
+                    });
+            },
+
+            applyFilters() {
+                this.filteredRoutes = this.routes.filter(route => {
+                    // Search filter
+                    const searchMatch = !this.filters.search ||
+                        route.name.toLowerCase().includes(this.filters.search.toLowerCase());
+
+                    // Status filter
+                    const statusMatch = !this.filters.status || route.status === this.filters.status;
+
+                    // Vehicle filter
+                    const vehicleMatch = !this.filters.vehicle ||
+                        (route.vehicle_id && route.vehicle_id.toString() === this.filters.vehicle.toString());
+
+                    // Date filter
+                    let dateMatch = true;
+                    if (this.filters.date) {
+                        const filterDate = new Date(this.filters.date);
+                        const routeDate = route.planned_date ? new Date(route.planned_date) : null;
+
+                        if (routeDate) {
+                            dateMatch = filterDate.toDateString() === routeDate.toDateString();
+                        } else {
+                            dateMatch = false;
+                        }
+                    }
+
+                    return searchMatch && statusMatch && vehicleMatch && dateMatch;
+                });
+            },
+
+            isFiltering() {
+                return this.filters.search || this.filters.status || this.filters.vehicle || this.filters.date;
+            },
+
+            getStatusText(status) {
+                switch(status) {
+                    case 'Planned': return 'مخطط';
+                    case 'InProgress': return 'قيد التنفيذ';
+                    case 'Completed': return 'مكتمل';
+                    case 'Cancelled': return 'ملغي';
+                    default: return status;
+                }
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ar-EG');
+            },
+
+            formatDuration(minutes) {
+                if (!minutes) return '-';
+
+                if (minutes < 60) {
+                    return minutes + ' دقيقة';
+                } else {
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMinutes = minutes % 60;
+
+                    if (remainingMinutes === 0) {
+                        return hours + ' ساعة';
+                    } else {
+                        return hours + ' ساعة ' + remainingMinutes + ' دقيقة';
+                    }
+                }
+            },
+
+            startRoute(route) {
+                if (route.status !== 'Planned') return;
+
+                this.selectedRoute = route;
+                this.showStartModal = true;
+            },
+
+            confirmStartRoute() {
+                if (!this.selectedRoute) return;
+
+                fetch('{{ url_for("distribution.start_route", route_id=0) }}'.replace('0', this.selectedRoute.id), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.loadRoutes();
+                        this.showStartModal = false;
+                        this.showToast('تم بدء المسار بنجاح', 'success');
+                    } else {
+                        this.showToast(data.message || 'حدث خطأ أثناء بدء المسار', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting route:', error);
+                    this.showToast('حدث خطأ أثناء بدء المسار', 'error');
+                });
+            },
+
+            completeRoute(route) {
+                if (route.status !== 'InProgress') return;
+
+                this.selectedRoute = route;
+                this.showCompleteModal = true;
+            },
+
+            confirmCompleteRoute() {
+                if (!this.selectedRoute) return;
+
+                fetch('{{ url_for("distribution.complete_route", route_id=0) }}'.replace('0', this.selectedRoute.id), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.loadRoutes();
+                        this.showCompleteModal = false;
+                        this.showToast('تم إنهاء المسار بنجاح', 'success');
+                    } else {
+                        this.showToast(data.message || 'حدث خطأ أثناء إنهاء المسار', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error completing route:', error);
+                    this.showToast('حدث خطأ أثناء إنهاء المسار', 'error');
+                });
+            },
+
+            showToast(message, type = 'info') {
+                // This assumes you have a toast notification system
+                // You can implement this based on your application's UI
+                if (window.showToast) {
+                    window.showToast(message, type);
+                } else {
+                    alert(message);
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}

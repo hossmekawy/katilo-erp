@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}سجل الملصقات للدفعة {{ batch.lot_number }} - نظام قاتيلو{% endblock %}
+
+{% block page_header %}سجل الملصقات للدفعة {{ batch.lot_number }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/batches/{{ batch.id }}" class="text-blue-600 hover:text-blue-800">الدفعة {{ batch.lot_number }}</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">سجل الملصقات</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <!-- Batch Information Card -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-layer-group text-blue-600 ml-2"></i>
+                معلومات الدفعة
+            </h3>
+        </div>
+
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <p class="text-sm text-gray-600">رقم الدفعة:</p>
+                    <p class="font-medium text-gray-800">{{ batch.lot_number }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">المنتج:</p>
+                    <p class="font-medium text-gray-800">{{ batch.item.name }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">الكمية:</p>
+                    <p class="font-medium text-gray-800">{{ batch.quantity }} {{ batch.item.unit_of_measure or 'وحدة' }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">تاريخ الإنتاج:</p>
+                    <p class="font-medium text-gray-800">{{ batch.production_date.strftime('%Y-%m-%d') }}</p>
+                </div>
+                {% if batch.expiry_date %}
+                <div>
+                    <p class="text-sm text-gray-600">تاريخ انتهاء الصلاحية:</p>
+                    <p class="font-medium text-gray-800">{{ batch.expiry_date.strftime('%Y-%m-%d') }}</p>
+                </div>
+                {% endif %}
+                <div>
+                    <p class="text-sm text-gray-600">الحالة:</p>
+                    <p class="font-medium">
+                        {% if batch.status == 'Created' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            تم الإنشاء
+                        </span>
+                        {% elif batch.status == 'InProduction' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            قيد الإنتاج
+                        </span>
+                        {% elif batch.status == 'QCPending' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            في انتظار فحص الجودة
+                        </span>
+                        {% elif batch.status == 'QCPassed' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            اجتاز فحص الجودة
+                        </span>
+                        {% elif batch.status == 'QCFailed' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            فشل في فحص الجودة
+                        </span>
+                        {% elif batch.status == 'Packaging' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            قيد التعبئة
+                        </span>
+                        {% elif batch.status == 'Packaged' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            تم التعبئة
+                        </span>
+                        {% elif batch.status == 'Stored' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            تم التخزين
+                        </span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <div class="flex flex-wrap gap-2">
+                    <a href="/production/batches/{{ batch.id }}/steps" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-tasks ml-1"></i>
+                        مراحل الإنتاج
+                    </a>
+                    <a href="/production/qc/report/{{ batch.id }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-clipboard-check ml-1"></i>
+                        تقرير فحص الجودة
+                    </a>
+                    <a href="/production/timeline/{{ batch.id }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-history ml-1"></i>
+                        مسار الإنتاج
+                    </a>
+                    <a href="/production/labels/generate/{{ batch.id }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus-circle ml-1"></i>
+                        إنشاء ملصق جديد
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Labels History Card -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-history text-blue-600 ml-2"></i>
+                سجل الملصقات
+            </h3>
+        </div>
+
+        <div class="p-6">
+            {% if labels %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رقم الملصق</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نوع القالب</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">عدد النسخ</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ الإنشاء</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تم الإنشاء بواسطة</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for label in labels %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{{ label.id }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if label.label_template == 'standard' %}
+                                قالب قياسي
+                                {% elif label.label_template == 'detailed' %}
+                                قالب مفصل
+                                {% else %}
+                                {{ label.label_template }}
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ label.quantity }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ label.generated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ label.generator.username }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <a href="/production/labels/{{ label.id }}" class="text-blue-600 hover:text-blue-800 ml-3">
+                                    <i class="fas fa-eye"></i>
+                                    عرض
+                                </a>
+                                <a href="#" onclick="printLabel({{ label.id }})" class="text-green-600 hover:text-green-800">
+                                    <i class="fas fa-print"></i>
+                                    طباعة
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Summary Card -->
+            <div class="mt-6 bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-blue-500 text-xl"></i>
+                    </div>
+                    <div class="mr-3">
+                        <h4 class="text-blue-800 font-medium">ملخص الملصقات</h4>
+                        <p class="text-blue-700 text-sm mt-1">
+                            إجمالي عدد الملصقات: <span class="font-medium">{{ labels|length }}</span> |
+                            إجمالي عدد النسخ: <span class="font-medium">{{ labels|sum(attribute='quantity') }}</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 text-blue-500 mb-4">
+                    <i class="fas fa-tag text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">لا توجد ملصقات</h3>
+                <p class="text-gray-500 mb-6">لم يتم إنشاء أي ملصقات لهذه الدفعة بعد</p>
+                <a href="/production/labels/generate/{{ batch.id }}" class="btn btn-primary">
+                    <i class="fas fa-plus-circle ml-1"></i>
+                    إنشاء ملصق جديد
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function printLabel(labelId) {
+        // Redirect to the label view page
+        window.location.href = `/production/labels/${labelId}`;
+    }
+</script>
+{% endblock %}

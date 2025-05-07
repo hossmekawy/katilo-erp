@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>{% if certificate_only %}شهادة تحليل{% else %}تقرير فحص الجودة{% endif %} - {{ batch.lot_number }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            direction: rtl;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        h1, h2, h3, h4 {
+            color: #2563eb;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            font-size: 24px;
+            text-align: center;
+            border-bottom: 2px solid #2563eb;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            font-size: 20px;
+        }
+        h3 {
+            font-size: 18px;
+        }
+        h4 {
+            font-size: 16px;
+        }
+        .section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            margin-bottom: 10px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 14px;
+        }
+        .info-value {
+            font-size: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: right;
+        }
+        th {
+            background-color: #f8fafc;
+            font-weight: bold;
+            color: #4b5563;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        .status-passed {
+            color: #16a34a;
+            font-weight: bold;
+        }
+        .status-failed {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        .status-pending {
+            color: #ca8a04;
+            font-weight: bold;
+        }
+        .certificate {
+            border: 2px solid #333;
+            padding: 20px;
+            margin-top: 40px;
+        }
+        .certificate-title {
+            text-align: center;
+            font-size: 22px;
+            margin-bottom: 20px;
+        }
+        .certificate-subtitle {
+            text-align: center;
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .signature-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 60px;
+        }
+        .signature-box {
+            text-align: center;
+        }
+        .signature-line {
+            border-top: 1px solid #333;
+            width: 70%;
+            margin: 40px auto 5px auto;
+        }
+        .signature-title {
+            font-size: 14px;
+            color: #666;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+<body>
+    {% if not certificate_only %}
+    <h1>تقرير فحص الجودة للدفعة {{ batch.lot_number }}</h1>
+    
+    <!-- Batch Information Section -->
+    <div class="section">
+        <h2>معلومات دفعة الإنتاج</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">رقم الدفعة:</div>
+                <div class="info-value">{{ batch.lot_number }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">المنتج:</div>
+                <div class="info-value">{{ batch.item.name }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">الكمية:</div>
+                <div class="info-value">{{ batch.quantity }} {{ batch.item.unit_of_measure or 'وحدة' }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">تاريخ الإنتاج:</div>
+                <div class="info-value">{{ batch.production_date.strftime('%Y-%m-%d') }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">أمر الإنتاج:</div>
+                <div class="info-value">#{{ batch.production_order_id }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">حالة الدفعة:</div>
+                <div class="info-value">
+                    {% if batch.status == 'QCPassed' %}
+                    <span class="status-passed">ناجحة - مطابقة للمواصفات</span>
+                    {% elif batch.status == 'QCFailed' %}
+                    <span class="status-failed">فاشلة - غير مطابقة للمواصفات</span>
+                    {% else %}
+                    <span>{{ batch.status }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- QC Tests Summary -->
+    <div class="section">
+        <h2>ملخص فحوصات الجودة</h2>
+        {% if tests %}
+            <div style="margin-bottom: 15px;">
+                <div class="info-label">عدد الفحوصات:</div>
+                <div class="info-value">{{ tests|length }}</div>
+                <div class="info-label">النتيجة النهائية:</div>
+                <div class="info-value">
+                    {% if batch.status == 'QCPassed' %}
+                    <span class="status-passed">ناجحة - مطابقة للمواصفات</span>
+                    {% elif batch.status == 'QCFailed' %}
+                    <span class="status-failed">فاشلة - غير مطابقة للمواصفات</span>
+                    {% else %}
+                    <span>{{ batch.status }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>رقم الفحص</th>
+                        <th>نوع الفحص</th>
+                        <th>تاريخ الفحص</th>
+                        <th>المفتش</th>
+                        <th>النتيجة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for test in tests %}
+                    <tr>
+                        <td>#{{ test.id }}</td>
+                        <td>{{ test.test_type }}</td>
+                        <td>{{ test.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ test.inspector.username if test.inspector else 'غير محدد' }}</td>
+                        <td>
+                            {% if test.status == 'Pending' %}
+                            <span class="status-pending">قيد الانتظار</span>
+                            {% elif test.status == 'InProgress' %}
+                            <span class="status-pending">قيد التنفيذ</span>
+                            {% elif test.status == 'Passed' %}
+                            <span class="status-passed">ناجح</span>
+                            {% elif test.status == 'Failed' %}
+                            <span class="status-failed">فاشل</span>
+                            {% else %}
+                            <span>{{ test.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>لا توجد فحوصات جودة مسجلة لهذه الدفعة</p>
+        {% endif %}
+    </div>
+    
+    <!-- Detailed Test Results -->
+    {% for test in tests %}
+    <div class="section {% if not loop.first %}page-break{% endif %}">
+        <h2>تفاصيل الفحص #{{ test.id }} - {{ test.test_type }}</h2>
+        
+        <div style="margin-bottom: 15px;">
+            <div class="info-label">تاريخ الفحص:</div>
+            <div class="info-value">{{ test.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            
+            <div class="info-label">المفتش:</div>
+            <div class="info-value">{{ test.inspector.username if test.inspector else 'غير محدد' }}</div>
+            
+            {% if test.completed_at %}
+            <div class="info-label">تاريخ الانتهاء:</div>
+            <div class="info-value">{{ test.completed_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            {% endif %}
+            
+            <div class="info-label">النتيجة:</div>
+            <div class="info-value">
+                {% if test.status == 'Passed' %}
+                <span class="status-passed">ناجح</span>
+                {% elif test.status == 'Failed' %}
+                <span class="status-failed">فاشل</span>
+                {% else %}
+                <span>{{ test.status }}</span>
+                {% endif %}
+            </div>
+            
+            {% if test.notes %}
+            <div class="info-label">ملاحظات:</div>
+            <div class="info-value">{{ test.notes }}</div>
+            {% endif %}
+        </div>
+        
+        <!-- Test Parameters and Results -->
+        {% if test.parameters or test.results %}
+        <h3>معايير ونتائج الفحص</h3>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>المعيار</th>
+                    <th>القيمة المتوقعة</th>
+                    <th>القيمة الفعلية</th>
+                    <th>النتيجة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if test.results %}
+                    {% for result in test.results %}
+                    <tr>
+                        <td>{{ result.parameter_name }}</td>
+                        <td>{{ result.expected_value }}</td>
+                        <td>{{ result.actual_value }}</td>
+                        <td>
+                            {% if result.is_passed %}
+                            <span class="status-passed">مطابق</span>
+                            {% else %}
+                            <span class="status-failed">غير مطابق</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% elif test.parameters %}
+                    {% for param_name, param_data in test.parameters.items() %}
+                    <tr>
+                        <td>{{ param_name }}</td>
+                        <td>{{ param_data.expected }}</td>
+                        <td>
+                            {% if test.status == 'Pending' %}
+                            <span class="status-pending">لم يتم التسجيل بعد</span>
+                            {% else %}
+                            <span>غير متوفر</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if test.status == 'Pending' %}
+                            <span class="status-pending">قيد الانتظار</span>
+                            {% else %}
+                            <span>غير متوفر</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center;">لا توجد معايير مسجلة لهذا الفحص</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+    
+    <!-- Certificate of Analysis -->
+    {% if batch.status == 'QCPassed' or certificate_only %}
+    <div class="certificate {% if not certificate_only %}page-break{% endif %}">
+        <h2 class="certificate-title">شهادة تحليل</h2>
+        <p class="certificate-subtitle">Certificate of Analysis (CoA)</p>
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">اسم المنتج:</div>
+                <div class="info-value">{{ batch.item.name }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">رقم الدفعة:</div>
+                <div class="info-value">{{ batch.lot_number }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">تاريخ الإنتاج:</div>
+                <div class="info-value">{{ batch.production_date.strftime('%Y-%m-%d') }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">تاريخ الفحص:</div>
+                <div class="info-value">{{ report_generated_at.strftime('%Y-%m-%d') }}</div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <h3>نتيجة الفحص</h3>
+            <p style="font-size: 20px; color: #16a34a; font-weight: bold;">مطابق للمواصفات</p>
+        </div>
+        
+        <h3>ملخص نتائج الفحص:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>المعيار</th>
+                    <th>المواصفة</th>
+                    <th>النتيجة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set found_results = false %}
+                {% for test in tests %}
+                    {% if test.results %}
+                        {% set found_results = true %}
+                        {% for result in test.results %}
+                        <tr>
+                            <td>{{ result.parameter_name }}</td>
+                            <td>{{ result.expected_value }}</td>
+                            <td>{{ result.actual_value }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+                
+                {% if not found_results %}
+                <tr>
+                    <td colspan="3" style="text-align: center;">لا توجد نتائج تفصيلية متاحة</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        
+        <div class="signature-section">
+            <div class="signature-box">
+                <p>مدير مراقبة الجودة</p>
+                <div class="signature-line"></div>
+                <p class="signature-title">التوقيع</p>
+            </div>
+            <div class="signature-box">
+                <p>مدير الإنتاج</p>
+                <div class="signature-line"></div>
+                <p class="signature-title">التوقيع</p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 40px; font-size: 12px; color: #666;">
+            <p>تم إصدار هذه الشهادة بواسطة نظام قاتيلو لإدارة الإنتاج</p>
+            <p>{{ report_generated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+        </div>
+    </div>
+    {% endif %}
+</body>
+</html>

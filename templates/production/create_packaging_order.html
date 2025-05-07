@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}إنشاء أمر تعبئة جديد - نظام قاتيلو{% endblock %}
+
+{% block page_header %}إنشاء أمر تعبئة جديد{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/dashboard" class="text-blue-600 hover:text-blue-800">إدارة الإنتاج</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/production/packaging/orders" class="text-blue-600 hover:text-blue-800">أوامر التعبئة</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">إنشاء أمر جديد</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-box text-blue-600 ml-2"></i>
+                إنشاء أمر تعبئة جديد
+            </h3>
+        </div>
+
+        <form method="POST" action="{{ url_for('production.create_packaging_order') }}" class="p-6 space-y-6">
+            <!-- Batch Selection -->
+            <div class="space-y-2">
+                <label for="batch_id" class="block text-sm font-medium text-gray-700">دفعة الإنتاج <span class="text-red-500">*</span></label>
+                <select id="batch_id" name="batch_id" required
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">-- اختر دفعة الإنتاج --</option>
+                    {% for batch in batches %}
+                    <option value="{{ batch.id }}"
+                            data-product-name="{{ batch.item.name }}"
+                            data-product-id="{{ batch.item_id }}"
+                            data-quantity="{{ batch.quantity }}"
+                            data-unit="{{ batch.item.unit_of_measure or 'وحدة' }}"
+                            {% if selected_batch and selected_batch.id == batch.id %}selected{% endif %}>
+                        {{ batch.lot_number }} - {{ batch.item.name }} ({{ batch.quantity }} {{ batch.item.unit_of_measure or 'وحدة' }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <p class="text-sm text-gray-500">يجب اختيار دفعة إنتاج اجتازت فحص الجودة</p>
+            </div>
+
+            <!-- Batch Details (shown after selection) -->
+            <div id="batch-details" class="bg-blue-50 p-4 rounded-lg border border-blue-200 hidden">
+                <h4 class="font-medium text-blue-800 mb-2">تفاصيل الدفعة</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600">المنتج:</p>
+                        <p id="product-name" class="font-medium text-gray-800"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">الكمية المتاحة:</p>
+                        <p id="available-quantity" class="font-medium text-gray-800"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Packaging Type -->
+            <div class="space-y-2">
+                <label for="packaging_type" class="block text-sm font-medium text-gray-700">نوع التعبئة <span class="text-red-500">*</span></label>
+                <input type="text" id="packaging_type" name="packaging_type" required
+                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                       placeholder="مثال: عبوات 1 كجم، كرتون 12 قطعة، الخ">
+            </div>
+
+            <!-- Quantity -->
+            <div class="space-y-2">
+                <label for="quantity" class="block text-sm font-medium text-gray-700">الكمية <span class="text-red-500">*</span></label>
+                <div class="flex items-center">
+                    <input type="number" id="quantity" name="quantity" required min="1" step="1"
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <span id="quantity-unit" class="mr-2 text-gray-600">وحدة</span>
+                </div>
+                <p class="text-sm text-red-500 hidden" id="quantity-error">الكمية المطلوبة أكبر من الكمية المتاحة</p>
+            </div>
+
+            <!-- Packaging Line -->
+            <div class="space-y-2">
+                <label for="packaging_line_id" class="block text-sm font-medium text-gray-700">خط التعبئة</label>
+                <select id="packaging_line_id" name="packaging_line_id"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">-- اختر خط التعبئة (اختياري) --</option>
+                    {% for line in packaging_lines %}
+                    <option value="{{ line.id }}">{{ line.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Notes -->
+            <div class="space-y-2">
+                <label for="notes" class="block text-sm font-medium text-gray-700">ملاحظات</label>
+                <textarea id="notes" name="notes" rows="3"
+                          class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          placeholder="أي ملاحظات إضافية حول أمر التعبئة..."></textarea>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex justify-end space-x-3 space-x-reverse pt-4 border-t border-gray-200">
+                <a href="/production/packaging/orders" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                    إلغاء
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save ml-1"></i>
+                    إنشاء أمر التعبئة
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- No Batches Available Message -->
+    {% if not batches %}
+    <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+        <p class="text-yellow-800">
+            <i class="fas fa-exclamation-triangle ml-2"></i>
+            لا توجد دفعات إنتاج جاهزة للتعبئة
+        </p>
+        <p class="text-sm text-yellow-700 mt-2">
+            يجب أن تكون دفعات الإنتاج قد اجتازت فحص الجودة قبل إنشاء أمر التعبئة
+        </p>
+        <div class="mt-4">
+            <a href="/production/qc/tests" class="text-blue-600 hover:text-blue-800 text-sm">
+                <i class="fas fa-arrow-left ml-1"></i>
+                الذهاب إلى فحوصات الجودة
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const batchSelect = document.getElementById('batch_id');
+        const batchDetails = document.getElementById('batch-details');
+        const productNameEl = document.getElementById('product-name');
+        const availableQuantityEl = document.getElementById('available-quantity');
+        const quantityInput = document.getElementById('quantity');
+        const quantityUnit = document.getElementById('quantity-unit');
+        const quantityError = document.getElementById('quantity-error');
+        const submitBtn = document.querySelector('button[type="submit"]');
+
+        console.log("Packaging order form initialized");
+
+        // Initialize with selected batch if any
+        if (batchSelect.value) {
+            console.log("Initial batch selected:", batchSelect.value);
+            updateBatchDetails();
+        }
+
+        batchSelect.addEventListener('change', function() {
+            console.log("Batch changed to:", batchSelect.value);
+            updateBatchDetails();
+        });
+
+        quantityInput.addEventListener('input', function() {
+            console.log("Quantity changed to:", quantityInput.value);
+            validateQuantity();
+        });
+
+        // Add form submission handler
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            console.log("Form submission attempted");
+
+            // Validate form before submission
+            if (!batchSelect.value) {
+                e.preventDefault();
+                console.error("No batch selected");
+                alert("يرجى اختيار دفعة الإنتاج");
+                return false;
+            }
+
+            if (!quantityInput.value || quantityInput.value <= 0) {
+                e.preventDefault();
+                console.error("Invalid quantity");
+                alert("يرجى إدخال كمية صحيحة");
+                return false;
+            }
+
+            // Validate quantity against available
+            const selectedOption = batchSelect.options[batchSelect.selectedIndex];
+            const availableQuantity = parseFloat(selectedOption.dataset.quantity);
+            const requestedQuantity = parseFloat(quantityInput.value);
+
+            if (requestedQuantity > availableQuantity) {
+                e.preventDefault();
+                console.error("Quantity exceeds available");
+                alert("الكمية المطلوبة أكبر من الكمية المتاحة");
+                return false;
+            }
+
+            console.log("Form validation passed, submitting");
+            return true;
+        });
+
+        function updateBatchDetails() {
+            if (batchSelect.value) {
+                const selectedOption = batchSelect.options[batchSelect.selectedIndex];
+                const productName = selectedOption.dataset.productName;
+                const availableQuantity = selectedOption.dataset.quantity;
+                const unit = selectedOption.dataset.unit;
+
+                console.log("Updating batch details:", {
+                    productName,
+                    availableQuantity,
+                    unit
+                });
+
+                productNameEl.textContent = productName;
+                availableQuantityEl.textContent = `${availableQuantity} ${unit}`;
+                quantityUnit.textContent = unit;
+
+                // Set max quantity
+                quantityInput.max = availableQuantity;
+
+                // Set default quantity if empty
+                if (!quantityInput.value) {
+                    quantityInput.value = availableQuantity;
+                }
+
+                // Show batch details
+                batchDetails.classList.remove('hidden');
+
+                // Validate quantity
+                validateQuantity();
+            } else {
+                // Hide batch details
+                batchDetails.classList.add('hidden');
+            }
+        }
+
+        function validateQuantity() {
+            if (batchSelect.value) {
+                const selectedOption = batchSelect.options[batchSelect.selectedIndex];
+                const availableQuantity = parseFloat(selectedOption.dataset.quantity);
+                const requestedQuantity = parseFloat(quantityInput.value);
+
+                console.log("Validating quantity:", {
+                    availableQuantity,
+                    requestedQuantity
+                });
+
+                if (requestedQuantity > availableQuantity) {
+                    quantityError.classList.remove('hidden');
+                    quantityInput.classList.add('border-red-500');
+                    submitBtn.disabled = true;
+                    console.log("Quantity validation failed");
+                } else {
+                    quantityError.classList.add('hidden');
+                    quantityInput.classList.remove('border-red-500');
+                    submitBtn.disabled = false;
+                    console.log("Quantity validation passed");
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

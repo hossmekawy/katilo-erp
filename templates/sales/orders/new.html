@@ -1,0 +1,1353 @@
+{% extends 'base.html' %}
+
+{% block title %}إنشاء طلب مبيعات جديد{% endblock %}
+
+{% block page_header %}إنشاء طلب مبيعات جديد{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.sales_dashboard') }}" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.list_orders') }}" class="text-blue-600 hover:text-blue-800">الطلبات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">طلب جديد</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="salesOrderApp()" class="space-y-6">
+    <!-- Order Details Card -->
+    <div class="card bg-white shadow-sm rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-blue-100 p-2 rounded-lg">
+                    <i class="fas fa-file-invoice text-blue-600 text-lg"></i>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800">تفاصيل الطلب</h2>
+            </div>
+            <div class="text-sm text-gray-500">
+                <span class="font-medium">التاريخ:</span> <span x-text="currentDate"></span>
+            </div>
+        </div>
+        <div class="p-6">
+            <form id="newOrderForm" class="space-y-6" @submit.prevent="submitOrder">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="customer" class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-user-circle text-blue-500 mr-1"></i> العميل <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="flex">
+                                <div class="relative flex-grow">
+                                    <input type="text" id="customerSearch"
+                                           placeholder="ابحث عن عميل..."
+                                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10"
+                                           @input="searchCustomers"
+                                           @focus="showCustomerResults = true"
+                                           :class="{'border-red-300': errors.customer}">
+                                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                        <i class="fas fa-search text-gray-400"></i>
+                                    </div>
+
+                                    <!-- Customer search results dropdown -->
+                                    <div x-show="showCustomerResults"
+                                         @click.away="showCustomerResults = false"
+                                         class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-y-auto">
+                                        <div x-show="isLoadingCustomers" class="p-3 text-center text-gray-500">
+                                            <i class="fas fa-spinner fa-spin mr-2"></i> جاري البحث...
+                                        </div>
+                                        <template x-if="!isLoadingCustomers && customerResults.length === 0">
+                                            <div class="p-3 text-center text-gray-500">
+                                                لا توجد نتائج
+                                            </div>
+                                        </template>
+                                        <template x-for="customer in customerResults" :key="customer.id">
+                                            <div @click="selectCustomer(customer)"
+                                                 class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 flex justify-between items-center">
+                                                <div>
+                                                    <div class="font-medium text-gray-800" x-text="customer.name"></div>
+                                                    <div class="text-xs text-gray-500" x-text="customer.contact_info || 'لا توجد معلومات اتصال'"></div>
+                                                </div>
+                                                <i class="fas fa-check text-blue-500" x-show="formData.customer_id == customer.id"></i>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                                <button type="button" @click="openNewCustomerModal"
+                                        class="mr-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <div x-show="formData.customer_id" class="mt-2 text-sm text-blue-600">
+                                <span class="font-medium">العميل المحدد:</span> <span x-text="selectedCustomerName"></span>
+                            </div>
+                        </div>
+                        <p x-show="errors.customer" x-text="errors.customer" class="mt-1 text-sm text-red-600"></p>
+                    </div>
+                    <div>
+                        <label for="representative" class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-user-tie text-blue-500 mr-1"></i> مندوب المبيعات (اختياري)
+                        </label>
+                        <div class="relative">
+                            <input type="text" id="representativeSearch"
+                                   placeholder="ابحث عن مندوب..."
+                                   class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10"
+                                   @input="searchRepresentatives"
+                                   @focus="showRepresentativeResults = true">
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <i class="fas fa-search text-gray-400"></i>
+                            </div>
+
+                            <!-- Representative search results dropdown -->
+                            <div x-show="showRepresentativeResults"
+                                 @click.away="showRepresentativeResults = false"
+                                 class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-y-auto">
+                                <div x-show="isLoadingRepresentatives" class="p-3 text-center text-gray-500">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i> جاري البحث...
+                                </div>
+                                <template x-if="!isLoadingRepresentatives && representativeResults.length === 0">
+                                    <div class="p-3 text-center text-gray-500">
+                                        لا توجد نتائج
+                                    </div>
+                                </template>
+                                <template x-for="rep in representativeResults" :key="rep.id">
+                                    <div @click="selectRepresentative(rep)"
+                                         class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 flex justify-between items-center">
+                                        <div>
+                                            <div class="font-medium text-gray-800" x-text="rep.name"></div>
+                                            <div class="text-xs text-gray-500" x-text="rep.territory || 'لا توجد منطقة محددة'"></div>
+                                        </div>
+                                        <i class="fas fa-check text-blue-500" x-show="formData.representative_id == rep.id"></i>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div x-show="formData.representative_id" class="mt-2 text-sm text-blue-600">
+                                <span class="font-medium">المندوب المحدد:</span> <span x-text="selectedRepresentativeName"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="payment_method" class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-money-bill-wave text-blue-500 mr-1"></i> طريقة الدفع
+                        </label>
+                        <select id="payment_method" x-model="formData.payment_method" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="cash">نقدي</option>
+                            <option value="credit_card">بطاقة ائتمان</option>
+                            <option value="bank_transfer">تحويل بنكي</option>
+                            <option value="credit">آجل</option>
+                        </select>
+                    </div>
+
+                    <div x-show="formData.payment_method === 'cash'">
+                        <label for="cash_account_id" class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-cash-register text-blue-500 mr-1"></i> حساب الخزينة
+                        </label>
+                        <select id="cash_account_id" x-model="formData.cash_account_id" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">اختر حساب الخزينة</option>
+                            {% for account in cash_accounts %}
+                                <option value="{{ account.id }}">{{ account.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div x-show="formData.payment_method !== 'cash'">
+                        <label for="payment_reference" class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-hashtag text-blue-500 mr-1"></i> مرجع الدفع
+                        </label>
+                        <input type="text" id="payment_reference" x-model="formData.payment_reference"
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               placeholder="رقم المعاملة أو المرجع">
+                    </div>
+                </div>
+
+                <!-- Order Items Section -->
+                <div class="mt-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center space-x-2 space-x-reverse">
+                            <i class="fas fa-boxes text-blue-500"></i>
+                            <h3 class="text-md font-semibold text-gray-700">عناصر الطلب</h3>
+                            <span x-show="orderItems.length > 0" class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                                <span x-text="orderItems.length"></span> عنصر
+                            </span>
+                        </div>
+                        <button type="button" @click="openAddItemModal"
+                                class="btn btn-primary flex items-center transition-all duration-300 transform hover:scale-105">
+                            <i class="fas fa-plus ml-1"></i> إضافة عنصر
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto bg-white rounded-lg border border-gray-200">
+                        <table id="orderItemsTable" class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gradient-to-l from-gray-50 to-blue-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المنتج</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">سعر الوحدة</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الكمية</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المجموع الفرعي</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <template x-if="orderItems.length === 0">
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-8 text-center">
+                                            <div class="flex flex-col items-center justify-center text-gray-500">
+                                                <i class="fas fa-shopping-cart text-4xl mb-3 text-gray-300"></i>
+                                                <p class="text-sm">لا توجد عناصر في الطلب</p>
+                                                <button type="button" @click="openAddItemModal"
+                                                        class="mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                                                    <i class="fas fa-plus ml-1"></i> إضافة عنصر الآن
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-for="(item, index) in orderItems" :key="index">
+                                    <tr :class="index % 2 === 0 ? 'bg-white' : 'bg-gray-50'" class="hover:bg-blue-50 transition-colors duration-150">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                                                    <i class="fas fa-cube"></i>
+                                                </div>
+                                                <div class="mr-4">
+                                                    <div class="text-sm font-medium text-gray-900" x-text="item.name"></div>
+                                                    <div class="text-xs text-gray-500">كود: <span x-text="item.item_id"></span></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900 font-medium" x-text="formatCurrency(item.unit_price)"></div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <button type="button" @click="decrementQuantity(index)" class="text-gray-500 hover:text-red-600 focus:outline-none">
+                                                    <i class="fas fa-minus-circle"></i>
+                                                </button>
+                                                <span class="mx-3 text-sm font-medium text-gray-900 bg-gray-100 px-3 py-1 rounded-lg" x-text="item.quantity"></span>
+                                                <button type="button" @click="incrementQuantity(index)" class="text-gray-500 hover:text-green-600 focus:outline-none">
+                                                    <i class="fas fa-plus-circle"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900 font-bold" x-text="formatCurrency(item.subtotal)"></div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <button type="button" @click="removeItem(index)"
+                                                    class="text-red-600 hover:text-red-900 transition-colors duration-150 focus:outline-none">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Order Summary Section -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div>
+                        <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-sticky-note text-blue-500 mr-1"></i> ملاحظات الطلب
+                        </label>
+                        <textarea id="notes" x-model="formData.notes" rows="4"
+                                  class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="أضف أي ملاحظات أو تعليمات خاصة بالطلب هنا..."></textarea>
+                    </div>
+                    <div>
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-100 p-5 shadow-sm">
+                            <h3 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-calculator text-blue-500 ml-2"></i> ملخص الطلب
+                            </h3>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600">المجموع الفرعي:</span>
+                                    <span id="subtotal" class="font-medium" x-text="formatCurrency(subtotal)"></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600 flex items-center">
+                                        الخصم:
+                                        <span x-show="discountAmount > 0" class="mr-1 text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
+                                            <span x-text="discountType === 'percentage' ? discountValue + '%' : ''"></span>
+                                        </span>
+                                    </span>
+                                    <span id="discount" class="font-medium text-green-600" x-text="formatCurrency(discountAmount)"></span>
+                                </div>
+                                <div class="border-t border-blue-200 pt-3 mt-3">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-gray-800 font-semibold">الإجمالي:</span>
+                                        <span id="total" class="text-gray-800 font-bold text-lg" x-text="formatCurrency(total)"></span>
+                                    </div>
+                                </div>
+                                <button type="button" @click="openDiscountModal"
+                                        class="mt-3 w-full bg-blue-100 text-blue-700 py-2 px-4 rounded-md hover:bg-blue-200 transition-colors flex items-center justify-center">
+                                    <i class="fas fa-tag ml-1"></i>
+                                    <span x-text="discountAmount > 0 ? 'تعديل الخصم' : 'تطبيق خصم'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Form Actions -->
+                <div class="flex justify-end space-x-3 space-x-reverse mt-6">
+                    <a href="{{ url_for('sales.list_orders') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors flex items-center">
+                        <i class="fas fa-times ml-1"></i> إلغاء
+                    </a>
+                    <button type="submit" class="btn btn-primary flex items-center" :disabled="isSubmitting">
+                        <i class="fas fa-save ml-1"></i>
+                        <span x-text="isSubmitting ? 'جاري الإنشاء...' : 'إنشاء الطلب'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div x-data="{ open: false }" x-show="$store.addItemModal.open" x-cloak
+     class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
+    <div @click.away="$store.addItemModal.open = false"
+         class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform scale-95"
+         x-transition:enter-end="opacity-100 transform scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 transform scale-100"
+         x-transition:leave-end="opacity-0 transform scale-95">
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+            <div class="flex items-center space-x-2 space-x-reverse">
+                <div class="bg-blue-100 p-1.5 rounded-lg">
+                    <i class="fas fa-cube text-blue-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800">إضافة عنصر للطلب</h3>
+            </div>
+            <button @click="$store.addItemModal.open = false" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-5">
+            <form id="addItemForm" class="space-y-4" @submit.prevent="$store.addItemModal.addItem()">
+                <div>
+                    <label for="itemSearch" class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-box text-blue-500 ml-1"></i> المنتج <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="itemSearch"
+                               placeholder="ابحث عن منتج..."
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10"
+                               @input="$store.addItemModal.searchItems()"
+                               @focus="$store.addItemModal.showItemResults = true">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+
+                        <!-- Item search results dropdown -->
+                        <div x-show="$store.addItemModal.showItemResults"
+                             @click.away="$store.addItemModal.showItemResults = false"
+                             class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-y-auto">
+                            <div x-show="$store.addItemModal.isLoadingItems" class="p-3 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i> جاري البحث...
+                            </div>
+                            <template x-if="!$store.addItemModal.isLoadingItems && $store.addItemModal.itemResults.length === 0">
+                                <div class="p-3 text-center text-gray-500">
+                                    لا توجد نتائج
+                                </div>
+                            </template>
+                            <template x-for="item in $store.addItemModal.itemResults" :key="item.id">
+                                <div @click="$store.addItemModal.selectItem(item)"
+                                     class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 flex justify-between items-center">
+                                    <div>
+                                        <div class="font-medium text-gray-800" x-text="item.name"></div>
+                                        <div class="text-xs text-gray-500">
+                                            <span x-text="item.sku || ''"></span>
+                                            <span x-show="item.category_type" class="mr-2 bg-blue-100 text-blue-800 text-xs px-1.5 py-0.5 rounded-full" x-text="item.category_type"></span>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-gray-600" x-text="formatCurrency(item.price)"></div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    <p x-show="$store.addItemModal.errors.item" x-text="$store.addItemModal.errors.item" class="mt-1 text-sm text-red-600"></p>
+                </div>
+                <div>
+                    <label for="itemPrice" class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-tag text-blue-500 ml-1"></i> سعر الوحدة <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input type="number" id="itemPrice" x-model="$store.addItemModal.price"
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pl-10"
+                               step="0.01" min="0">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <span class="text-gray-500">ج.م</span>
+                        </div>
+                    </div>
+                    <p x-show="$store.addItemModal.errors.price" x-text="$store.addItemModal.errors.price" class="mt-1 text-sm text-red-600"></p>
+                </div>
+                <div>
+                    <label for="itemQuantity" class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-sort-amount-up text-blue-500 ml-1"></i> الكمية <span class="text-red-500">*</span>
+                    </label>
+                    <div class="flex rounded-lg shadow-sm">
+                        <button type="button" @click="$store.addItemModal.decrementQuantity()"
+                                class="px-3 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-r-lg border border-gray-300 border-l-0">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <input type="number" id="itemQuantity" x-model="$store.addItemModal.quantity"
+                               @change="$store.addItemModal.checkAvailability()"
+                               class="flex-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-center"
+                               min="1" value="1">
+                        <button type="button" @click="$store.addItemModal.incrementQuantity()"
+                                class="px-3 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-l-lg border border-gray-300 border-r-0">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <p x-show="$store.addItemModal.errors.quantity" x-text="$store.addItemModal.errors.quantity" class="mt-1 text-sm text-red-600"></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-warehouse text-blue-500 ml-1"></i> المتاح
+                    </label>
+                    <div id="availabilityInfo"
+                         :class="$store.addItemModal.availabilityClass"
+                         class="p-3 rounded-md flex items-center">
+                        <i :class="$store.addItemModal.availabilityIcon" class="ml-2"></i>
+                        <span x-text="$store.addItemModal.availabilityText"></span>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="p-4 border-t border-gray-100 flex justify-end space-x-3 space-x-reverse bg-gray-50">
+            <button @click="$store.addItemModal.open = false"
+                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                إلغاء
+            </button>
+            <button @click="$store.addItemModal.addItem()"
+                    class="btn btn-primary"
+                    :disabled="$store.addItemModal.isLoading || !$store.addItemModal.isAvailable">
+                <i class="fas fa-plus ml-1"></i> إضافة العنصر
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- New Customer Modal -->
+<div x-data="{ open: false }" x-show="$store.newCustomerModal.open" x-cloak
+     class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
+    <div @click.away="$store.newCustomerModal.open = false"
+         class="bg-white rounded-lg shadow-xl max-w-md w-full"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform scale-95"
+         x-transition:enter-end="opacity-100 transform scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 transform scale-100"
+         x-transition:leave-end="opacity-0 transform scale-95">
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+            <div class="flex items-center space-x-2 space-x-reverse">
+                <div class="bg-blue-100 p-1.5 rounded-lg">
+                    <i class="fas fa-user-plus text-blue-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800">إضافة عميل جديد</h3>
+            </div>
+            <button @click="$store.newCustomerModal.open = false" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-5">
+            <form id="newCustomerForm" class="space-y-4" @submit.prevent="$store.newCustomerModal.createCustomer()">
+                <div>
+                    <label for="customerName" class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-user text-blue-500 ml-1"></i> اسم العميل <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" id="customerName" x-model="$store.newCustomerModal.customerName"
+                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           placeholder="أدخل اسم العميل">
+                    <p x-show="$store.newCustomerModal.errors.customerName" x-text="$store.newCustomerModal.errors.customerName" class="mt-1 text-sm text-red-600"></p>
+                </div>
+                <div>
+                    <label for="contactInfo" class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-phone text-blue-500 ml-1"></i> معلومات الاتصال
+                    </label>
+                    <input type="text" id="contactInfo" x-model="$store.newCustomerModal.contactInfo"
+                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           placeholder="رقم الهاتف / البريد الإلكتروني">
+                </div>
+                <div>
+                    <label for="billingAddress" class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-file-invoice text-blue-500 ml-1"></i> عنوان الفواتير
+                    </label>
+                    <textarea id="billingAddress" x-model="$store.newCustomerModal.billingAddress" rows="2"
+                              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              placeholder="أدخل عنوان الفواتير"></textarea>
+                </div>
+                <div>
+                    <label for="shippingAddress" class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-shipping-fast text-blue-500 ml-1"></i> عنوان الشحن
+                    </label>
+                    <textarea id="shippingAddress" x-model="$store.newCustomerModal.shippingAddress" rows="2"
+                              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              placeholder="أدخل عنوان الشحن"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="p-4 border-t border-gray-100 flex justify-end space-x-3 space-x-reverse bg-gray-50">
+            <button @click="$store.newCustomerModal.open = false"
+                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                إلغاء
+            </button>
+            <button @click="$store.newCustomerModal.createCustomer()"
+                    class="btn btn-primary"
+                    :disabled="$store.newCustomerModal.isSubmitting">
+                <i class="fas fa-save ml-1"></i>
+                <span x-text="$store.newCustomerModal.isSubmitting ? 'جاري الحفظ...' : 'حفظ العميل'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Apply Discount Modal -->
+<div x-data="discountModalApp()" x-show="$store.discountModal.open" x-cloak
+     class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
+    <div @click.away="$store.discountModal.open = false"
+         class="bg-white rounded-lg shadow-xl max-w-md w-full"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform scale-95"
+         x-transition:enter-end="opacity-100 transform scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 transform scale-100"
+         x-transition:leave-end="opacity-0 transform scale-95">
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-l from-blue-50 to-indigo-50">
+            <div class="flex items-center space-x-2 space-x-reverse">
+                <div class="bg-blue-100 p-1.5 rounded-lg">
+                    <i class="fas fa-percentage text-blue-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800">تطبيق خصم</h3>
+            </div>
+            <button @click="$store.discountModal.open = false" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-5">
+            <form id="discountForm" class="space-y-4" @submit.prevent="$store.discountModal.applyDiscount()">
+                <div>
+                    <label for="discountType" class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-tag text-blue-500 ml-1"></i> نوع الخصم
+                    </label>
+                    <div class="relative">
+                        <select id="discountType" x-model="$store.discountModal.type"
+                                class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10">
+                            <option value="percentage">نسبة مئوية (%)</option>
+                            <option value="fixed">مبلغ ثابت (ج.م)</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <i class="fas" :class="$store.discountModal.type === 'percentage' ? 'fa-percent' : 'fa-money-bill-alt'" class="text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label for="discountValue" class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-calculator text-blue-500 ml-1"></i> قيمة الخصم
+                    </label>
+                    <div class="relative">
+                        <input type="number" id="discountValue" x-model="$store.discountModal.value"
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               min="0" step="0.01">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <span class="text-gray-500" x-text="$store.discountModal.type === 'percentage' ? '%' : 'ج.م'"></span>
+                        </div>
+                    </div>
+                    <p x-show="$store.discountModal.error" x-text="$store.discountModal.error" class="mt-1 text-sm text-red-600"></p>
+                </div>
+                <!-- Preview of discount -->
+                <div x-show="$store.discountModal.value > 0" class="bg-blue-50 p-3 rounded-lg">
+                    <div class="text-sm text-blue-800">
+                        <div class="font-medium mb-1">معاينة الخصم:</div>
+                        <div class="flex justify-between">
+                            <span>المجموع الفرعي:</span>
+                            <span x-text="formatCurrency(currentSubtotal)"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>قيمة الخصم:</span>
+                            <span x-text="formatCurrency(calculateDiscountAmount())"></span>
+                        </div>
+                        <div class="flex justify-between font-medium border-t border-blue-200 mt-1 pt-1">
+                            <span>الإجمالي بعد الخصم:</span>
+                            <span x-text="formatCurrency(currentSubtotal - calculateDiscountAmount())"></span>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="p-4 border-t border-gray-100 flex justify-end space-x-3 space-x-reverse bg-gray-50">
+            <button @click="$store.discountModal.open = false"
+                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                إلغاء
+            </button>
+            <button @click="applyDiscount()"
+                    class="btn btn-primary">
+                <i class="fas fa-check ml-1"></i> تطبيق
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global currency formatter function
+    function formatCurrency(amount) {
+        if (amount === undefined || amount === null || isNaN(amount)) return '0.00 ج.م';
+        return new Intl.NumberFormat('ar-EG', {
+            style: 'currency',
+            currency: 'EGP'
+        }).format(parseFloat(amount));
+    }
+
+    // Discount Modal Component
+    function discountModalApp() {
+        return {
+            currentSubtotal: 0,
+
+            init() {
+                // Get the main component's Alpine instance to get the current subtotal
+                const mainComponent = Alpine.$data(document.querySelector('[x-data^="salesOrderApp"]'));
+                if (mainComponent) {
+                    this.currentSubtotal = mainComponent.subtotal;
+                }
+
+                // Listen for discount modal open event to update subtotal
+                this.$watch('$store.discountModal.open', (isOpen) => {
+                    if (isOpen) {
+                        const mainComponent = Alpine.$data(document.querySelector('[x-data^="salesOrderApp"]'));
+                        if (mainComponent) {
+                            this.currentSubtotal = mainComponent.subtotal;
+                        }
+                    }
+                });
+            },
+
+            // Format currency using the global function
+            formatCurrency(amount) {
+                return formatCurrency(amount);
+            },
+
+            // Calculate discount amount
+            calculateDiscountAmount() {
+                const discountStore = Alpine.store('discountModal');
+                if (!discountStore.value || isNaN(discountStore.value) || parseFloat(discountStore.value) <= 0) {
+                    return 0;
+                }
+
+                let amount = 0;
+                if (discountStore.type === 'percentage') {
+                    amount = (parseFloat(discountStore.value) / 100) * parseFloat(this.currentSubtotal);
+                } else {
+                    amount = parseFloat(discountStore.value);
+                }
+
+                return isNaN(amount) ? 0 : amount;
+            },
+
+            // Apply discount
+            applyDiscount() {
+                const discountStore = Alpine.store('discountModal');
+
+                // Validate discount
+                if (!discountStore.validate(this.currentSubtotal)) return;
+
+                // Get the main component's Alpine instance
+                const mainComponent = Alpine.$data(document.querySelector('[x-data^="salesOrderApp"]'));
+
+                // Apply discount
+                mainComponent.applyDiscount(discountStore.type, parseFloat(discountStore.value));
+
+                // Close modal
+                discountStore.open = false;
+
+                // Show notification
+                showNotification('تم تطبيق الخصم بنجاح', 'success');
+            }
+        };
+    }
+
+    document.addEventListener('alpine:init', () => {
+        // New Customer Modal Store
+        Alpine.store('newCustomerModal', {
+            open: false,
+            customerName: '',
+            contactInfo: '',
+            billingAddress: '',
+            shippingAddress: '',
+            isSubmitting: false,
+            errors: {},
+
+            // Reset the form
+            reset() {
+                this.customerName = '';
+                this.contactInfo = '';
+                this.billingAddress = '';
+                this.shippingAddress = '';
+                this.errors = {};
+            },
+
+            // Validate form
+            validate() {
+                this.errors = {};
+
+                if (!this.customerName.trim()) {
+                    this.errors.customerName = 'يرجى إدخال اسم العميل';
+                }
+
+                return Object.keys(this.errors).length === 0;
+            },
+
+            // Create customer
+            createCustomer() {
+                if (!this.validate()) return;
+
+                this.isSubmitting = true;
+
+                fetch('/sales/customers/create-modal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        customer_name: this.customerName,
+                        contact_info: this.contactInfo,
+                        billing_address: this.billingAddress,
+                        shipping_address: this.shippingAddress
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'حدث خطأ أثناء إنشاء العميل');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Get the main component's Alpine instance
+                    const mainComponent = Alpine.$data(document.querySelector('[x-data^="salesOrderApp"]'));
+
+                    // Select the newly created customer
+                    mainComponent.selectCustomer({
+                        id: data.customer_id,
+                        name: data.customer_name,
+                        contact_info: this.contactInfo
+                    });
+
+                    // Close modal and reset form
+                    this.open = false;
+                    this.reset();
+
+                    // Show notification
+                    showNotification(data.message, 'success');
+                })
+                .catch(error => {
+                    console.error('Error creating customer:', error);
+                    showNotification(error.message, 'error');
+                })
+                .finally(() => {
+                    this.isSubmitting = false;
+                });
+            }
+        });
+
+        // Add Item Modal Store
+        Alpine.store('addItemModal', {
+            open: false,
+            itemId: '',
+            selectedItem: null,
+            price: '',
+            quantity: 1,
+            availabilityText: 'اختر منتج للتحقق من المتاح',
+            availabilityClass: 'bg-blue-50 text-blue-700',
+            availabilityIcon: 'fas fa-info-circle',
+            isLoading: false,
+            isLoadingItems: false,
+            showItemResults: false,
+            itemResults: [],
+            isAvailable: false,
+            errors: {},
+
+            // Reset the form
+            reset() {
+                this.itemId = '';
+                this.selectedItem = null;
+                this.price = '';
+                this.quantity = 1;
+                this.availabilityText = 'اختر منتج للتحقق من المتاح';
+                this.availabilityClass = 'bg-blue-50 text-blue-700';
+                this.availabilityIcon = 'fas fa-info-circle';
+                this.isAvailable = false;
+                this.errors = {};
+                this.itemResults = [];
+            },
+
+            // Search for items
+            searchItems() {
+                const query = document.getElementById('itemSearch').value;
+
+                if (query.length < 2 && query.length > 0) return;
+
+                this.isLoadingItems = true;
+                this.showItemResults = true;
+
+                fetch(`/sales/api/items/search?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        this.itemResults = data;
+                        this.isLoadingItems = false;
+                    })
+                    .catch(error => {
+                        console.error('Error searching items:', error);
+                        this.isLoadingItems = false;
+                    });
+            },
+
+            // Select an item from search results
+            selectItem(item) {
+                this.itemId = item.id;
+                this.selectedItem = item;
+                this.price = item.price;
+                document.getElementById('itemSearch').value = item.name;
+                this.showItemResults = false;
+                this.checkAvailability();
+            },
+
+            // Increment quantity
+            incrementQuantity() {
+                this.quantity = parseInt(this.quantity) + 1;
+                if (this.itemId) {
+                    this.checkAvailability();
+                }
+            },
+
+            // Decrement quantity
+            decrementQuantity() {
+                if (this.quantity > 1) {
+                    this.quantity = parseInt(this.quantity) - 1;
+                    if (this.itemId) {
+                        this.checkAvailability();
+                    }
+                }
+            },
+
+            // Check item availability
+            checkAvailability() {
+                if (!this.itemId || !this.quantity) return;
+
+                this.isLoading = true;
+                this.availabilityText = 'جاري التحقق...';
+                this.availabilityClass = 'bg-blue-50 text-blue-700';
+                this.availabilityIcon = 'fas fa-spinner fa-spin';
+                this.isAvailable = false;
+
+                fetch('/sales/check-availability', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        item_id: this.itemId,
+                        quantity: this.quantity
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    this.isLoading = false;
+
+                    if (data.is_available) {
+                        this.availabilityText = `متاح: ${data.available_quantity} وحدة`;
+                        this.availabilityClass = 'bg-green-50 text-green-700';
+                        this.availabilityIcon = 'fas fa-check-circle';
+                        this.isAvailable = true;
+                    } else {
+                        this.availabilityText = `غير كافي! المتاح: ${data.available_quantity} وحدة`;
+                        this.availabilityClass = 'bg-red-50 text-red-700';
+                        this.availabilityIcon = 'fas fa-exclamation-circle';
+                        this.isAvailable = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking availability:', error);
+                    this.isLoading = false;
+                    this.availabilityText = 'حدث خطأ أثناء التحقق من المتاح';
+                    this.availabilityClass = 'bg-red-50 text-red-700';
+                    this.availabilityIcon = 'fas fa-exclamation-triangle';
+                    this.isAvailable = false;
+                });
+            },
+
+            // Validate form
+            validate() {
+                this.errors = {};
+
+                if (!this.itemId) {
+                    this.errors.item = 'يرجى اختيار منتج';
+                }
+
+                if (!this.price || parseFloat(this.price) <= 0) {
+                    this.errors.price = 'يرجى إدخال سعر صحيح';
+                }
+
+                if (!this.quantity || parseInt(this.quantity) <= 0) {
+                    this.errors.quantity = 'يرجى إدخال كمية صحيحة';
+                }
+
+                if (!this.isAvailable) {
+                    this.errors.quantity = 'الكمية المطلوبة غير متاحة في المخزن';
+                }
+
+                return Object.keys(this.errors).length === 0;
+            },
+
+            // Add item to order
+            addItem() {
+                if (!this.validate()) return;
+
+                // Get the main component's Alpine instance
+                const mainComponent = Alpine.$data(document.querySelector('[x-data^="salesOrderApp"]'));
+
+                // Add or update item
+                mainComponent.addOrderItem({
+                    item_id: this.itemId,
+                    name: this.selectedItem.name,
+                    unit_price: parseFloat(this.price),
+                    quantity: parseInt(this.quantity)
+                });
+
+                // Close modal and reset form
+                this.open = false;
+                this.reset();
+
+                // Show notification
+                showNotification('تمت إضافة العنصر بنجاح', 'success');
+            }
+        });
+
+        // Discount Modal Store
+        Alpine.store('discountModal', {
+            open: false,
+            type: 'percentage',
+            value: 0,
+            error: '',
+
+            // Reset the form
+            reset() {
+                this.type = 'percentage';
+                this.value = 0;
+                this.error = '';
+            },
+
+            // Calculate discount amount
+            calculateAmount(subtotal) {
+                if (!this.value || isNaN(this.value) || parseFloat(this.value) <= 0) return 0;
+
+                let amount = 0;
+                if (this.type === 'percentage') {
+                    amount = (parseFloat(this.value) / 100) * parseFloat(subtotal);
+                } else {
+                    amount = parseFloat(this.value);
+                }
+
+                // Ensure we return a valid number
+                return isNaN(amount) ? 0 : amount;
+            },
+
+            // Validate discount
+            validate(subtotal) {
+                this.error = '';
+
+                if (!this.value || isNaN(this.value) || parseFloat(this.value) <= 0) {
+                    this.error = 'يرجى إدخال قيمة خصم صالحة';
+                    return false;
+                }
+
+                if (this.type === 'percentage' && parseFloat(this.value) > 100) {
+                    this.error = 'لا يمكن أن تتجاوز نسبة الخصم 100%';
+                    return false;
+                }
+
+                if (this.type === 'fixed' && parseFloat(this.value) > subtotal) {
+                    this.error = 'لا يمكن أن يتجاوز مبلغ الخصم المجموع الفرعي';
+                    return false;
+                }
+
+                return true;
+            },
+
+            // Apply discount
+            applyDiscount() {
+                // Get the main component's Alpine instance
+                const mainComponent = Alpine.$data(document.querySelector('[x-data^="salesOrderApp"]'));
+
+                if (!this.validate(mainComponent.subtotal)) return;
+
+                // Apply discount
+                mainComponent.applyDiscount(this.type, parseFloat(this.value));
+
+                // Close modal
+                this.open = false;
+
+                // Show notification
+                showNotification('تم تطبيق الخصم بنجاح', 'success');
+            }
+        });
+
+        // Main Sales Order App
+        Alpine.data('salesOrderApp', () => ({
+            orderItems: [],
+            subtotal: 0,
+            discountType: '',
+            discountValue: 0,
+            discountAmount: 0,
+            total: 0,
+            isSubmitting: false,
+            errors: {},
+            currentDate: new Date().toLocaleDateString('ar-EG'),
+
+            // Customer search
+            customerResults: [],
+            isLoadingCustomers: false,
+            showCustomerResults: false,
+            selectedCustomerName: '',
+
+            // Representative search
+            representativeResults: [],
+            isLoadingRepresentatives: false,
+            showRepresentativeResults: false,
+            selectedRepresentativeName: '',
+
+            formData: {
+                customer_id: '',
+                representative_id: '',
+                payment_method: 'cash',
+                cash_account_id: '',
+                payment_reference: '',
+                notes: ''
+            },
+
+            init() {
+                // Initialize the page
+                this.updateOrderSummary();
+            },
+
+            // Format currency - using the global function
+            formatCurrency(amount) {
+                // Use the global formatCurrency function
+                return formatCurrency(amount);
+            },
+
+            // Search for customers
+            searchCustomers() {
+                const query = document.getElementById('customerSearch').value;
+
+                if (query.length < 2 && query.length > 0) return;
+
+                this.isLoadingCustomers = true;
+                this.showCustomerResults = true;
+
+                fetch(`/sales/api/customers/search?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        this.customerResults = data;
+                        this.isLoadingCustomers = false;
+                    })
+                    .catch(error => {
+                        console.error('Error searching customers:', error);
+                        this.isLoadingCustomers = false;
+                    });
+            },
+
+            // Select a customer
+            selectCustomer(customer) {
+                this.formData.customer_id = customer.id;
+                this.selectedCustomerName = customer.name;
+                document.getElementById('customerSearch').value = customer.name;
+                this.showCustomerResults = false;
+                this.errors.customer = '';
+            },
+
+            // Open new customer modal
+            openNewCustomerModal() {
+                Alpine.store('newCustomerModal').reset();
+                Alpine.store('newCustomerModal').open = true;
+            },
+
+            // Search for representatives
+            searchRepresentatives() {
+                const query = document.getElementById('representativeSearch').value;
+
+                if (query.length < 2 && query.length > 0) return;
+
+                this.isLoadingRepresentatives = true;
+                this.showRepresentativeResults = true;
+
+                fetch(`/sales/api/representatives/search?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        this.representativeResults = data;
+                        this.isLoadingRepresentatives = false;
+                    })
+                    .catch(error => {
+                        console.error('Error searching representatives:', error);
+                        this.isLoadingRepresentatives = false;
+                    });
+            },
+
+            // Select a representative
+            selectRepresentative(rep) {
+                this.formData.representative_id = rep.id;
+                this.selectedRepresentativeName = rep.name;
+                document.getElementById('representativeSearch').value = rep.name;
+                this.showRepresentativeResults = false;
+            },
+
+            // Open add item modal
+            openAddItemModal() {
+                Alpine.store('addItemModal').reset();
+                Alpine.store('addItemModal').open = true;
+            },
+
+            // Open discount modal
+            openDiscountModal() {
+                const discountStore = Alpine.store('discountModal');
+                discountStore.reset();
+
+                // Pre-fill with current discount if any
+                if (this.discountAmount > 0) {
+                    discountStore.type = this.discountType;
+                    discountStore.value = this.discountValue;
+                }
+
+                // Make sure subtotal is calculated before opening modal
+                this.updateOrderSummary();
+
+                // Open the modal
+                discountStore.open = true;
+
+                // The discountModalApp component will get the current subtotal when the modal opens
+            },
+
+            // Add item to order
+            addOrderItem(item) {
+                // Check if item already exists
+                const existingItemIndex = this.orderItems.findIndex(i => i.item_id === item.item_id);
+
+                if (existingItemIndex !== -1) {
+                    // Update existing item
+                    this.orderItems[existingItemIndex].quantity += item.quantity;
+                    this.orderItems[existingItemIndex].subtotal = this.orderItems[existingItemIndex].quantity * this.orderItems[existingItemIndex].unit_price;
+                } else {
+                    // Add new item with subtotal
+                    this.orderItems.push({
+                        ...item,
+                        subtotal: item.quantity * item.unit_price
+                    });
+                }
+
+                this.updateOrderSummary();
+            },
+
+            // Remove item from order
+            removeItem(index) {
+                this.orderItems.splice(index, 1);
+                this.updateOrderSummary();
+            },
+
+            // Increment item quantity
+            incrementQuantity(index) {
+                this.orderItems[index].quantity += 1;
+                this.orderItems[index].subtotal = this.orderItems[index].quantity * this.orderItems[index].unit_price;
+                this.updateOrderSummary();
+
+                // Check availability for the updated quantity
+                this.checkItemAvailability(this.orderItems[index].item_id, this.orderItems[index].quantity, index);
+            },
+
+            // Decrement item quantity
+            decrementQuantity(index) {
+                if (this.orderItems[index].quantity > 1) {
+                    this.orderItems[index].quantity -= 1;
+                    this.orderItems[index].subtotal = this.orderItems[index].quantity * this.orderItems[index].unit_price;
+                    this.updateOrderSummary();
+                }
+            },
+
+            // Check availability when changing quantity in the table
+            checkItemAvailability(itemId, quantity, index) {
+                fetch('/sales/check-availability', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        item_id: itemId,
+                        quantity: quantity
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.is_available) {
+                        showNotification(`تنبيه: الكمية المطلوبة (${quantity}) للمنتج "${this.orderItems[index].name}" تتجاوز المتاح (${data.available_quantity})`, 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking availability:', error);
+                });
+            },
+
+            // Apply discount
+            applyDiscount(type, value) {
+                this.discountType = type;
+                this.discountValue = value;
+
+                if (type === 'percentage') {
+                    this.discountAmount = (value / 100) * this.subtotal;
+                } else {
+                    this.discountAmount = value;
+                }
+
+                this.updateOrderSummary();
+            },
+
+            // Update order summary
+            updateOrderSummary() {
+                // Calculate subtotal
+                this.subtotal = this.orderItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+                // Recalculate discount if percentage
+                if (this.discountType === 'percentage' && this.discountValue > 0) {
+                    this.discountAmount = (this.discountValue / 100) * this.subtotal;
+                }
+
+                // Ensure discount doesn't exceed subtotal
+                if (this.discountAmount > this.subtotal) {
+                    this.discountAmount = this.subtotal;
+                }
+
+                // Calculate total
+                this.total = this.subtotal - this.discountAmount;
+            },
+
+            // Validate form
+            validateForm() {
+                this.errors = {};
+
+                if (!this.formData.customer_id) {
+                    this.errors.customer = 'يرجى اختيار عميل';
+                }
+
+                if (this.orderItems.length === 0) {
+                    showNotification('يرجى إضافة عنصر واحد على الأقل إلى الطلب', 'error');
+                    return false;
+                }
+
+                // Validate payment method
+                if (this.formData.payment_method === 'cash' && !this.formData.cash_account_id) {
+                    this.errors.cash_account = 'يرجى اختيار حساب الخزينة للدفع النقدي';
+                    showNotification('يرجى اختيار حساب الخزينة للدفع النقدي', 'error');
+                    return false;
+                }
+
+                return Object.keys(this.errors).length === 0;
+            },
+
+            // Submit order
+            submitOrder() {
+                if (!this.validateForm()) return;
+
+                this.isSubmitting = true;
+
+                // Prepare data
+                const orderData = {
+                    customer_id: this.formData.customer_id,
+                    representative_id: this.formData.representative_id || null,
+                    total_amount: this.total,
+                    notes: this.formData.notes,
+                    payment_method: this.formData.payment_method,
+                    cash_account_id: this.formData.payment_method === 'cash' ? this.formData.cash_account_id : null,
+                    payment_reference: this.formData.payment_reference,
+                    items: this.orderItems.map(item => ({
+                        item_id: item.item_id,
+                        quantity: item.quantity,
+                        unit_price: item.unit_price
+                    }))
+                };
+
+                // Submit order
+                fetch('/sales/orders', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(orderData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'حدث خطأ أثناء إنشاء الطلب');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    showNotification(data.message, 'success');
+
+                    // Redirect to order list after short delay
+                    setTimeout(function() {
+                        window.location.href = '/sales/orders';
+                    }, 1500);
+                })
+                .catch(error => {
+                    console.error('Error creating order:', error);
+                    showNotification(error.message, 'error');
+                    this.isSubmitting = false;
+                });
+            }
+        }));
+    });
+
+    // Helper function to show notifications
+    function showNotification(message, type = 'info') {
+        // Check if Toastify is available
+        if (typeof Toastify === 'function') {
+            const bgColors = {
+                'success': 'linear-gradient(to right, #00b09b, #96c93d)',
+                'error': 'linear-gradient(to right, #ff5f6d, #ffc371)',
+                'warning': 'linear-gradient(to right, #f7b733, #fc4a1a)',
+                'info': 'linear-gradient(to right, #2193b0, #6dd5ed)'
+            };
+
+            Toastify({
+                text: message,
+                duration: 3000,
+                gravity: "top",
+                position: 'center',
+                backgroundColor: bgColors[type],
+                className: "rounded-lg",
+                stopOnFocus: true
+            }).showToast();
+        } else {
+            // Fallback to alert if Toastify is not available
+            alert(message);
+        }
+    }
+</script>
+{% endblock %}
+
+
+

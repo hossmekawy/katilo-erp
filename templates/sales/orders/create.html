@@ -1,0 +1,468 @@
+{% extends "base.html" %}
+
+{% block title %}إنشاء طلب جديد - نظام قاتيلو{% endblock %}
+
+{% block page_header %}إنشاء طلب جديد{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales/orders" class="text-blue-600 hover:text-blue-800">الطلبات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">إنشاء طلب جديد</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="orderManager()">
+    <!-- Header with actions -->
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h1 class="text-2xl font-bold text-gray-800">إنشاء طلب جديد</h1>
+        <a href="/sales/orders" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center">
+            <i class="fas fa-arrow-right ml-2"></i>
+            العودة للطلبات
+        </a>
+    </div>
+
+    <!-- Order Form -->
+    <div class="card mb-6">
+        <div class="border-b border-gray-200 px-6 py-4">
+            <h2 class="font-semibold text-gray-800">تفاصيل الطلب</h2>
+        </div>
+        <div class="p-6">
+            <form @submit.prevent="submitOrder">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <div class="mb-4">
+                            <label for="customerId" class="block text-sm font-medium text-gray-700 mb-1">العميل <span class="text-red-500">*</span></label>
+                            <select id="customerId" x-model="order.customer_id" @change="loadCustomerInfo()" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">اختر العميل</option>
+                                {% for customer in customers %}
+                                <option value="{{ customer.id }}" {% if selected_customer_id == customer.id %}selected{% endif %}>
+                                    {{ customer.customer_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <p x-show="errors.customer_id" x-text="errors.customer_id" class="mt-1 text-sm text-red-600"></p>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="orderDate" class="block text-sm font-medium text-gray-700 mb-1">تاريخ الطلب <span class="text-red-500">*</span></label>
+                            <input type="date" id="orderDate" x-model="order.order_date" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <p x-show="errors.order_date" x-text="errors.order_date" class="mt-1 text-sm text-red-600"></p>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="representativeId" class="block text-sm font-medium text-gray-700 mb-1">مندوب المبيعات</label>
+                            <select id="representativeId" x-model="order.representative_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">بدون مندوب</option>
+                                {% for rep in representatives %}
+                                <option value="{{ rep.id }}">{{ rep.user.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">معلومات العميل</label>
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <template x-if="customerInfo">
+                                <div class="space-y-2">
+                                    <div>
+                                        <span class="text-sm font-medium text-gray-500">معلومات الاتصال:</span>
+                                        <p class="text-sm text-gray-800" x-text="customerInfo.contact_info || 'غير متوفر'"></p>
+                                    </div>
+                                    <div>
+                                        <span class="text-sm font-medium text-gray-500">عنوان الفواتير:</span>
+                                        <p class="text-sm text-gray-800" x-text="customerInfo.billing_address || 'غير متوفر'"></p>
+                                    </div>
+                                    <div>
+                                        <span class="text-sm font-medium text-gray-500">عنوان الشحن:</span>
+                                        <p class="text-sm text-gray-800" x-text="customerInfo.shipping_address || 'غير متوفر'"></p>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="!customerInfo">
+                                <div class="text-center py-4 text-gray-500">
+                                    <p>يرجى اختيار العميل لعرض المعلومات</p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-6 border-gray-200">
+
+                <h3 class="text-lg font-medium text-gray-800 mb-4">منتجات الطلب</h3>
+
+                <div class="overflow-x-auto mb-4">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    المنتج
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                    الكمية
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                                    سعر الوحدة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                                    الإجمالي
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                                    الإجراءات
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <template x-if="orderItems.length === 0">
+                                <tr>
+                                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                        لم يتم إضافة منتجات بعد
+                                    </td>
+                                </tr>
+                            </template>
+                            <template x-for="(item, index) in orderItems" :key="index">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="item.item_name"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="item.quantity"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(item.unit_price)"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(item.subtotal)"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                                        <button @click="removeItem(index)" type="button" class="text-red-600 hover:text-red-900">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-gray-50">
+                                <td colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                    الإجمالي:
+                                </td>
+                                <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900" x-text="formatCurrency(orderTotal)"></td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <button @click="showAddItemModal = true" type="button" class="btn bg-green-600 hover:bg-green-700 text-white flex items-center">
+                    <i class="fas fa-plus ml-2"></i>
+                    إضافة منتج
+                </button>
+
+                <hr class="my-6 border-gray-200">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">ملاحظات الطلب</label>
+                        <textarea id="notes" x-model="order.notes" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                    </div>
+
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">حالة الطلب <span class="text-red-500">*</span></label>
+                        <select id="status" x-model="order.status" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="Pending">قيد الانتظار</option>
+                            <option value="Processing">قيد المعالجة</option>
+                            <option value="Shipped">تم الشحن</option>
+                            <option value="Delivered">تم التسليم</option>
+                            <option value="Cancelled">ملغي</option>
+                        </select>
+                        <p x-show="errors.status" x-text="errors.status" class="mt-1 text-sm text-red-600"></p>
+                    </div>
+                </div>
+
+                <div class="text-center mt-6">
+                    <button type="submit" class="btn btn-primary px-8 py-3 text-base">
+                        <i class="fas fa-save ml-2"></i>
+                        إنشاء الطلب
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Item Modal -->
+    <div x-show="showAddItemModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="showAddItemModal = false">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex justify-between items-start mb-4">
+                        <button @click="showAddItemModal = false" class="text-gray-400 hover:text-gray-500">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">إضافة منتج للطلب</h3>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label for="itemId" class="block text-sm font-medium text-gray-700 mb-1">اختر المنتج <span class="text-red-500">*</span></label>
+                            <select id="itemId" x-model="newItem.item_id" @change="updateItemPrice()" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">اختر المنتج</option>
+                                {% for item in items %}
+                                <option value="{{ item.id }}" data-price="{{ item.price }}">
+                                    {{ item.name }} ({{ item.sku }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <p x-show="errors.item_id" x-text="errors.item_id" class="mt-1 text-sm text-red-600"></p>
+                        </div>
+
+                        <div>
+                            <label for="itemQuantity" class="block text-sm font-medium text-gray-700 mb-1">الكمية <span class="text-red-500">*</span></label>
+                            <input type="number" id="itemQuantity" x-model="newItem.quantity" min="1" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <p x-show="errors.quantity" x-text="errors.quantity" class="mt-1 text-sm text-red-600"></p>
+                        </div>
+
+                        <div>
+                            <label for="itemPrice" class="block text-sm font-medium text-gray-700 mb-1">سعر الوحدة <span class="text-red-500">*</span></label>
+                            <div class="mt-1 relative rounded-md shadow-sm">
+                                <input type="number" id="itemPrice" x-model="newItem.unit_price" min="0.01" step="0.01" class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-gray-500 sm:text-sm">ج.م</span>
+                                </div>
+                            </div>
+                            <p x-show="errors.unit_price" x-text="errors.unit_price" class="mt-1 text-sm text-red-600"></p>
+                        </div>
+
+                        <div class="bg-gray-50 p-3 rounded-md mt-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-700">الإجمالي:</span>
+                                <span class="text-sm font-bold text-gray-900" x-text="formatCurrency(calculateItemSubtotal())"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="addItem()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        إضافة
+                    </button>
+                    <button @click="showAddItemModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global currency formatter function
+    function formatCurrency(amount) {
+        if (amount === undefined || amount === null) return '';
+        return new Intl.NumberFormat('ar-EG', {
+            style: 'currency',
+            currency: 'EGP'
+        }).format(amount);
+    }
+
+    function orderManager() {
+        return {
+            order: {
+                customer_id: '{{ selected_customer_id or "" }}',
+                order_date: '{{ today_date }}',
+                representative_id: '',
+                status: 'Pending',
+                notes: '',
+                total_amount: 0
+            },
+            customerInfo: null,
+            orderItems: [],
+            orderTotal: 0,
+            showAddItemModal: false,
+            newItem: {
+                item_id: '',
+                item_name: '',
+                quantity: 1,
+                unit_price: 0
+            },
+            errors: {},
+
+            init() {
+                // Load customer info if customer is pre-selected
+                if (this.order.customer_id) {
+                    this.loadCustomerInfo();
+                }
+            },
+
+            loadCustomerInfo() {
+                if (!this.order.customer_id) {
+                    this.customerInfo = null;
+                    return;
+                }
+
+                fetchAPI(`/sales/customers/${this.order.customer_id}`)
+                    .then(data => {
+                        this.customerInfo = data.customer;
+                    })
+                    .catch(error => {
+                        showNotification('فشل في تحميل بيانات العميل', 'error');
+                    });
+            },
+
+            updateItemPrice() {
+                if (!this.newItem.item_id) {
+                    this.newItem.unit_price = 0;
+                    return;
+                }
+
+                const selectedOption = document.querySelector(`#itemId option[value="${this.newItem.item_id}"]`);
+                if (selectedOption) {
+                    const price = selectedOption.dataset.price;
+                    this.newItem.unit_price = parseFloat(price);
+                    this.newItem.item_name = selectedOption.textContent.trim();
+                }
+            },
+
+            calculateItemSubtotal() {
+                return this.newItem.quantity * this.newItem.unit_price;
+            },
+
+            validateNewItem() {
+                this.errors = {};
+
+                if (!this.newItem.item_id) {
+                    this.errors.item_id = 'يرجى اختيار المنتج';
+                    return false;
+                }
+
+                if (!this.newItem.quantity || this.newItem.quantity < 1) {
+                    this.errors.quantity = 'يجب أن تكون الكمية أكبر من صفر';
+                    return false;
+                }
+
+                if (!this.newItem.unit_price || this.newItem.unit_price <= 0) {
+                    this.errors.unit_price = 'يجب أن يكون السعر أكبر من صفر';
+                    return false;
+                }
+
+                return true;
+            },
+
+            addItem() {
+                if (!this.validateNewItem()) {
+                    return;
+                }
+
+                // Check if item already exists in order
+                const existingItemIndex = this.orderItems.findIndex(item => item.item_id === this.newItem.item_id);
+
+                if (existingItemIndex !== -1) {
+                    // Update existing item
+                    this.orderItems[existingItemIndex].quantity += parseInt(this.newItem.quantity);
+                    this.orderItems[existingItemIndex].subtotal = this.orderItems[existingItemIndex].quantity * this.orderItems[existingItemIndex].unit_price;
+                } else {
+                    // Add new item
+                    this.orderItems.push({
+                        item_id: this.newItem.item_id,
+                        item_name: this.newItem.item_name,
+                        quantity: parseInt(this.newItem.quantity),
+                        unit_price: parseFloat(this.newItem.unit_price),
+                        subtotal: this.calculateItemSubtotal()
+                    });
+                }
+
+                // Update order total
+                this.updateOrderTotal();
+
+                // Reset form and close modal
+                this.newItem = {
+                    item_id: '',
+                    item_name: '',
+                    quantity: 1,
+                    unit_price: 0
+                };
+                this.showAddItemModal = false;
+            },
+
+            removeItem(index) {
+                this.orderItems.splice(index, 1);
+                this.updateOrderTotal();
+            },
+
+            updateOrderTotal() {
+                this.orderTotal = this.orderItems.reduce((total, item) => total + item.subtotal, 0);
+                this.order.total_amount = this.orderTotal;
+            },
+
+            formatCurrency(amount) {
+                // Use the global formatCurrency function
+                return formatCurrency(amount);
+            },
+
+            validateOrder() {
+                this.errors = {};
+
+                if (!this.order.customer_id) {
+                    this.errors.customer_id = 'يرجى اختيار العميل';
+                    return false;
+                }
+
+                if (!this.order.order_date) {
+                    this.errors.order_date = 'يرجى تحديد تاريخ الطلب';
+                    return false;
+                }
+
+                if (!this.order.status) {
+                    this.errors.status = 'يرجى تحديد حالة الطلب';
+                    return false;
+                }
+
+                if (this.orderItems.length === 0) {
+                    showNotification('يرجى إضافة منتج واحد على الأقل للطلب', 'error');
+                    return false;
+                }
+
+                return true;
+            },
+
+            submitOrder() {
+                if (!this.validateOrder()) {
+                    return;
+                }
+
+                // Prepare order data
+                const orderData = {
+                    customer_id: this.order.customer_id,
+                    representative_id: this.order.representative_id || null,
+                    status: this.order.status,
+                    notes: this.order.notes,
+                    total_amount: this.orderTotal,
+                    items: this.orderItems.map(item => ({
+                        item_id: item.item_id,
+                        quantity: item.quantity,
+                        unit_price: item.unit_price
+                    }))
+                };
+
+                // Submit order
+                fetchAPI('/sales/orders', 'POST', orderData)
+                    .then(response => {
+                        showNotification('تم إنشاء الطلب بنجاح', 'success');
+                        // Redirect to order view page
+                        window.location.href = `/sales/orders/${response.order_id}`;
+                    })
+                    .catch(error => {
+                        showNotification('حدث خطأ أثناء إنشاء الطلب', 'error');
+                    });
+            }
+        };
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,506 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة التوزيع - لوحة التحكم{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">لوحة تحكم التوزيع</h1>
+        <div class="flex space-x-2 rtl:space-x-reverse">
+            <a href="{{ url_for('distribution.vehicles') }}" class="btn btn-primary">
+                <i class="fas fa-truck ml-2"></i>
+                إدارة المركبات
+            </a>
+            <a href="{{ url_for('distribution.shipments') }}" class="btn btn-success">
+                <i class="fas fa-shipping-fast ml-2"></i>
+                إدارة الشحنات
+            </a>
+            <a href="{{ url_for('distribution.routes') }}" class="btn btn-info">
+                <i class="fas fa-route ml-2"></i>
+                إدارة المسارات
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Shipments -->
+        <div class="stat-card bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-100 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-blue-600">إجمالي الشحنات</p>
+                    <p class="text-3xl font-bold text-blue-900 mt-2">{{ total_shipments }}</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                    <i class="fas fa-shipping-fast text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <a href="{{ url_for('distribution.shipments') }}" class="text-blue-600 hover:text-blue-800 font-medium flex items-center">
+                    <span>عرض الشحنات</span>
+                    <i class="fas fa-arrow-left mr-1 text-xs"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Pending Shipments -->
+        <div class="stat-card bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-sm border border-amber-100 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-amber-600">شحنات قيد الانتظار</p>
+                    <p class="text-3xl font-bold text-amber-900 mt-2">{{ pending_shipments }}</p>
+                </div>
+                <div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600">
+                    <i class="fas fa-clock text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <a href="{{ url_for('distribution.shipments') }}?status=Pending" class="text-amber-600 hover:text-amber-800 font-medium flex items-center">
+                    <span>عرض قيد الانتظار</span>
+                    <i class="fas fa-arrow-left mr-1 text-xs"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- In Transit Shipments -->
+        <div class="stat-card bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl shadow-sm border border-purple-100 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-purple-600">شحنات قيد التوصيل</p>
+                    <p class="text-3xl font-bold text-purple-900 mt-2">{{ in_transit_shipments }}</p>
+                </div>
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600">
+                    <i class="fas fa-truck-moving text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <a href="{{ url_for('distribution.shipments') }}?status=InTransit" class="text-purple-600 hover:text-purple-800 font-medium flex items-center">
+                    <span>عرض قيد التوصيل</span>
+                    <i class="fas fa-arrow-left mr-1 text-xs"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Delivered Shipments -->
+        <div class="stat-card bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-sm border border-green-100 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-green-600">شحنات تم توصيلها</p>
+                    <p class="text-3xl font-bold text-green-900 mt-2">{{ delivered_shipments }}</p>
+                </div>
+                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-green-600">
+                    <i class="fas fa-check-circle text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <a href="{{ url_for('distribution.shipments') }}?status=Delivered" class="text-green-600 hover:text-green-800 font-medium flex items-center">
+                    <span>عرض المكتملة</span>
+                    <i class="fas fa-arrow-left mr-1 text-xs"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fleet Status -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Fleet Overview -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-truck text-blue-600 ml-2"></i>
+                    حالة الأسطول
+                </h3>
+                <a href="{{ url_for('distribution.vehicles') }}" class="text-sm text-blue-600 hover:text-blue-800 flex items-center">
+                    <span>إدارة المركبات</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center justify-center mb-6">
+                    <div class="w-48 h-48 relative">
+                        <canvas id="fleetStatusChart"></canvas>
+                        <div class="absolute inset-0 flex items-center justify-center flex-col">
+                            <span class="text-3xl font-bold text-gray-800">{{ total_vehicles }}</span>
+                            <span class="text-sm text-gray-500">إجمالي المركبات</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div class="bg-blue-50 rounded-lg p-3">
+                        <div class="text-xl font-bold text-blue-600">{{ active_vehicles }}</div>
+                        <div class="text-xs text-gray-600">نشطة</div>
+                    </div>
+                    <div class="bg-amber-50 rounded-lg p-3">
+                        <div class="text-xl font-bold text-amber-600">{{ maintenance_vehicles }}</div>
+                        <div class="text-xs text-gray-600">صيانة</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xl font-bold text-gray-600">{{ total_vehicles - active_vehicles - maintenance_vehicles }}</div>
+                        <div class="text-xs text-gray-600">غير نشطة</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Routes -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-route text-purple-600 ml-2"></i>
+                    المسارات النشطة
+                </h3>
+                <a href="{{ url_for('distribution.routes') }}" class="text-sm text-purple-600 hover:text-purple-800 flex items-center">
+                    <span>إدارة المسارات</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+            <div class="p-6">
+                {% if active_routes %}
+                <div class="space-y-4">
+                    {% for route in active_routes %}
+                    <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h4 class="font-medium text-gray-800">{{ route.name }}</h4>
+                                <p class="text-sm text-gray-500">
+                                    <i class="fas fa-truck text-gray-400 ml-1"></i>
+                                    {{ route.vehicle.name if route.vehicle else 'غير محدد' }}
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm text-gray-500">
+                                    {{ route.stops|length }} توقف
+                                </div>
+                                <a href="{{ url_for('distribution.view_route', route_id=route.id) }}" class="text-purple-600 hover:text-purple-800 text-sm">
+                                    تتبع المسار
+                                </a>
+                            </div>
+                        </div>
+                        <div class="mt-3 w-full bg-gray-200 rounded-full h-2.5">
+                            {% set completed = route.stops|selectattr('status', 'equalto', 'Completed')|list|length %}
+                            {% set percentage = (completed / route.stops|length * 100)|int %}
+                            <div class="bg-purple-600 h-2.5 rounded-full" style="width: {{ percentage }}%"></div>
+                        </div>
+                        <div class="mt-1 text-xs text-gray-500 text-right">
+                            {{ completed }}/{{ route.stops|length }} توقف مكتمل
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="flex flex-col items-center justify-center py-8 text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center text-purple-500 mb-4">
+                        <i class="fas fa-route text-2xl"></i>
+                    </div>
+                    <p class="text-gray-500 mb-4">لا توجد مسارات نشطة حالياً</p>
+                    <a href="{{ url_for('distribution.new_route') }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus ml-1"></i>
+                        إنشاء مسار جديد
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Vehicles in Transit -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-truck-moving text-green-600 ml-2"></i>
+                    المركبات قيد التوصيل
+                </h3>
+                <a href="{{ url_for('distribution.tracking_index') }}" class="text-sm text-green-600 hover:text-green-800 flex items-center">
+                    <span>تتبع الشحنات</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+            <div class="p-6">
+                {% if vehicles_in_transit %}
+                <div class="space-y-4">
+                    {% for vehicle in vehicles_in_transit %}
+                    <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 ml-4">
+                                <i class="fas fa-truck text-xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-medium text-gray-800">{{ vehicle.name }}</h4>
+                                <p class="text-sm text-gray-500">{{ vehicle.plate_number }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex justify-between items-center">
+                            <div class="text-sm">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse ml-1"></span>
+                                    قيد التوصيل
+                                </span>
+                            </div>
+                            <a href="{{ url_for('distribution.tracking_index') }}?vehicle_id={{ vehicle.id }}" class="text-green-600 hover:text-green-800 text-sm">
+                                تتبع المركبة
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="flex flex-col items-center justify-center py-8 text-center">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-500 mb-4">
+                        <i class="fas fa-truck-moving text-2xl"></i>
+                    </div>
+                    <p class="text-gray-500">لا توجد مركبات قيد التوصيل حالياً</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Shipments and Fleet Details -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent Shipments -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-shipping-fast text-blue-600 ml-2"></i>
+                    أحدث الشحنات
+                </h3>
+                <a href="{{ url_for('distribution.shipments') }}" class="text-sm text-blue-600 hover:text-blue-800 flex items-center">
+                    <span>عرض الكل</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+            <div class="p-6">
+                {% if recent_shipments %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">العميل</th>
+                                <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
+                                <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المركبة</th>
+                                <th class="px-3 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التاريخ</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for shipment in recent_shipments %}
+                            <tr>
+                                <td class="px-3 py-3 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        {{ shipment.sales_order.customer.customer_name if shipment.sales_order and shipment.sales_order.customer else 'غير محدد' }}
+                                    </div>
+                                    <div class="text-xs text-gray-500">
+                                        #{{ shipment.sales_order_id }}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3 whitespace-nowrap">
+                                    {% if shipment.status == 'Pending' %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        قيد الانتظار
+                                    </span>
+                                    {% elif shipment.status == 'Assigned' %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        تم التعيين
+                                    </span>
+                                    {% elif shipment.status == 'InTransit' %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                        قيد التوصيل
+                                    </span>
+                                    {% elif shipment.status == 'Delivered' %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        تم التوصيل
+                                    </span>
+                                    {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        فشل التوصيل
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                                    {{ shipment.vehicle.name if shipment.vehicle else 'غير محدد' }}
+                                </td>
+                                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                                    {{ shipment.created_at.strftime('%Y-%m-%d') }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="flex flex-col items-center justify-center py-8 text-center">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 mb-4">
+                        <i class="fas fa-shipping-fast text-2xl"></i>
+                    </div>
+                    <p class="text-gray-500 mb-4">لا توجد شحنات حديثة</p>
+                    <a href="{{ url_for('distribution.assign_shipment_page') }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus ml-1"></i>
+                        تعيين شحنة جديدة
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Fleet Details -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-truck text-indigo-600 ml-2"></i>
+                    تفاصيل الأسطول
+                </h3>
+                <a href="{{ url_for('distribution.vehicles') }}" class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center">
+                    <span>إدارة المركبات</span>
+                    <i class="fas fa-arrow-left mr-1"></i>
+                </a>
+            </div>
+            <div class="p-6">
+                <div id="fleetDetails" class="grid grid-cols-1 gap-4">
+                    <!-- Fleet details will be loaded via JavaScript -->
+                    <div class="flex justify-center items-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                        <span class="mr-2 text-gray-500">جاري تحميل بيانات الأسطول...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fleet Status Chart
+        const fleetStatusCtx = document.getElementById('fleetStatusChart').getContext('2d');
+        new Chart(fleetStatusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['نشطة', 'صيانة', 'غير نشطة'],
+                datasets: [{
+                    data: [
+                        {{ active_vehicles }},
+                        {{ maintenance_vehicles }},
+                        {{ total_vehicles - active_vehicles - maintenance_vehicles }}
+                    ],
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(156, 163, 175, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgba(59, 130, 246, 1)',
+                        'rgba(245, 158, 11, 1)',
+                        'rgba(156, 163, 175, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        // Load Fleet Details
+        loadFleetDetails();
+    });
+
+    async function loadFleetDetails() {
+        try {
+            const response = await fetch('{{ url_for("distribution.get_vehicles") }}');
+            const vehicles = await response.json();
+
+            const fleetDetailsContainer = document.getElementById('fleetDetails');
+            fleetDetailsContainer.innerHTML = '';
+
+            if (vehicles.length === 0) {
+                fleetDetailsContainer.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-8 text-center">
+                        <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-500 mb-4">
+                            <i class="fas fa-truck text-2xl"></i>
+                        </div>
+                        <p class="text-gray-500 mb-4">لا توجد مركبات مسجلة</p>
+                        <a href="{{ url_for('distribution.new_vehicle') }}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus ml-1"></i>
+                            إضافة مركبة جديدة
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            vehicles.forEach(vehicle => {
+                const vehicleCard = document.createElement('div');
+                vehicleCard.className = 'border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors';
+
+                let statusBadge = '';
+                if (vehicle.status === 'Active') {
+                    statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">نشطة</span>';
+                } else if (vehicle.status === 'Maintenance') {
+                    statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">صيانة</span>';
+                } else {
+                    statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">غير نشطة</span>';
+                }
+
+                const storageUtilization = vehicle.storage ? vehicle.storage.weight_utilization : 0;
+
+                vehicleCard.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 ml-4">
+                            ${vehicle.image_path ?
+                                `<img src="${vehicle.image_path}" alt="${vehicle.name}" class="w-16 h-16 object-cover rounded-lg">` :
+                                `<div class="w-16 h-16 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-500">
+                                    <i class="fas fa-truck text-2xl"></i>
+                                </div>`
+                            }
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h4 class="font-medium text-gray-800">${vehicle.name}</h4>
+                                    <p class="text-sm text-gray-500">${vehicle.plate_number} - ${vehicle.model || 'غير محدد'}</p>
+                                </div>
+                                <div>
+                                    ${statusBadge}
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <div class="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>استخدام السعة</span>
+                                    <span>${storageUtilization}%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-indigo-600 h-2 rounded-full" style="width: ${storageUtilization}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-right">
+                        <a href="{{ url_for('distribution.view_vehicle', vehicle_id=0) }}".replace('0', vehicle.id) class="text-indigo-600 hover:text-indigo-800 text-sm">
+                            عرض التفاصيل
+                        </a>
+                    </div>
+                `;
+
+                fleetDetailsContainer.appendChild(vehicleCard);
+            });
+
+        } catch (error) {
+            console.error('Error loading fleet details:', error);
+            document.getElementById('fleetDetails').innerHTML = `
+                <div class="text-center py-4 text-red-500">
+                    <p>حدث خطأ أثناء تحميل بيانات الأسطول</p>
+                </div>
+            `;
+        }
+    }
+</script>
+{% endblock %}

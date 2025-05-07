@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فاتورة #{{ invoice.invoice_number }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
+
+        :root {
+            --primary-color: #1a5276;
+            --primary-light: #d4e6f1;
+            --secondary-color: #283747;
+            --accent-color: #d35400;
+            --light-color: #f8fafc;
+            --border-color: #e2e8f0;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #c0392b;
+            --gray-100: #f7fafc;
+            --gray-200: #edf2f7;
+            --gray-300: #e2e8f0;
+            --gray-400: #cbd5e0;
+            --gray-500: #a0aec0;
+            --gray-600: #718096;
+            --gray-700: #4a5568;
+            --gray-800: #2d3748;
+            --gray-900: #1a202c;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Cairo', Arial, sans-serif;
+            background-color: white;
+            color: var(--gray-800);
+            line-height: 1.5;
+            font-size: 10px;
+            padding: 0;
+            margin: 0;
+        }
+
+        .invoice-container {
+            width: 100%;
+            max-width: 148mm; /* A5 width */
+            margin: 0 auto;
+            background: white;
+            border: 1px solid var(--gray-300);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 60px;
+            color: rgba(0, 0, 0, 0.03);
+            font-weight: 700;
+            pointer-events: none;
+            z-index: 0;
+            white-space: nowrap;
+        }
+
+        /* Header with elegant design */
+        .invoice-header {
+            position: relative;
+            padding: 15px;
+            border-bottom: 3px solid var(--primary-color);
+            background: linear-gradient(135deg, var(--primary-light) 0%, white 100%);
+            overflow: hidden;
+        }
+
+        .invoice-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%231a5276' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+            opacity: 0.5;
+            z-index: 0;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            z-index: 1;
+        }
+
+        .company-info {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .company-logo {
+            margin-left: 10px;
+            background-color: white;
+            padding: 8px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--gray-300);
+        }
+
+        .company-logo img {
+            max-width: 60px;
+            max-height: 40px;
+            object-fit: contain;
+        }
+
+        .company-details {
+            font-size: 9px;
+            color: var(--gray-700);
+            line-height: 1.4;
+        }
+
+        .company-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 4px;
+        }
+
+        .invoice-title {
+            text-align: left;
+            padding: 8px 10px;
+            background-color: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--gray-300);
+        }
+
+        .invoice-title h1 {
+            color: var(--primary-color);
+            font-size: 16px;
+            margin-bottom: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .invoice-number, .invoice-date {
+            font-size: 9px;
+            margin-bottom: 2px;
+            color: var(--gray-600);
+        }
+
+        .invoice-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 8px;
+            font-weight: 600;
+            margin-top: 4px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-unpaid {
+            background-color: #fecaca;
+            color: #991b1b;
+            border: 1px solid #f87171;
+        }
+
+        .status-partially-paid {
+            background-color: #fed7aa;
+            color: #9a3412;
+            border: 1px solid #fb923c;
+        }
+
+        .status-paid {
+            background-color: #bbf7d0;
+            color: #166534;
+            border: 1px solid #4ade80;
+        }
+
+        /* Customer and Order Info Section */
+        .customer-section {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            border-bottom: 1px solid var(--gray-300);
+            background-color: var(--gray-100);
+            position: relative;
+        }
+
+        .customer-section::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 15px;
+            right: 15px;
+            height: 2px;
+            background: linear-gradient(to right, var(--primary-color), transparent);
+        }
+
+        .customer-info, .order-info {
+            width: 48%;
+            background-color: white;
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--gray-300);
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 6px;
+            border-bottom: 1px solid var(--primary-light);
+            padding-bottom: 4px;
+            position: relative;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            right: 0;
+            width: 30px;
+            height: 1px;
+            background-color: var(--primary-color);
+        }
+
+        .info-row {
+            margin-bottom: 4px;
+            display: flex;
+            font-size: 9px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-left: 4px;
+        }
+
+        .info-value {
+            color: var(--gray-800);
+        }
+
+        /* Items Table */
+        .items-table-container {
+            padding: 15px;
+            border-bottom: 1px solid var(--gray-300);
+        }
+
+        .items-table-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            text-align: center;
+            position: relative;
+        }
+
+        .items-table-title::before,
+        .items-table-title::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 50px;
+            height: 1px;
+            background: linear-gradient(to right, var(--primary-color), transparent);
+        }
+
+        .items-table-title::before {
+            right: 60%;
+        }
+
+        .items-table-title::after {
+            left: 60%;
+            transform: rotate(180deg);
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--gray-300);
+        }
+
+        .items-table th {
+            background: linear-gradient(to bottom, var(--primary-color), #154360);
+            color: white;
+            font-weight: 600;
+            text-align: right;
+            padding: 6px 8px;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .items-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--gray-300);
+            color: var(--gray-700);
+            font-size: 9px;
+        }
+
+        .items-table tbody tr:nth-child(even) {
+            background-color: var(--gray-100);
+        }
+
+        .items-table tbody tr:hover {
+            background-color: var(--primary-light);
+        }
+
+        .items-table tfoot tr {
+            background-color: var(--gray-200);
+        }
+
+        .items-table tfoot th {
+            background-color: transparent;
+            color: var(--gray-700);
+            text-align: right;
+            font-weight: 600;
+            text-transform: none;
+            letter-spacing: normal;
+            font-size: 9px;
+        }
+
+        .items-table tfoot tr:last-child {
+            background: linear-gradient(to right, var(--primary-light), white);
+            font-weight: 700;
+        }
+
+        .items-table tfoot tr:last-child td {
+            color: var(--primary-color);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 8px;
+        }
+
+        /* Payment History */
+        .payment-history {
+            padding: 15px;
+            border-bottom: 1px solid var(--gray-300);
+            background-color: var(--gray-100);
+        }
+
+        .payment-history .items-table {
+            margin-top: 10px;
+        }
+
+        /* Notes Section */
+        .notes-section {
+            padding: 15px;
+            border-bottom: 1px solid var(--gray-300);
+            background-color: white;
+        }
+
+        .notes-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 6px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .notes-title::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            right: 0;
+            width: 100%;
+            height: 1px;
+            background-color: var(--primary-color);
+        }
+
+        .notes-content {
+            font-size: 9px;
+            color: var(--gray-700);
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: var(--gray-100);
+            border-radius: 6px;
+            border-right: 3px solid var(--primary-color);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            line-height: 1.5;
+        }
+
+        .payment-terms {
+            margin-top: 15px;
+        }
+
+        .signature-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            padding: 0 20px;
+        }
+
+        .signature-box {
+            text-align: center;
+            width: 100px;
+        }
+
+        .signature-line {
+            border-bottom: 1px solid var(--gray-400);
+            margin-bottom: 5px;
+            padding-bottom: 10px;
+        }
+
+        .signature-title {
+            font-size: 8px;
+            color: var(--gray-600);
+        }
+
+        /* Footer */
+        .invoice-footer {
+            padding: 15px;
+            text-align: center;
+            font-size: 9px;
+            color: var(--gray-600);
+            background: linear-gradient(to bottom, white, var(--primary-light));
+            border-top: 2px solid var(--primary-color);
+            position: relative;
+        }
+
+        .footer-text {
+            font-weight: 700;
+            margin-bottom: 5px;
+            font-size: 10px;
+            color: var(--primary-color);
+        }
+
+        .footer-contact {
+            font-size: 8px;
+            margin-top: 5px;
+        }
+
+        /* Responsive adjustments */
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+                background: white;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .invoice-container {
+                width: 100%;
+                max-width: none;
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+                border: none;
+            }
+
+            .watermark {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <div class="watermark">{{ company_info.name }}</div>
+
+        <div class="invoice-header">
+            <div class="header-content">
+                <div class="company-info">
+                    <div class="company-logo">
+                        <img src="file:///{{ logo_path }}" alt="{{ company_info.name }}" />
+                    </div>
+                    <div class="company-details">
+                        <div class="company-name">{{ company_info.name }}</div>
+                        <div>{{ company_info.address }}</div>
+                        <div>{{ company_info.city }}</div>
+                        <div>البريد الإلكتروني: {{ company_info.email }}</div>
+                        <div>الهاتف: {{ company_info.phone }}</div>
+                    </div>
+                </div>
+                <div class="invoice-title">
+                    <h1>فاتورة</h1>
+                    <div class="invoice-number">رقم الفاتورة: #{{ invoice.invoice_number }}</div>
+                    <div class="invoice-date">تاريخ الفاتورة: {{ invoice.invoice_date.strftime('%Y-%m-%d') }}</div>
+                    <div class="invoice-date">تاريخ الاستحقاق: {{ invoice.due_date.strftime('%Y-%m-%d') }}</div>
+                    <div>
+                        <span class="invoice-status
+                            {% if invoice.status == 'Unpaid' %}
+                                status-unpaid
+                            {% elif invoice.status == 'Partially Paid' %}
+                                status-partially-paid
+                            {% elif invoice.status == 'Paid' %}
+                                status-paid
+                            {% endif %}">
+                            {% if invoice.status == 'Unpaid' %}
+                                غير مدفوعة
+                            {% elif invoice.status == 'Partially Paid' %}
+                                مدفوعة جزئياً
+                            {% elif invoice.status == 'Paid' %}
+                                مدفوعة
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="customer-section">
+            <div class="customer-info">
+                <div class="section-title">معلومات العميل</div>
+                <div class="info-row">
+                    <span class="info-label">الاسم:</span>
+                    <span class="info-value">{{ invoice.sales_order.customer.customer_name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">العنوان:</span>
+                    <span class="info-value">{{ invoice.sales_order.customer.billing_address or 'غير متوفر' }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">معلومات الاتصال:</span>
+                    <span class="info-value">{{ invoice.sales_order.customer.contact_info or 'غير متوفر' }}</span>
+                </div>
+            </div>
+            <div class="order-info">
+                <div class="section-title">معلومات الطلب</div>
+                <div class="info-row">
+                    <span class="info-label">رقم الطلب:</span>
+                    <span class="info-value">#{{ invoice.sales_order_id }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">تاريخ الطلب:</span>
+                    <span class="info-value">{{ invoice.sales_order.order_date.strftime('%Y-%m-%d') }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">حالة الطلب:</span>
+                    <span class="info-value">{{ invoice.sales_order.status }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="items-table-container">
+            <div class="items-table-title">تفاصيل الفاتورة</div>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>المنتج</th>
+                        <th>الكمية</th>
+                        <th>سعر الوحدة</th>
+                        <th>الإجمالي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detail in invoice.sales_order.details %}
+                    <tr>
+                        <td>{{ detail.item.name }}</td>
+                        <td>{{ detail.quantity_ordered }}</td>
+                        <td>{{ "%.2f"|format(detail.unit_price) }} ج.م</td>
+                        <td>{{ "%.2f"|format(detail.unit_price * detail.quantity_ordered) }} ج.م</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="3">المجموع الفرعي:</th>
+                        <td>{{ "%.2f"|format(invoice.subtotal) }} ج.م</td>
+                    </tr>
+                    {% if invoice.tax_amount > 0 %}
+                    <tr>
+                        <th colspan="3">الضريبة:</th>
+                        <td>{{ "%.2f"|format(invoice.tax_amount) }} ج.م</td>
+                    </tr>
+                    {% endif %}
+                    {% if invoice.discount_amount > 0 %}
+                    <tr>
+                        <th colspan="3">الخصم:</th>
+                        <td>{{ "%.2f"|format(invoice.discount_amount) }} ج.م</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <th colspan="3">الإجمالي:</th>
+                        <td>{{ "%.2f"|format(invoice.total_amount) }} ج.م</td>
+                    </tr>
+                    {% if invoice.payments %}
+                    <tr>
+                        <th colspan="3">المدفوع:</th>
+                        <td>{{ "%.2f"|format(invoice.payments|sum(attribute='amount') or 0) }} ج.م</td>
+                    </tr>
+                    <tr>
+                        <th colspan="3">المتبقي:</th>
+                        <td>{{ "%.2f"|format(invoice.total_amount - (invoice.payments|sum(attribute='amount') or 0)) }} ج.م</td>
+                    </tr>
+                    {% endif %}
+                </tfoot>
+            </table>
+        </div>
+
+        {% if invoice.payments %}
+        <div class="payment-history">
+            <div class="notes-title">سجل المدفوعات</div>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>طريقة الدفع</th>
+                        <th>المبلغ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in invoice.payments %}
+                    <tr>
+                        <td>{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            {% if payment.payment_method == 'Cash' %}
+                                نقداً
+                            {% elif payment.payment_method == 'Credit Card' %}
+                                بطاقة ائتمان
+                            {% elif payment.payment_method == 'Bank Transfer' %}
+                                تحويل بنكي
+                            {% elif payment.payment_method == 'Check' %}
+                                شيك
+                            {% else %}
+                                {{ payment.payment_method }}
+                            {% endif %}
+                        </td>
+                        <td>{{ "%.2f"|format(payment.amount) }} ج.م</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <div class="notes-section">
+            {% if invoice.notes %}
+            <div class="notes-title">ملاحظات</div>
+            <div class="notes-content">{{ invoice.notes }}</div>
+            {% endif %}
+
+            <div class="payment-terms">
+                <div class="notes-title">شروط الدفع</div>
+                <div class="notes-content">
+                    {{ payment_terms }}
+                </div>
+            </div>
+
+            <div class="signature-section">
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-title">توقيع المستلم</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-title">توقيع المفوض</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="invoice-footer">
+            <div class="footer-text">شكراً لتعاملكم مع {{ company_info.name }}</div>
+            <div class="footer-contact">
+                للاستفسارات، يرجى التواصل معنا على {{ company_info.email }} أو الاتصال على {{ company_info.phone }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

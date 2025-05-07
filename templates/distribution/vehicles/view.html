@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block title %}تفاصيل المركبة - {{ vehicle.name }}{% endblock %}
+
+{% block styles %}
+<style>
+    .vehicle-status {
+        @apply px-2 py-1 text-xs font-semibold rounded-full;
+    }
+    .status-active {
+        @apply bg-green-100 text-green-800;
+    }
+    .status-maintenance {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .status-inactive {
+        @apply bg-red-100 text-red-800;
+    }
+    .utilization-bar {
+        @apply h-2 rounded-full bg-gray-200 overflow-hidden;
+    }
+    .utilization-progress {
+        @apply h-full rounded-full;
+    }
+    .shipment-status {
+        @apply px-2 py-1 text-xs font-semibold rounded-full;
+    }
+    .shipment-status-pending {
+        @apply bg-yellow-100 text-yellow-800;
+    }
+    .shipment-status-assigned {
+        @apply bg-blue-100 text-blue-800;
+    }
+    .shipment-status-in-transit {
+        @apply bg-indigo-100 text-indigo-800;
+    }
+    .shipment-status-delivered {
+        @apply bg-green-100 text-green-800;
+    }
+    .shipment-status-failed {
+        @apply bg-red-100 text-red-800;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">{{ vehicle.name }}</h1>
+            <p class="text-gray-600 mt-1">
+                <span class="vehicle-status
+                    {% if vehicle.status == 'Active' %}status-active
+                    {% elif vehicle.status == 'Maintenance' %}status-maintenance
+                    {% elif vehicle.status == 'Inactive' %}status-inactive{% endif %}">
+                    {% if vehicle.status == 'Active' %}نشط
+                    {% elif vehicle.status == 'Maintenance' %}قيد الصيانة
+                    {% elif vehicle.status == 'Inactive' %}غير نشط
+                    {% else %}{{ vehicle.status }}{% endif %}
+                </span>
+            </p>
+        </div>
+        <div class="flex space-x-2 space-x-reverse">
+            <a href="{{ url_for('distribution.vehicles') }}" class="btn bg-gray-100 text-gray-800 hover:bg-gray-200">
+                <i class="fas fa-arrow-right ml-2"></i>
+                العودة إلى المركبات
+            </a>
+            <a href="{{ url_for('distribution.edit_vehicle', vehicle_id=vehicle.id) }}" class="btn btn-primary">
+                <i class="fas fa-edit ml-2"></i>
+                تعديل
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Vehicle Information -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">معلومات المركبة</h2>
+
+                {% if vehicle.image_data and vehicle.image_data != 'None' and vehicle.image_data != None %}
+                <div class="mb-6">
+                    <img src="data:image/jpeg;base64,{{ vehicle.image_data }}" alt="{{ vehicle.name }}" class="w-full h-48 object-cover rounded-lg">
+                </div>
+                {% elif vehicle.image_path %}
+                <div class="mb-6">
+                    <img src="{{ vehicle.image_path }}" alt="{{ vehicle.name }}" class="w-full h-48 object-cover rounded-lg">
+                </div>
+                {% else %}
+                <div class="mb-6 flex items-center justify-center h-48 bg-gray-100 rounded-lg">
+                    <i class="fas fa-truck text-6xl text-gray-400"></i>
+                </div>
+                {% endif %}
+
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-sm text-gray-500">رقم اللوحة</p>
+                        <p class="font-medium">{{ vehicle.plate_number }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">النوع</p>
+                        <p class="font-medium">{{ vehicle.vehicle_type }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">الموديل</p>
+                        <p class="font-medium">{{ vehicle.model or '-' }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">السنة</p>
+                        <p class="font-medium">{{ vehicle.year or '-' }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">الحمولة القصوى</p>
+                        <p class="font-medium">{{ vehicle.max_weight or '-' }} كجم</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">الحجم الأقصى</p>
+                        <p class="font-medium">{{ vehicle.max_volume or '-' }} م³</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">الطول الأقصى</p>
+                        <p class="font-medium">{{ vehicle.max_length or '-' }} مم</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">الارتفاع الأقصى</p>
+                        <p class="font-medium">{{ vehicle.max_height or '-' }} مم</p>
+                    </div>
+
+                    {% if vehicle.last_maintenance_date %}
+                    <div>
+                        <p class="text-sm text-gray-500">تاريخ آخر صيانة</p>
+                        <p class="font-medium">{{ vehicle.last_maintenance_date.strftime('%Y-%m-%d') }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if vehicle.next_maintenance_date %}
+                    <div>
+                        <p class="text-sm text-gray-500">تاريخ الصيانة القادمة</p>
+                        <p class="font-medium">{{ vehicle.next_maintenance_date.strftime('%Y-%m-%d') }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if vehicle.notes %}
+                    <div>
+                        <p class="text-sm text-gray-500">ملاحظات</p>
+                        <p class="font-medium">{{ vehicle.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Utilization and Current Shipments -->
+        <div class="lg:col-span-2">
+            <!-- Utilization -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-gray-800">استخدام السعة</h2>
+                    <a href="{{ url_for('inventory.item_weights') }}" class="text-sm text-blue-600 hover:text-blue-800 flex items-center">
+                        <i class="fas fa-weight-hanging mr-1"></i>
+                        <span>إدارة أوزان وأحجام المنتجات</span>
+                    </a>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <p class="text-sm font-medium text-gray-700">الوزن</p>
+                            <p class="text-sm text-gray-600">
+                                {% if vehicle.storage %}
+                                    {{ vehicle.storage.current_weight or 0 }} / {{ vehicle.max_weight or 0 }} كجم
+                                    <span class="font-bold
+                                        {% if vehicle.storage.weight_utilization > 90 %}text-red-600
+                                        {% elif vehicle.storage.weight_utilization > 80 %}text-amber-600
+                                        {% elif vehicle.storage.weight_utilization > 60 %}text-green-600
+                                        {% else %}text-blue-600{% endif %}">
+                                        ({{ vehicle.storage.weight_utilization|round|int or 0 }}%)
+                                    </span>
+                                {% else %}
+                                    0 / {{ vehicle.max_weight or 0 }} كجم (0%)
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="utilization-bar">
+                            <div class="utilization-progress
+                                {% if vehicle.storage and vehicle.storage.weight_utilization > 90 %}bg-red-500
+                                {% elif vehicle.storage and vehicle.storage.weight_utilization > 80 %}bg-amber-500
+                                {% elif vehicle.storage and vehicle.storage.weight_utilization > 60 %}bg-green-500
+                                {% else %}bg-blue-500{% endif %}"
+                                style="width: {{ vehicle.storage.weight_utilization if vehicle.storage else 0 }}%">
+                            </div>
+                        </div>
+                        {% if vehicle.storage and vehicle.storage.weight_utilization > 90 %}
+                        <div class="mt-2 text-sm text-red-600 flex items-center">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            <span>تحذير: استخدام السعة (الوزن) مرتفع جداً</span>
+                        </div>
+                        {% elif vehicle.storage and vehicle.storage.weight_utilization > 80 %}
+                        <div class="mt-2 text-sm text-amber-600 flex items-center">
+                            <i class="fas fa-exclamation-circle mr-1"></i>
+                            <span>تنبيه: استخدام السعة (الوزن) مرتفع</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <p class="text-sm font-medium text-gray-700">الحجم</p>
+                            <p class="text-sm text-gray-600">
+                                {% if vehicle.storage %}
+                                    {{ vehicle.storage.current_volume or 0 }} / {{ vehicle.max_volume or 0 }} م³
+                                    <span class="font-bold
+                                        {% if vehicle.storage.volume_utilization > 90 %}text-red-600
+                                        {% elif vehicle.storage.volume_utilization > 80 %}text-amber-600
+                                        {% elif vehicle.storage.volume_utilization > 60 %}text-green-600
+                                        {% else %}text-blue-600{% endif %}">
+                                        ({{ vehicle.storage.volume_utilization|round|int or 0 }}%)
+                                    </span>
+                                {% else %}
+                                    0 / {{ vehicle.max_volume or 0 }} م³ (0%)
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="utilization-bar">
+                            <div class="utilization-progress
+                                {% if vehicle.storage and vehicle.storage.volume_utilization > 90 %}bg-red-500
+                                {% elif vehicle.storage and vehicle.storage.volume_utilization > 80 %}bg-amber-500
+                                {% elif vehicle.storage and vehicle.storage.volume_utilization > 60 %}bg-green-500
+                                {% else %}bg-blue-500{% endif %}"
+                                style="width: {{ vehicle.storage.volume_utilization if vehicle.storage else 0 }}%">
+                            </div>
+                        </div>
+                        {% if vehicle.storage and vehicle.storage.volume_utilization > 90 %}
+                        <div class="mt-2 text-sm text-red-600 flex items-center">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            <span>تحذير: استخدام السعة (الحجم) مرتفع جداً</span>
+                        </div>
+                        {% elif vehicle.storage and vehicle.storage.volume_utilization > 80 %}
+                        <div class="mt-2 text-sm text-amber-600 flex items-center">
+                            <i class="fas fa-exclamation-circle mr-1"></i>
+                            <span>تنبيه: استخدام السعة (الحجم) مرتفع</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Shipments -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">الشحنات الحالية</h2>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    رقم الشحنة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    العميل
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    تاريخ التعيين
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    تاريخ التسليم المتوقع
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الحالة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الإجراءات
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% if vehicle.shipments %}
+                                {% for shipment in vehicle.shipments %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">{{ shipment.id }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">
+                                            {% if shipment.sales_order and shipment.sales_order.customer %}
+                                                {{ shipment.sales_order.customer.customer_name }}
+                                            {% else %}
+                                                غير معروف
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ shipment.assigned_date.strftime('%Y-%m-%d') if shipment.assigned_date else '-' }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ shipment.estimated_delivery_date.strftime('%Y-%m-%d') if shipment.estimated_delivery_date else '-' }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="shipment-status
+                                            {% if shipment.status == 'Pending' %}shipment-status-pending
+                                            {% elif shipment.status == 'Assigned' %}shipment-status-assigned
+                                            {% elif shipment.status == 'InTransit' %}shipment-status-in-transit
+                                            {% elif shipment.status == 'Delivered' %}shipment-status-delivered
+                                            {% elif shipment.status == 'Failed' %}shipment-status-failed{% endif %}">
+                                            {% if shipment.status == 'Pending' %}قيد الانتظار
+                                            {% elif shipment.status == 'Assigned' %}تم التعيين
+                                            {% elif shipment.status == 'InTransit' %}قيد التوصيل
+                                            {% elif shipment.status == 'Delivered' %}تم التسليم
+                                            {% elif shipment.status == 'Failed' %}فشل التسليم
+                                            {% else %}{{ shipment.status }}{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <a href="{{ url_for('distribution.tracking', tracking_number=shipment.shipment.tracking_number) if shipment.shipment else '#' }}" class="text-indigo-600 hover:text-indigo-900">
+                                            <i class="fas fa-truck ml-1"></i>
+                                            تتبع
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                        لا توجد شحنات حالية لهذه المركبة
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Routes -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mt-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">المسارات</h2>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    اسم المسار
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    التاريخ
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    المسافة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    المحطات
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الحالة
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    الإجراءات
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% if vehicle.routes %}
+                                {% for route in vehicle.routes %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">{{ route.name }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ route.planned_date.strftime('%Y-%m-%d') if route.planned_date else '-' }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ route.total_distance or '-' }} كم
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ route.stops|length }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="vehicle-status
+                                            {% if route.status == 'Planned' %}status-maintenance
+                                            {% elif route.status == 'InProgress' %}status-active
+                                            {% elif route.status == 'Completed' %}status-active
+                                            {% elif route.status == 'Cancelled' %}status-inactive{% endif %}">
+                                            {% if route.status == 'Planned' %}مخطط
+                                            {% elif route.status == 'InProgress' %}قيد التنفيذ
+                                            {% elif route.status == 'Completed' %}مكتمل
+                                            {% elif route.status == 'Cancelled' %}ملغي
+                                            {% else %}{{ route.status }}{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <a href="{{ url_for('distribution.view_route', route_id=route.id) }}" class="text-indigo-600 hover:text-indigo-900">
+                                            <i class="fas fa-eye ml-1"></i>
+                                            عرض
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                        لا توجد مسارات لهذه المركبة
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- No Alpine.js initialization needed for this page -->
+{% endblock %}

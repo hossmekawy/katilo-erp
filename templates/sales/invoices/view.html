@@ -1,0 +1,1033 @@
+{% extends "base.html" %}
+
+{% block title %}فاتورة #{{ invoice.invoice_number }} - نظام قاتيلو{% endblock %}
+
+{% block page_header %}فاتورة #{{ invoice.invoice_number }}{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="/sales/invoices" class="text-blue-600 hover:text-blue-800">الفواتير</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">فاتورة #{{ invoice.invoice_number }}</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="invoiceManager()">
+    <!-- Header with actions -->
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h1 class="text-2xl font-bold text-gray-800">فاتورة #{{ invoice.invoice_number }}</h1>
+        <div class="flex gap-2">
+            <a href="/sales/orders/{{ invoice.sales_order_id }}" class="btn bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center">
+                <i class="fas fa-arrow-right ml-2"></i>
+                العودة للطلب
+            </a>
+            <button @click="printInvoice()" class="btn bg-blue-600 hover:bg-blue-700 text-white flex items-center">
+                <i class="fas fa-print ml-2"></i>
+                طباعة
+            </button>
+            {% if invoice.status != 'Paid' %}
+            <button @click="openPaymentModal()" class="btn bg-green-600 hover:bg-green-700 text-white flex items-center">
+                <i class="fas fa-money-bill-wave ml-2"></i>
+                تسجيل دفعة
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Invoice Details -->
+        <div class="lg:col-span-2">
+            <div class="card" id="invoicePrintArea">
+                <div class="border-b border-gray-200 px-6 py-4">
+                    <h2 class="font-semibold text-gray-800">تفاصيل الفاتورة</h2>
+                </div>
+                <div class="p-6">
+                    <!-- Header Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-700 mb-3">من:</h3>
+                            <div class="text-sm">
+                                <div class="font-bold">{{ settings.company_name }}</div>
+                                <div>{{ settings.company_address }}</div>
+                                <div>{{ settings.company_city }}</div>
+                                <div>البريد الإلكتروني: {{ settings.company_email }}</div>
+                                <div>الهاتف: {{ settings.company_phone }}</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-700 mb-3">إلى:</h3>
+                            <div class="text-sm">
+                                <div class="font-bold">{{ invoice.sales_order.customer.customer_name }}</div>
+                                <div>{{ invoice.sales_order.customer.billing_address }}</div>
+                                <div>{{ invoice.sales_order.customer.contact_info }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Invoice Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="text-sm">
+                            <div class="mb-1"><span class="font-semibold">رقم الفاتورة:</span> {{ invoice.invoice_number }}</div>
+                            <div class="mb-1"><span class="font-semibold">تاريخ الفاتورة:</span> {{ invoice.invoice_date.strftime('%Y-%m-%d') }}</div>
+                            <div class="mb-1"><span class="font-semibold">تاريخ الاستحقاق:</span> {{ invoice.due_date.strftime('%Y-%m-%d') }}</div>
+                        </div>
+                        <div class="text-sm">
+                            <div class="mb-1"><span class="font-semibold">رقم الطلب:</span> {{ invoice.sales_order_id }}</div>
+                            <div class="mb-1">
+                                <span class="font-semibold">الحالة:</span>
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    {% if invoice.status == 'Unpaid' %}
+                                        bg-red-100 text-red-800
+                                    {% elif invoice.status == 'Partially Paid' %}
+                                        bg-yellow-100 text-yellow-800
+                                    {% elif invoice.status == 'Paid' %}
+                                        bg-green-100 text-green-800
+                                    {% endif %}">
+                                    {% if invoice.status == 'Unpaid' %}
+                                        غير مدفوعة
+                                    {% elif invoice.status == 'Partially Paid' %}
+                                        مدفوعة جزئياً
+                                    {% elif invoice.status == 'Paid' %}
+                                        مدفوعة
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Items Table -->
+                    <div class="overflow-x-auto mb-8">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        المنتج
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        الكمية
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        سعر الوحدة
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        الإجمالي
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for detail in invoice.sales_order.details %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ detail.item.name }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ detail.quantity_ordered }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ "%.2f"|format(detail.unit_price) }} ج.م
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ "%.2f"|format(detail.unit_price * detail.quantity_ordered) }} ج.م
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                        المجموع الفرعي:
+                                    </th>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ "%.2f"|format(invoice.subtotal) }} ج.م
+                                    </td>
+                                </tr>
+                                {% if invoice.tax_amount > 0 %}
+                                <tr>
+                                    <th colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                        الضريبة:
+                                    </th>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ "%.2f"|format(invoice.tax_amount) }} ج.م
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if invoice.discount_amount > 0 %}
+                                <tr>
+                                    <th colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                        الخصم:
+                                    </th>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ "%.2f"|format(invoice.discount_amount) }} ج.م
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                <tr class="bg-gray-50">
+                                    <th colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                        الإجمالي:
+                                    </th>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ "%.2f"|format(invoice.total_amount) }} ج.م
+                                    </td>
+                                </tr>
+                                {% if invoice.payments %}
+                                <tr>
+                                    <th colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                        المدفوع:
+                                    </th>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ "%.2f"|format(invoice.payments|sum(attribute='amount') or 0) }} ج.م
+                                    </td>
+                                </tr>
+                                <tr class="bg-gray-50">
+                                    <th colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                        المتبقي:
+                                    </th>
+                                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ "%.2f"|format(invoice.total_amount - (invoice.payments|sum(attribute='amount') or 0)) }} ج.م
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Notes -->
+                    {% if invoice.notes %}
+                    <div class="mb-8">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">ملاحظات:</h3>
+                        <p class="text-sm text-gray-600">{{ invoice.notes }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Payment Terms -->
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">شروط الدفع:</h3>
+                        <p class="text-sm text-gray-600">
+                            {{ payment_terms }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="lg:col-span-1">
+            <!-- Payment History -->
+            <div class="card mb-6">
+                <div class="border-b border-gray-200 px-6 py-4">
+                    <h2 class="font-semibold text-gray-800">سجل المدفوعات</h2>
+                </div>
+                <div class="p-6">
+                    {% if invoice.payments %}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        التاريخ
+                                    </th>
+                                    <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        الطريقة
+                                    </th>
+                                    <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        المبلغ
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for payment in invoice.payments %}
+                                <tr>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {{ payment.payment_date.strftime('%Y-%m-%d') }}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {% if payment.payment_method == 'Cash' %}
+                                            نقداً
+                                        {% elif payment.payment_method == 'Credit Card' %}
+                                            بطاقة ائتمان
+                                        {% elif payment.payment_method == 'Bank Transfer' %}
+                                            تحويل بنكي
+                                        {% elif payment.payment_method == 'Check' %}
+                                            شيك
+                                        {% else %}
+                                            {{ payment.payment_method }}
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ "%.2f"|format(payment.amount) }} ج.م
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="2" class="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                                        إجمالي المدفوعات:
+                                    </th>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ "%.2f"|format(invoice.payments|sum(attribute='amount') or 0) }} ج.م
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th colspan="2" class="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                                        المبلغ المتبقي:
+                                    </th>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ "%.2f"|format(invoice.total_amount - (invoice.payments|sum(attribute='amount') or 0)) }} ج.م
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-6">
+                        <i class="fas fa-money-bill-wave text-gray-300 text-4xl mb-3"></i>
+                        <p class="text-gray-500">لا توجد مدفوعات مسجلة بعد</p>
+                        {% if invoice.status != 'Paid' %}
+                        <button @click="openPaymentModal()" class="btn btn-primary mt-3">
+                            <i class="fas fa-plus-circle ml-2"></i>
+                            تسجيل دفعة
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Customer Information -->
+            <div class="card mb-6">
+                <div class="border-b border-gray-200 px-6 py-4">
+                    <h2 class="font-semibold text-gray-800">معلومات العميل</h2>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-500 mb-1">الاسم:</h5>
+                        <p class="text-gray-800">{{ invoice.sales_order.customer.customer_name }}</p>
+                    </div>
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-500 mb-1">معلومات الاتصال:</h5>
+                        <p class="text-gray-800">{{ invoice.sales_order.customer.contact_info or 'غير متوفر' }}</p>
+                    </div>
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-500 mb-1">عنوان الفواتير:</h5>
+                        <p class="text-gray-800 whitespace-pre-line">{{ invoice.sales_order.customer.billing_address or 'غير متوفر' }}</p>
+                    </div>
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-500 mb-1">عنوان الشحن:</h5>
+                        <p class="text-gray-800 whitespace-pre-line">{{ invoice.sales_order.customer.shipping_address or 'غير متوفر' }}</p>
+                    </div>
+                    <div class="pt-2">
+                        <a href="/sales/customers/{{ invoice.sales_order.customer.id }}" class="text-blue-600 hover:text-blue-800 flex items-center">
+                            <i class="fas fa-external-link-alt ml-1"></i>
+                            عرض ملف العميل
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Information -->
+            <div class="card">
+                <div class="border-b border-gray-200 px-6 py-4">
+                    <h2 class="font-semibold text-gray-800">معلومات الطلب</h2>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-500 mb-1">رقم الطلب:</h5>
+                        <p class="text-gray-800">#{{ invoice.sales_order_id }}</p>
+                    </div>
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-500 mb-1">تاريخ الطلب:</h5>
+                        <p class="text-gray-800">{{ invoice.sales_order.order_date.strftime('%Y-%m-%d') }}</p>
+                    </div>
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-500 mb-1">حالة الطلب:</h5>
+                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                            {% if invoice.sales_order.status == 'Delivered' %}
+                                bg-green-100 text-green-800
+                            {% elif invoice.sales_order.status == 'Pending' %}
+                                bg-yellow-100 text-yellow-800
+                            {% elif invoice.sales_order.status == 'Processing' %}
+                                bg-blue-100 text-blue-800
+                            {% else %}
+                                bg-gray-100 text-gray-800
+                            {% endif %}">
+                            {{ invoice.sales_order.status }}
+                        </span>
+                    </div>
+                    <div class="pt-2">
+                        <a href="/sales/orders/{{ invoice.sales_order_id }}" class="text-blue-600 hover:text-blue-800 flex items-center">
+                            <i class="fas fa-external-link-alt ml-1"></i>
+                            عرض تفاصيل الطلب
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Payment Modal -->
+    <div x-show="showPaymentModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="showPaymentModal = false">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex justify-between items-start mb-4">
+                        <button @click="showPaymentModal = false" class="text-gray-400 hover:text-gray-500">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">تسجيل دفعة</h3>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm text-gray-500">رقم الفاتورة:</span>
+                                <span class="text-sm font-medium">{{ invoice.invoice_number }}</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm text-gray-500">إجمالي الفاتورة:</span>
+                                <span class="text-sm font-medium">{{ "%.2f"|format(invoice.total_amount) }} ج.م</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm text-gray-500">المبلغ المتبقي:</span>
+                                <span class="text-sm font-medium text-red-600" x-text="formatCurrency(remainingAmount)"></span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="paymentAmount" class="block text-sm font-medium text-gray-700 mb-1">مبلغ الدفعة <span class="text-red-500">*</span></label>
+                            <input type="number" id="paymentAmount" x-model="payment.amount" min="0.01" step="0.01" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <p x-show="errors.amount" x-text="errors.amount" class="mt-1 text-sm text-red-600"></p>
+                        </div>
+
+                        <div>
+                            <label for="paymentMethod" class="block text-sm font-medium text-gray-700 mb-1">طريقة الدفع <span class="text-red-500">*</span></label>
+                            <select id="paymentMethod" x-model="payment.payment_method" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="Cash">نقداً</option>
+                                <option value="Credit Card">بطاقة ائتمان</option>
+                                <option value="Bank Transfer">تحويل بنكي</option>
+                                <option value="Check">شيك</option>
+                            </select>
+                        </div>
+
+                        <div x-show="payment.payment_method === 'Cash'">
+                            <label for="cashAccount" class="block text-sm font-medium text-gray-700 mb-1">حساب الخزينة <span class="text-red-500">*</span></label>
+                            <select id="cashAccount" x-model="payment.cash_account_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">اختر حساب الخزينة</option>
+                                {% for account in cash_accounts %}
+                                    <option value="{{ account.id }}">{{ account.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <p x-show="errors.cash_account_id" x-text="errors.cash_account_id" class="mt-1 text-sm text-red-600"></p>
+                        </div>
+
+                        <div>
+                            <label for="referenceNumber" class="block text-sm font-medium text-gray-700 mb-1">رقم المرجع</label>
+                            <input type="text" id="referenceNumber" x-model="payment.reference_number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+
+                        <div>
+                            <label for="paymentNotes" class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                            <textarea id="paymentNotes" x-model="payment.notes" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="processPayment()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        تسجيل الدفعة
+                    </button>
+                    <button @click="showPaymentModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global currency formatter function
+    function formatCurrency(amount) {
+        if (amount === undefined || amount === null) return '';
+        return new Intl.NumberFormat('ar-EG', {
+            style: 'currency',
+            currency: 'EGP'
+        }).format(amount);
+    }
+
+    function invoiceManager() {
+        return {
+            showPaymentModal: false,
+            remainingAmount: {{ invoice.total_amount - (invoice.payments|sum(attribute='amount') or 0) }},
+            payment: {
+                amount: {{ invoice.total_amount - (invoice.payments|sum(attribute='amount') or 0) }},
+                payment_method: 'Cash',
+                cash_account_id: '',
+                reference_number: '',
+                notes: ''
+            },
+            errors: {},
+
+            openPaymentModal() {
+                // Ensure we have the latest remaining amount
+                this.remainingAmount = {{ invoice.total_amount - (invoice.payments|sum(attribute='amount') or 0) }};
+                this.payment = {
+                    amount: this.remainingAmount,
+                    payment_method: 'Cash',
+                    cash_account_id: '',
+                    reference_number: '',
+                    notes: ''
+                };
+                this.errors = {};
+                this.showPaymentModal = true;
+            },
+
+            formatCurrency(amount) {
+                // Use the global formatCurrency function
+                return formatCurrency(amount);
+            },
+            validatePayment() {
+                this.errors = {};
+
+                if (!this.payment.amount || this.payment.amount <= 0) {
+                    this.errors.amount = 'يجب أن يكون مبلغ الدفعة أكبر من صفر';
+                    return false;
+                }
+
+                if (this.payment.payment_method === 'Cash' && !this.payment.cash_account_id) {
+                    this.errors.cash_account_id = 'يرجى اختيار حساب الخزينة للدفع النقدي';
+                    return false;
+                }
+
+                if (this.payment.amount > this.remainingAmount) {
+                    this.errors.amount = `مبلغ الدفعة يتجاوز المبلغ المتبقي (${this.formatCurrency(this.remainingAmount)})`;
+                    return false;
+                }
+
+                return true;
+            },
+
+            processPayment() {
+                if (!this.validatePayment()) {
+                    return;
+                }
+
+                // Prepare payment data
+                const paymentData = {
+                    amount: this.payment.amount,
+                    payment_method: this.payment.payment_method,
+                    reference_number: this.payment.reference_number,
+                    notes: this.payment.notes
+                };
+
+                // Add cash_account_id only if payment method is Cash
+                if (this.payment.payment_method === 'Cash') {
+                    paymentData.cash_account_id = this.payment.cash_account_id;
+                }
+
+                fetchAPI(`/sales/invoices/{{ invoice.id }}/process-payment`, 'POST', paymentData)
+                    .then(response => {
+                        showNotification('تم تسجيل الدفعة بنجاح', 'success');
+                        this.showPaymentModal = false;
+                        // Reload page to show updated payment info
+                        window.location.reload();
+                    })
+                    .catch(error => {
+                        showNotification('حدث خطأ أثناء تسجيل الدفعة', 'error');
+                    });
+            },
+
+            printInvoice() {
+                // Create a print-friendly version
+                const printPage = `
+                    <!DOCTYPE html>
+                    <html lang="ar" dir="rtl">
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>فاتورة #{{ invoice.invoice_number }}</title>
+                        <style>
+                            @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+
+                            :root {
+                                --primary-color: #3b82f6;
+                                --secondary-color: #1e293b;
+                                --accent-color: #f59e0b;
+                                --light-color: #f8fafc;
+                                --border-color: #e2e8f0;
+                                --success-color: #10b981;
+                                --warning-color: #f59e0b;
+                                --danger-color: #ef4444;
+                            }
+
+                            * {
+                                box-sizing: border-box;
+                                margin: 0;
+                                padding: 0;
+                            }
+
+                            body {
+                                font-family: 'Tajawal', sans-serif;
+                                margin: 0;
+                                padding: 0;
+                                color: var(--secondary-color);
+                                background-color: white;
+                                line-height: 1.6;
+                            }
+
+                            .invoice-container {
+                                max-width: 800px;
+                                margin: 0 auto;
+                                padding: 40px;
+                                border: 1px solid var(--border-color);
+                                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+                            }
+
+                            .invoice-header {
+                                display: flex;
+                                justify-content: space-between;
+                                margin-bottom: 40px;
+                                border-bottom: 2px solid var(--primary-color);
+                                padding-bottom: 20px;
+                            }
+
+                            .company-info {
+                                text-align: right;
+                            }
+
+                            .company-logo {
+                                width: 150px;
+                                height: 80px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                margin-bottom: 10px;
+                            }
+
+                            .company-logo img {
+                                max-width: 100%;
+                                max-height: 100%;
+                                object-fit: contain;
+                            }
+
+                            .company-details {
+                                font-size: 14px;
+                            }
+
+                            .invoice-title {
+                                text-align: left;
+                            }
+
+                            .invoice-title h1 {
+                                font-size: 28px;
+                                color: var(--primary-color);
+                                margin-bottom: 5px;
+                            }
+
+                            .invoice-title .invoice-number {
+                                font-size: 16px;
+                                color: var(--secondary-color);
+                            }
+
+                            .invoice-title .invoice-date {
+                                font-size: 14px;
+                                color: #64748b;
+                                margin-top: 5px;
+                            }
+
+                            .invoice-status {
+                                display: inline-block;
+                                padding: 6px 12px;
+                                border-radius: 20px;
+                                font-weight: 500;
+                                font-size: 14px;
+                                margin-top: 10px;
+                            }
+
+                            .status-unpaid {
+                                background-color: #fee2e2;
+                                color: #b91c1c;
+                            }
+
+                            .status-partial {
+                                background-color: #fef3c7;
+                                color: #92400e;
+                            }
+
+                            .status-paid {
+                                background-color: #d1fae5;
+                                color: #065f46;
+                            }
+
+                            .parties {
+                                display: flex;
+                                justify-content: space-between;
+                                margin-bottom: 30px;
+                            }
+
+                            .party {
+                                width: 48%;
+                            }
+
+                            .party-title {
+                                font-size: 16px;
+                                font-weight: 600;
+                                color: var(--primary-color);
+                                margin-bottom: 10px;
+                                border-bottom: 1px solid var(--border-color);
+                                padding-bottom: 5px;
+                            }
+
+                            .party-details {
+                                font-size: 14px;
+                            }
+
+                            .party-details div {
+                                margin-bottom: 5px;
+                            }
+
+                            .invoice-details {
+                                margin-bottom: 20px;
+                                display: flex;
+                                justify-content: space-between;
+                            }
+
+                            .detail-group {
+                                width: 48%;
+                            }
+
+                            .detail-item {
+                                display: flex;
+                                justify-content: space-between;
+                                margin-bottom: 8px;
+                                font-size: 14px;
+                            }
+
+                            .detail-label {
+                                font-weight: 500;
+                                color: #64748b;
+                            }
+
+                            .detail-value {
+                                font-weight: 500;
+                            }
+
+                            .items-table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                margin-bottom: 30px;
+                            }
+
+                            .items-table th {
+                                background-color: var(--primary-color);
+                                color: white;
+                                font-weight: 500;
+                                text-align: right;
+                                padding: 12px;
+                                font-size: 14px;
+                            }
+
+                            .items-table td {
+                                padding: 12px;
+                                text-align: right;
+                                border-bottom: 1px solid var(--border-color);
+                                font-size: 14px;
+                            }
+
+                            .items-table tr:nth-child(even) {
+                                background-color: #f9fafb;
+                            }
+
+                            .items-table tfoot th {
+                                background-color: white;
+                                color: var(--secondary-color);
+                                font-weight: 600;
+                                text-align: right;
+                            }
+
+                            .items-table tfoot td {
+                                font-weight: 600;
+                            }
+
+                            .items-table tfoot tr:last-child {
+                                border-top: 2px solid var(--primary-color);
+                                font-weight: 700;
+                            }
+
+                            .items-table tfoot tr:last-child td {
+                                color: var(--primary-color);
+                                font-size: 16px;
+                            }
+
+                            .notes-section {
+                                margin-top: 30px;
+                                border-top: 1px solid var(--border-color);
+                                padding-top: 20px;
+                            }
+
+                            .notes-title {
+                                font-size: 16px;
+                                font-weight: 600;
+                                margin-bottom: 10px;
+                                color: var(--secondary-color);
+                            }
+
+                            .notes-content {
+                                font-size: 14px;
+                                color: #64748b;
+                            }
+
+                            .payment-terms {
+                                margin-top: 20px;
+                            }
+
+                            .invoice-footer {
+                                margin-top: 40px;
+                                text-align: center;
+                                border-top: 1px solid var(--border-color);
+                                padding-top: 20px;
+                            }
+
+                            .footer-text {
+                                font-size: 14px;
+                                color: #64748b;
+                                margin-bottom: 10px;
+                            }
+
+                            .footer-contact {
+                                font-size: 12px;
+                                color: #94a3b8;
+                            }
+
+                            @media print {
+                                body {
+                                    -webkit-print-color-adjust: exact;
+                                    print-color-adjust: exact;
+                                }
+
+                                .invoice-container {
+                                    border: none;
+                                    box-shadow: none;
+                                    padding: 0;
+                                }
+
+                                @page {
+                                    margin: 1cm;
+                                }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="invoice-container">
+                            <div class="invoice-header">
+                                <div class="company-info">
+                                    <div class="company-logo">
+                                        <img src="/static/uploads/images/katilo.png" alt="{{ settings.company_name }}" />
+                                    </div>
+                                    <div class="company-details">
+                                        <div><strong>{{ settings.company_name }}</strong></div>
+                                        <div>{{ settings.company_address }}</div>
+                                        <div>{{ settings.company_city }}</div>
+                                        <div>البريد الإلكتروني: {{ settings.company_email }}</div>
+                                        <div>الهاتف: {{ settings.company_phone }}</div>
+                                        {% if settings.company_tax_id %}
+                                        <div>الرقم الضريبي: {{ settings.company_tax_id }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="invoice-title">
+                                    <h1>فاتورة</h1>
+                                    <div class="invoice-number">رقم الفاتورة: #{{ invoice.invoice_number }}</div>
+                                    <div class="invoice-date">تاريخ الفاتورة: {{ invoice.invoice_date.strftime('%Y-%m-%d') }}</div>
+                                    <div class="invoice-date">تاريخ الاستحقاق: {{ invoice.due_date.strftime('%Y-%m-%d') }}</div>
+                                    <div>
+                                        <span class="invoice-status
+                                            {% if invoice.status == 'Unpaid' %}
+                                                status-unpaid
+                                            {% elif invoice.status == 'Partially Paid' %}
+                                                status-partial
+                                            {% elif invoice.status == 'Paid' %}
+                                                status-paid
+                                            {% endif %}">
+                                            {% if invoice.status == 'Unpaid' %}
+                                                غير مدفوعة
+                                            {% elif invoice.status == 'Partially Paid' %}
+                                                مدفوعة جزئياً
+                                            {% elif invoice.status == 'Paid' %}
+                                                مدفوعة
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="parties">
+                                <div class="party">
+                                    <div class="party-title">معلومات العميل</div>
+                                    <div class="party-details">
+                                        <div><strong>{{ invoice.sales_order.customer.customer_name }}</strong></div>
+                                        <div>{{ invoice.sales_order.customer.billing_address or 'غير متوفر' }}</div>
+                                        <div>{{ invoice.sales_order.customer.contact_info or 'غير متوفر' }}</div>
+                                    </div>
+                                </div>
+
+                                <div class="party">
+                                    <div class="party-title">معلومات الطلب</div>
+                                    <div class="party-details">
+                                        <div><strong>رقم الطلب:</strong> #{{ invoice.sales_order_id }}</div>
+                                        <div><strong>تاريخ الطلب:</strong> {{ invoice.sales_order.order_date.strftime('%Y-%m-%d') }}</div>
+                                        <div><strong>حالة الطلب:</strong> {{ invoice.sales_order.status }}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <table class="items-table">
+                                <thead>
+                                    <tr>
+                                        <th>المنتج</th>
+                                        <th>الكمية</th>
+                                        <th>سعر الوحدة</th>
+                                        <th>الإجمالي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for detail in invoice.sales_order.details %}
+                                    <tr>
+                                        <td>{{ detail.item.name }}</td>
+                                        <td>{{ detail.quantity_ordered }}</td>
+                                        <td>{{ "%.2f"|format(detail.unit_price) }} ج.م</td>
+                                        <td>{{ "%.2f"|format(detail.unit_price * detail.quantity_ordered) }} ج.م</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th colspan="3">المجموع الفرعي:</th>
+                                        <td>{{ "%.2f"|format(invoice.subtotal) }} ج.م</td>
+                                    </tr>
+                                    {% if invoice.tax_amount > 0 %}
+                                    <tr>
+                                        <th colspan="3">الضريبة:</th>
+                                        <td>{{ "%.2f"|format(invoice.tax_amount) }} ج.م</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if invoice.discount_amount > 0 %}
+                                    <tr>
+                                        <th colspan="3">الخصم:</th>
+                                        <td>{{ "%.2f"|format(invoice.discount_amount) }} ج.م</td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr>
+                                        <th colspan="3">الإجمالي:</th>
+                                        <td>{{ "%.2f"|format(invoice.total_amount) }} ج.م</td>
+                                    </tr>
+                                    {% if invoice.payments %}
+                                    <tr>
+                                        <th colspan="3">المدفوع:</th>
+                                        <td>{{ "%.2f"|format(invoice.payments|sum(attribute='amount') or 0) }} ج.م</td>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="3">المتبقي:</th>
+                                        <td>{{ "%.2f"|format(invoice.total_amount - (invoice.payments|sum(attribute='amount') or 0)) }} ج.م</td>
+                                    </tr>
+                                    {% endif %}
+                                </tfoot>
+                            </table>
+
+                            {% if invoice.payments %}
+                            <div class="payment-history">
+                                <div class="notes-title">سجل المدفوعات</div>
+                                <table class="items-table">
+                                    <thead>
+                                        <tr>
+                                            <th>التاريخ</th>
+                                            <th>طريقة الدفع</th>
+                                            <th>المبلغ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for payment in invoice.payments %}
+                                        <tr>
+                                            <td>{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                                            <td>
+                                                {% if payment.payment_method == 'Cash' %}
+                                                    نقداً
+                                                {% elif payment.payment_method == 'Credit Card' %}
+                                                    بطاقة ائتمان
+                                                {% elif payment.payment_method == 'Bank Transfer' %}
+                                                    تحويل بنكي
+                                                {% elif payment.payment_method == 'Check' %}
+                                                    شيك
+                                                {% else %}
+                                                    {{ payment.payment_method }}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ "%.2f"|format(payment.amount) }} ج.م</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+
+                            <div class="notes-section">
+                                {% if invoice.notes %}
+                                <div class="notes-title">ملاحظات</div>
+                                <div class="notes-content">{{ invoice.notes }}</div>
+                                {% endif %}
+
+                                <div class="payment-terms">
+                                    <div class="notes-title">شروط الدفع</div>
+                                    <div class="notes-content">
+                                        {{ payment_terms }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="invoice-footer">
+                                <div class="footer-text">شكراً لتعاملكم مع {{ settings.company_name }}</div>
+                                <div class="footer-contact">
+                                    للاستفسارات، يرجى التواصل معنا على {{ settings.company_email }} أو الاتصال على {{ settings.company_phone }}
+                                </div>
+                                {% if settings.company_website %}
+                                <div class="footer-contact">
+                                    {{ settings.company_website }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `;
+
+                // Open a new window for printing
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(printPage);
+                printWindow.document.close();
+
+                // Wait for resources to load before printing
+                printWindow.onload = function() {
+                    printWindow.print();
+                    printWindow.onafterprint = function() {
+                        printWindow.close();
+                    };
+                };
+            }
+        };
+    }
+</script>
+{% endblock %}
