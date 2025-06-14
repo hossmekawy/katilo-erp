@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}التنبيهات - نظام قاتيلو للمخزون{% endblock %}
+
+{% block page_header %}التنبيهات{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600">التنبيهات</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="p-6" x-data="alertsManager()">
+    <!-- Header with Stats -->
+    <div class="mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <!-- Total Alerts -->
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <i class="fas fa-bell text-blue-600"></i>
+                    </div>
+                    <div class="mr-3">
+                        <p class="text-sm text-gray-600">إجمالي التنبيهات</p>
+                        <p class="text-lg font-semibold" x-text="stats.total_count">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Unread Alerts -->
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-red-100 rounded-lg">
+                        <i class="fas fa-exclamation-circle text-red-600"></i>
+                    </div>
+                    <div class="mr-3">
+                        <p class="text-sm text-gray-600">غير مقروءة</p>
+                        <p class="text-lg font-semibold text-red-600" x-text="stats.unread_count">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Alerts -->
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-green-100 rounded-lg">
+                        <i class="fas fa-clock text-green-600"></i>
+                    </div>
+                    <div class="mr-3">
+                        <p class="text-sm text-gray-600">خلال 24 ساعة</p>
+                        <p class="text-lg font-semibold text-green-600" x-text="stats.recent_count">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex flex-col space-y-2">
+                    <button @click="markAllAsRead()" 
+                            class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors"
+                            :disabled="loading">
+                        <i class="fas fa-check-double ml-1"></i>
+                        تحديد الكل كمقروء
+                    </button>
+                    <button @click="refreshAlerts()" 
+                            class="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700 transition-colors"
+                            :disabled="loading">
+                        <i class="fas fa-sync-alt ml-1"></i>
+                        تحديث
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="mb-6">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8 space-x-reverse">
+                <button @click="activeTab = 'all'; loadAlerts()" 
+                        :class="activeTab === 'all' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                    <i class="fas fa-list ml-1"></i>
+                    جميع التنبيهات
+                </button>
+                <button @click="activeTab = 'money_transfer'; loadAlerts()" 
+                        :class="activeTab === 'money_transfer' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                    <i class="fas fa-exchange-alt ml-1"></i>
+                    التحويلات النقدية
+                </button>
+                <button @click="activeTab = 'inventory_movement'; loadAlerts()" 
+                        :class="activeTab === 'inventory_movement' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                    <i class="fas fa-truck ml-1"></i>
+                    حركة المخزون
+                </button>
+                <button @click="activeTab = 'low_stock'; loadAlerts()" 
+                        :class="activeTab === 'low_stock' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                    <i class="fas fa-exclamation-triangle ml-1"></i>
+                    مخزون منخفض
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div x-show="loading" class="text-center py-8">
+        <i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>
+        <p class="text-gray-600 mt-2">جاري التحميل...</p>
+    </div>
+
+    <!-- Alerts List -->
+    <div x-show="!loading" class="bg-white rounded-lg shadow">
+        <div x-show="alerts.length === 0" class="text-center py-8">
+            <i class="fas fa-bell-slash text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-600">لا توجد تنبيهات</p>
+        </div>
+
+        <div x-show="alerts.length > 0" class="divide-y divide-gray-200">
+            <template x-for="alert in alerts" :key="alert.autoid">
+                <div class="p-4 hover:bg-gray-50 transition-colors" 
+                     :class="!alert.read ? 'bg-blue-50 border-r-4 border-blue-500' : ''">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <!-- Alert Icon and Type -->
+                            <div class="flex items-center mb-2">
+                                <div class="p-1 rounded-full mr-2" 
+                                     :class="getAlertTypeClass(alert.type)">
+                                    <i :class="getAlertTypeIcon(alert.type)" class="text-xs"></i>
+                                </div>
+                                <span class="text-xs text-gray-500 uppercase tracking-wide" 
+                                      x-text="getAlertTypeLabel(alert.type)"></span>
+                                <span x-show="!alert.read" class="mr-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                    جديد
+                                </span>
+                            </div>
+
+                            <!-- Alert Title -->
+                            <h3 class="text-sm font-medium text-gray-900 mb-1" x-text="alert.title"></h3>
+
+                            <!-- Alert Time -->
+                            <p class="text-xs text-gray-500" x-text="formatTime(alert.time)"></p>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex items-center space-x-2 space-x-reverse">
+                            <button x-show="!alert.read" 
+                                    @click="markAsRead(alert.autoid)"
+                                    class="text-blue-600 hover:text-blue-800 text-sm">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button @click="deleteAlert(alert.autoid)"
+                                    class="text-red-600 hover:text-red-800 text-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+function alertsManager() {
+    return {
+        alerts: [],
+        stats: {
+            total_count: 0,
+            unread_count: 0,
+            recent_count: 0
+        },
+        activeTab: 'all',
+        loading: true,
+
+        init() {
+            this.loadAlerts();
+            this.loadStats();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(() => {
+                this.loadAlerts();
+                this.loadStats();
+            }, 30000);
+        },
+
+        async loadAlerts() {
+            this.loading = true;
+            try {
+                const params = new URLSearchParams();
+                if (this.activeTab !== 'all') {
+                    params.append('type', this.activeTab);
+                }
+
+                const response = await fetch(`/alerts/api/alerts?${params}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    this.alerts = data.alerts;
+                } else {
+                    this.showNotification('خطأ في تحميل التنبيهات', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+                this.showNotification('خطأ في تحميل التنبيهات', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async loadStats() {
+            try {
+                const response = await fetch('/alerts/api/alerts/stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    this.stats = data.stats;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        },
+
+        async markAsRead(alertId) {
+            try {
+                const response = await fetch(`/alerts/api/alerts/${alertId}/read`, {
+                    method: 'PUT'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // Update local state
+                    const alert = this.alerts.find(a => a.autoid === alertId);
+                    if (alert) {
+                        alert.read = true;
+                    }
+                    this.loadStats();
+                } else {
+                    this.showNotification('خطأ في تحديث التنبيه', 'error');
+                }
+            } catch (error) {
+                console.error('Error marking alert as read:', error);
+                this.showNotification('خطأ في تحديث التنبيه', 'error');
+            }
+        },
+
+        async deleteAlert(alertId) {
+            if (!confirm('هل أنت متأكد من حذف هذا التنبيه؟')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/alerts/api/alerts/${alertId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    this.alerts = this.alerts.filter(a => a.autoid !== alertId);
+                    this.loadStats();
+                    this.showNotification('تم حذف التنبيه بنجاح', 'success');
+                } else {
+                    this.showNotification('خطأ في حذف التنبيه', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting alert:', error);
+                this.showNotification('خطأ في حذف التنبيه', 'error');
+            }
+        },
+
+        async markAllAsRead() {
+            try {
+                const params = new URLSearchParams();
+                if (this.activeTab !== 'all') {
+                    params.append('type', this.activeTab);
+                }
+
+                const response = await fetch(`/alerts/api/alerts/mark-all-read?${params}`, {
+                    method: 'PUT'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    this.loadAlerts();
+                    this.loadStats();
+                    this.showNotification(`تم تحديد ${data.marked_count} تنبيه كمقروء`, 'success');
+                } else {
+                    this.showNotification('خطأ في تحديث التنبيهات', 'error');
+                }
+            } catch (error) {
+                console.error('Error marking all as read:', error);
+                this.showNotification('خطأ في تحديث التنبيهات', 'error');
+            }
+        },
+
+        refreshAlerts() {
+            this.loadAlerts();
+            this.loadStats();
+            this.showNotification('تم تحديث التنبيهات', 'success');
+        },
+
+        getAlertTypeClass(type) {
+            const classes = {
+                'money_transfer': 'bg-green-100 text-green-600',
+                'inventory_movement': 'bg-blue-100 text-blue-600',
+                'low_stock': 'bg-red-100 text-red-600',
+                'general': 'bg-gray-100 text-gray-600'
+            };
+            return classes[type] || classes['general'];
+        },
+
+        getAlertTypeIcon(type) {
+            const icons = {
+                'money_transfer': 'fas fa-exchange-alt',
+                'inventory_movement': 'fas fa-truck',
+                'low_stock': 'fas fa-exclamation-triangle',
+                'general': 'fas fa-bell'
+            };
+            return icons[type] || icons['general'];
+        },
+
+        getAlertTypeLabel(type) {
+            const labels = {
+                'money_transfer': 'تحويل نقدي',
+                'inventory_movement': 'حركة مخزون',
+                'low_stock': 'مخزون منخفض',
+                'general': 'عام'
+            };
+            return labels[type] || labels['general'];
+        },
+
+        formatTime(timeString) {
+            try {
+                const date = new Date(timeString);
+                return date.toLocaleString('ar-SA', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (error) {
+                return timeString;
+            }
+        },
+
+        showNotification(message, type = 'info') {
+            if (typeof showNotification === 'function') {
+                showNotification(message, type);
+            } else {
+                alert(message);
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

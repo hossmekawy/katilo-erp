@@ -11,76 +11,99 @@
                 <i class="fas fa-arrow-right ml-1"></i> العودة
             </a>
         </div>
-        
+
         <div class="mb-6">
             <p class="text-gray-600 dark:text-gray-300">
                 قم بإدارة قاعدة البيانات الخاصة بالنظام، بما في ذلك النسخ الاحتياطي والاستعادة.
             </p>
         </div>
-        
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Export Database -->
+            <!-- Database Backup -->
             <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-100 dark:border-green-800">
                 <div class="flex items-center mb-4">
-                    <i class="fas fa-download text-green-500 text-xl mr-3"></i>
-                    <h2 class="text-lg font-semibold text-green-700 dark:text-green-300">تصدير قاعدة البيانات</h2>
+                    <i class="fas fa-database text-green-500 text-xl mr-3"></i>
+                    <h2 class="text-lg font-semibold text-green-700 dark:text-green-300">نسخ احتياطي لقاعدة البيانات</h2>
                 </div>
-                
+
                 <p class="text-gray-600 dark:text-gray-300 mb-4">
-                    قم بتصدير نسخة كاملة من قاعدة البيانات الحالية للنسخ الاحتياطي أو النقل إلى نظام آخر.
+                    قم بإنشاء نسخة احتياطية من قاعدة البيانات PostgreSQL. سيتم تنزيل ملف النسخ الاحتياطي على جهازك.
                 </p>
                 
                 <div class="flex justify-center">
-                    <a href="{{ url_for('settings.api_export_database') }}" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
-                        <i class="fas fa-download mr-1"></i> تصدير قاعدة البيانات
-                    </a>
+                    <button @click="backupDatabase" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                            :disabled="isBackingUp">
+                        <span x-show="!isBackingUp">
+                            <i class="fas fa-download mr-1"></i> إنشاء نسخة احتياطية
+                        </span>
+                        <span x-show="isBackingUp" class="flex items-center">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            جاري النسخ الاحتياطي...
+                        </span>
+                    </button>
                 </div>
             </div>
-            
-            <!-- Import Database -->
+
+            <!-- Database Restore -->
             <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
                 <div class="flex items-center mb-4">
                     <i class="fas fa-upload text-blue-500 text-xl mr-3"></i>
-                    <h2 class="text-lg font-semibold text-blue-700 dark:text-blue-300">استيراد قاعدة البيانات</h2>
+                    <h2 class="text-lg font-semibold text-blue-700 dark:text-blue-300">استعادة قاعدة البيانات</h2>
                 </div>
-                
+
                 <p class="text-gray-600 dark:text-gray-300 mb-4">
-                    قم باستيراد قاعدة بيانات من ملف نسخة احتياطية. <span class="text-red-600 font-semibold">تحذير: سيؤدي هذا إلى استبدال جميع البيانات الحالية!</span>
+                    استعادة قاعدة البيانات من نسخة احتياطية. يجب أن يكون الملف بتنسيق PostgreSQL dump.
+                    <span class="text-red-600 font-semibold">تحذير: سيؤدي هذا إلى استبدال جميع البيانات الحالية!</span>
                 </p>
                 
-                <form @submit.prevent="importDatabase" class="space-y-4">
-                    <div>
-                        <label for="database_file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ملف قاعدة البيانات (.db)</label>
-                        <input type="file" id="database_file" @change="handleFileChange" accept=".db" 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    
-                    <div class="flex justify-center">
-                        <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                                :disabled="!databaseFile || isImporting">
-                            <span x-show="!isImporting">
-                                <i class="fas fa-upload mr-1"></i> استيراد قاعدة البيانات
-                            </span>
-                            <span x-show="isImporting" class="flex items-center">
-                                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                جاري الاستيراد...
-                            </span>
-                        </button>
-                    </div>
-                </form>
+                <div class="flex justify-center">
+                    <button @click="showRestoreConfirmModal = true" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        <i class="fas fa-upload mr-1"></i> استعادة من نسخة احتياطية
+                    </button>
+                </div>
             </div>
+
+            <!-- Erase Database -->
+            {% if current_user.role and current_user.role.name == 'admin' %}
+            <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-100 dark:border-red-800 md:col-span-2">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-trash-alt text-red-500 text-xl mr-3"></i>
+                    <h2 class="text-lg font-semibold text-red-700 dark:text-red-300">مسح قاعدة البيانات</h2>
+                </div>
+
+                <p class="text-gray-600 dark:text-gray-300 mb-4">
+                    مسح جميع البيانات من قاعدة البيانات وإعادة تعيينها. <span class="text-red-600 font-semibold">تحذير: سيؤدي هذا إلى حذف جميع البيانات بشكل دائم ولا يمكن التراجع عن هذا الإجراء!</span>
+                </p>
+
+                <div class="flex justify-center">
+                    <button @click="showEraseConfirmModal = true" class="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            :disabled="isErasing">
+                        <span x-show="!isErasing">
+                            <i class="fas fa-trash-alt mr-1"></i> مسح قاعدة البيانات
+                        </span>
+                        <span x-show="isErasing" class="flex items-center">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            جاري المسح...
+                        </span>
+                    </button>
+                </div>
+            </div>
+            {% endif %}
         </div>
-        
+
         <!-- Database Information -->
         <div class="mt-8 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
             <div class="flex items-center mb-4">
                 <i class="fas fa-info-circle text-gray-500 text-xl mr-3"></i>
                 <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-300">معلومات قاعدة البيانات</h2>
             </div>
-            
+
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-100 dark:bg-gray-800">
@@ -92,43 +115,97 @@
                     <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">نوع قاعدة البيانات</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">SQLite</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">PostgreSQL</td>
                         </tr>
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">مسار الملف</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">katilo.db</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">اسم قاعدة البيانات</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">katiloerp</td>
                         </tr>
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">إصدار SQLite</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">3</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">المضيف</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">localhost:5432</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
-        
-        <!-- Confirmation Modal -->
-        <div x-show="showConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+
+        <!-- Erase Confirmation Modal -->
+        <div x-show="showEraseConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
                 <div class="flex items-center mb-4 text-red-600 dark:text-red-400">
                     <i class="fas fa-exclamation-triangle text-2xl mr-3"></i>
-                    <h3 class="text-xl font-bold">تأكيد استيراد قاعدة البيانات</h3>
+                    <h3 class="text-xl font-bold">تأكيد مسح قاعدة البيانات</h3>
                 </div>
-                
+
                 <p class="text-gray-600 dark:text-gray-300 mb-6">
-                    أنت على وشك استبدال قاعدة البيانات الحالية بالملف المستورد. سيؤدي هذا إلى حذف جميع البيانات الحالية واستبدالها بالبيانات من الملف المستورد.
+                    أنت على وشك مسح جميع البيانات من قاعدة البيانات. سيؤدي هذا إلى حذف جميع البيانات بشكل دائم.
                     <br><br>
                     <span class="font-semibold text-red-600 dark:text-red-400">هذا الإجراء لا يمكن التراجع عنه!</span>
                     <br><br>
-                    هل أنت متأكد من أنك تريد المتابعة؟
+                    للتأكيد، يرجى إدخال كلمة المرور الخاصة بك:
                 </p>
-                
+
+                <div class="mb-4">
+                    <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">كلمة المرور</label>
+                    <input type="password" id="password" x-model="password"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                </div>
+
                 <div class="flex justify-end space-x-3">
-                    <button @click="showConfirmModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">
+                    <button @click="cancelEraseDatabase" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">
                         إلغاء
                     </button>
-                    <button @click="confirmImport" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
-                        نعم، استيراد قاعدة البيانات
+                    <button @click="confirmEraseDatabase" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                            :disabled="!password">
+                        نعم، مسح قاعدة البيانات
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Restore Confirmation Modal -->
+        <div x-show="showRestoreConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+                <div class="flex items-center mb-4 text-blue-600 dark:text-blue-400">
+                    <i class="fas fa-exclamation-triangle text-2xl mr-3"></i>
+                    <h3 class="text-xl font-bold">تأكيد استعادة قاعدة البيانات</h3>
+                </div>
+
+                <p class="text-gray-600 dark:text-gray-300 mb-6">
+                    أنت على وشك استعادة قاعدة البيانات من نسخة احتياطية. سيؤدي هذا إلى استبدال جميع البيانات الحالية.
+                    <br><br>
+                    <span class="font-semibold text-red-600 dark:text-red-400">هذا الإجراء لا يمكن التراجع عنه!</span>
+                    <br><br>
+                    يرجى تحديد ملف النسخة الاحتياطية وإدخال كلمة المرور الخاصة بك للتأكيد:
+                </p>
+
+                <div class="mb-4">
+                    <label for="backup_file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ملف النسخة الاحتياطية</label>
+                    <input type="file" id="backup_file" @change="handleFileChange"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <div class="mb-4">
+                    <label for="restore_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">كلمة المرور</label>
+                    <input type="password" id="restore_password" x-model="restorePassword"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button @click="cancelRestoreDatabase" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">
+                        إلغاء
+                    </button>
+                    <button @click="confirmRestoreDatabase" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                            :disabled="!restorePassword || !backupFile || isRestoring">
+                        <span x-show="!isRestoring">نعم، استعادة قاعدة البيانات</span>
+                        <span x-show="isRestoring" class="flex items-center">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            جاري الاستعادة...
+                        </span>
                     </button>
                 </div>
             </div>
@@ -141,61 +218,135 @@
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('databaseApp', () => ({
-            databaseFile: null,
-            isImporting: false,
-            showConfirmModal: false,
-            
+            isErasing: false,
+            isBackingUp: false,
+            isRestoring: false,
+            showEraseConfirmModal: false,
+            showRestoreConfirmModal: false,
+            password: '',
+            restorePassword: '',
+            backupFile: null,
+
             handleFileChange(event) {
-                const file = event.target.files[0];
-                if (file && file.name.endsWith('.db')) {
-                    this.databaseFile = file;
-                } else {
-                    this.databaseFile = null;
-                    alert('يرجى اختيار ملف قاعدة بيانات صالح (.db)');
-                    event.target.value = '';
-                }
+                this.backupFile = event.target.files[0];
             },
-            
-            importDatabase() {
-                if (!this.databaseFile) {
-                    alert('يرجى اختيار ملف قاعدة بيانات صالح');
-                    return;
-                }
-                
-                this.showConfirmModal = true;
-            },
-            
-            async confirmImport() {
-                this.showConfirmModal = false;
-                this.isImporting = true;
+
+            async backupDatabase() {
+                this.isBackingUp = true;
                 
                 try {
+                    // Create a hidden form to submit
+                    const form = document.createElement('form');
+                    form.method = 'GET';
+                    form.action = '/settings/api/backup-database';
+                    document.body.appendChild(form);
+                    form.submit();
+                    document.body.removeChild(form);
+                } catch (error) {
+                    console.error('Error backing up database:', error);
+                    alert('حدث خطأ أثناء النسخ الاحتياطي لقاعدة البيانات');
+                } finally {
+                    this.isBackingUp = false;
+                }
+            },
+
+            cancelEraseDatabase() {
+                this.showEraseConfirmModal = false;
+                this.password = '';
+            },
+
+            cancelRestoreDatabase() {
+                this.showRestoreConfirmModal = false;
+                this.restorePassword = '';
+                this.backupFile = null;
+                document.getElementById('backup_file').value = '';
+            },
+
+            async confirmEraseDatabase() {
+                if (!this.password) {
+                    alert('يرجى إدخال كلمة المرور للتأكيد');
+                    return;
+                }
+
+                this.isErasing = true;
+
+                try {
+                    const response = await fetch('/settings/api/erase-database', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            password: this.password
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        alert('تم مسح قاعدة البيانات بنجاح. تم إعادة تعيين النظام إلى حالته الأولية مع الحفاظ على حساب المسؤول الخاص بك. ملاحظة: قد تحتوي بعض البيانات الأولية على مفاتيح مكررة وقد تحتاج إلى تصحيح يدوي.');
+                        window.location.href = '/dashboard';
+                    } else {
+                        alert('حدث خطأ أثناء مسح قاعدة البيانات: ' + data.error);
+                    }
+                } catch (error) {
+                    console.error('Error erasing database:', error);
+                    alert('حدث خطأ أثناء مسح قاعدة البيانات');
+                } finally {
+                    this.isErasing = false;
+                    this.showEraseConfirmModal = false;
+                    this.password = '';
+                }
+            },
+
+            async confirmRestoreDatabase() {
+                if (!this.restorePassword) {
+                    alert('يرجى إدخال كلمة المرور للتأكيد');
+                    return;
+                }
+
+                if (!this.backupFile) {
+                    alert('يرجى تحديد ملف النسخة الاحتياطية');
+                    return;
+                }
+
+                this.isRestoring = true;
+
+                try {
                     const formData = new FormData();
-                    formData.append('database_file', this.databaseFile);
-                    
-                    const response = await fetch('/settings/api/import-database', {
+                    formData.append('backup_file', this.backupFile);
+                    formData.append('password', this.restorePassword);
+
+                    const response = await fetch('/settings/api/restore-database', {
                         method: 'POST',
                         body: formData
                     });
-                    
+
                     const data = await response.json();
-                    
+
                     if (data.success) {
-                        alert('تم استيراد قاعدة البيانات بنجاح. يرجى إعادة تشغيل التطبيق لتطبيق التغييرات.');
+                        if (data.warning) {
+                            alert('تم استعادة قاعدة البيانات بنجاح مع بعض التحذيرات: ' + data.warning);
+                        } else {
+                            alert('تم استعادة قاعدة البيانات بنجاح');
+                        }
                         window.location.href = '/dashboard';
                     } else {
-                        alert('حدث خطأ أثناء استيراد قاعدة البيانات: ' + data.error);
+                        alert('حدث خطأ أثناء استعادة قاعدة البيانات: ' + data.error);
                     }
                 } catch (error) {
-                    console.error('Error importing database:', error);
-                    alert('حدث خطأ أثناء استيراد قاعدة البيانات');
+                    console.error('Error restoring database:', error);
+                    alert('حدث خطأ أثناء استعادة قاعدة البيانات');
                 } finally {
-                    this.isImporting = false;
-                    this.databaseFile = null;
-                    document.getElementById('database_file').value = '';
+                    this.isRestoring = false;
+                    this.showRestoreConfirmModal = false;
+                    this.restorePassword = '';
+                    this.backupFile = null;
+                    document.getElementById('backup_file').value = '';
                 }
             }
         }));
     });
 </script>
 {% endblock %}
+

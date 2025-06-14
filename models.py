@@ -97,8 +97,9 @@ class Item(db.Model):
         try:
             # Try to get the weight from the item_weights table
             from app import db
+            from sqlalchemy import text
             result = db.session.execute(
-                "SELECT weight FROM item_weights WHERE item_id = :item_id",
+                text("SELECT weight FROM item_weights WHERE item_id = :item_id"),
                 {"item_id": self.id}
             ).fetchone()
             return result[0] if result else 0
@@ -112,8 +113,9 @@ class Item(db.Model):
         try:
             # Try to get the volume from the item_weights table
             from app import db
+            from sqlalchemy import text
             result = db.session.execute(
-                "SELECT volume FROM item_weights WHERE item_id = :item_id",
+                text("SELECT volume FROM item_weights WHERE item_id = :item_id"),
                 {"item_id": self.id}
             ).fetchone()
             return result[0] if result else 0
@@ -1455,6 +1457,225 @@ class SystemSettings(db.Model):
             'dashboard_layout': self.dashboard_layout,
             'custom_colors': self.custom_colors
         }
+
+class SidebarItem(db.Model):
+    __tablename__ = 'sidebar_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    icon = db.Column(db.String(50), nullable=False)
+    url = db.Column(db.String(255))
+    order = db.Column(db.Integer, default=0)
+    parent_id = db.Column(db.Integer, db.ForeignKey('sidebar_items.id'), nullable=True)
+    is_dropdown = db.Column(db.Boolean, default=False)
+    admin_only = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Relationship for parent-child structure
+    children = db.relationship('SidebarItem', 
+                              backref=db.backref('parent', remote_side=[id]),
+                              cascade="all, delete-orphan")
+    
+    # Add this method to your SidebarItem class
+    def to_dict(self):
+        """Convert the model to a dictionary"""
+        return {
+            'id': self.id,
+            'title': self.title,
+            'icon': self.icon,
+            'url': self.url or '',
+            'order': self.order,
+            'parent_id': self.parent_id,
+            'is_dropdown': self.is_dropdown,
+            'admin_only': self.admin_only,
+            'is_active': self.is_active
+        }
+
+    @classmethod
+    def get_default_menu(cls):
+        """Create default menu structure if none exists"""
+        # First, delete all existing sidebar items
+        cls.query.delete()
+        db.session.commit()
+        
+        # Create default menu structure
+        dashboard = cls(title="لوحة التحكم", icon="fa-tachometer-alt", url="/dashboard", order=1)
+        db.session.add(dashboard)
+        
+        # Inventory Management
+        inventory = cls(title="إدارة المخزون", icon="fa-boxes", is_dropdown=True, order=2)
+        db.session.add(inventory)
+        db.session.flush()  # To get the ID
+        
+        inventory_items = [
+            cls(title="المخزون", icon="fa-box-open", url="/inventory-management", parent_id=inventory.id, order=1),
+            cls(title="فحص الجودة", icon="fa-clipboard-check", url="/quality-inspections", parent_id=inventory.id, order=2),
+            cls(title="تخطيط المستودع", icon="fa-th", url="/warehouse-layout", parent_id=inventory.id, order=3),
+            cls(title="إدارة المستودعات", icon="fa-warehouse", url="/warehouses-management", parent_id=inventory.id, order=4),
+            cls(title="التقارير", icon="fa-file-alt", url="/inventory-reports", parent_id=inventory.id, order=5, admin_only=True)
+        ]
+        db.session.add_all(inventory_items)
+        
+        # Products Management
+        products = cls(title="إدارة المنتجات", icon="fa-cubes", is_dropdown=True, order=3)
+        db.session.add(products)
+        db.session.flush()
+        
+        product_items = [
+            cls(title="التصنيفات", icon="fa-tags", url="/categories-management", parent_id=products.id, order=1),
+            cls(title="العناصر", icon="fa-cube", url="/items-management", parent_id=products.id, order=2),
+            cls(title="أوزان وأحجام المنتجات", icon="fa-weight-hanging", url="/inventory/item-weights", parent_id=products.id, order=3)
+        ]
+        db.session.add_all(product_items)
+        
+        # Production Management
+        production = cls(title="إدارة الإنتاج", icon="fa-industry", is_dropdown=True, order=4)
+        db.session.add(production)
+        db.session.flush()
+        
+        production_items = [
+            cls(title="لوحة التحكم", icon="fa-tachometer-alt", url="/production/dashboard", parent_id=production.id, order=1),
+            cls(title="أوامر الإنتاج", icon="fa-clipboard-list", url="/production/orders", parent_id=production.id, order=2),
+            cls(title="قوائم المواد", icon="fa-project-diagram", url="/bom-management", parent_id=production.id, order=3),
+            cls(title="إدارة الدفعات", icon="fa-cubes", url="/production/batches", parent_id=production.id, order=4),
+            cls(title="خطوط الإنتاج", icon="fa-stream", url="/production/lines", parent_id=production.id, order=5),
+            cls(title="تتبع الأنشطة", icon="fa-tasks", url="/production/logs", parent_id=production.id, order=6),
+            cls(title="مراقبة الجودة", icon="fa-check-circle", url="/production/qc/tests", parent_id=production.id, order=7),
+            cls(title="تعبئة المنتجات", icon="fa-box", url="/production/packaging/orders", parent_id=production.id, order=8),
+            cls(title="تقارير الإنتاج", icon="fa-chart-bar", url="/production/timeline", parent_id=production.id, order=9)
+        ]
+        db.session.add_all(production_items)
+        
+        # Sales Management
+        sales = cls(title="إدارة المبيعات", icon="fa-shopping-cart", is_dropdown=True, order=5)
+        db.session.add(sales)
+        db.session.flush()
+        
+        sales_items = [
+            cls(title="لوحة المبيعات", icon="fa-tachometer-alt", url="/sales", parent_id=sales.id, order=1),
+            cls(title="طلبات المبيعات", icon="fa-file-invoice", url="/sales/orders", parent_id=sales.id, order=2),
+            cls(title="الفواتير", icon="fa-file-invoice-dollar", url="/sales/invoices", parent_id=sales.id, order=3),
+            cls(title="العملاء", icon="fa-users", url="/sales/customers", parent_id=sales.id, order=4),
+            cls(title="المرتجعات", icon="fa-undo", url="/sales/returns", parent_id=sales.id, order=5),
+            cls(title="سجل الأنشطة", icon="fa-history", url="/sales/activity-logs", parent_id=sales.id, order=6)
+        ]
+        db.session.add_all(sales_items)
+        
+        # Sales Representatives
+        reps = cls(title="مندوبي المبيعات", icon="fa-user-tie", is_dropdown=True, parent_id=sales.id, order=5)
+        db.session.add(reps)
+        db.session.flush()
+        
+        reps_items = [
+            cls(title="قائمة المندوبين", icon="fa-users", url="/sales/representatives", parent_id=reps.id, order=1),
+            cls(title="خطط المسارات", icon="fa-route", url="/sales/representatives/routes", parent_id=reps.id, order=2),
+            cls(title="تتبع المندوبين", icon="fa-map-marker-alt", url="/sales/representatives/tracking", parent_id=reps.id, order=3),
+            cls(title="تقارير المسارات", icon="fa-chart-line", url="/sales/representatives/routes/report", parent_id=reps.id, order=4)
+        ]
+        db.session.add_all(reps_items)
+        
+        # Suppliers Management
+        suppliers = cls(title="إدارة الموردين", icon="fa-truck", is_dropdown=True, order=6)
+        db.session.add(suppliers)
+        db.session.flush()
+        
+        suppliers_items = [
+            cls(title="الموردين", icon="fa-address-book", url="/suppliers-management", parent_id=suppliers.id, order=1),
+            cls(title="حسابات الموردين", icon="fa-file-invoice-dollar", url="/supplier-accounts", parent_id=suppliers.id, order=2),
+            cls(title="طلبات الشراء", icon="fa-shopping-cart", url="/purchase-orders", parent_id=suppliers.id, order=3)
+        ]
+        db.session.add_all(suppliers_items)
+        
+        # Cash Management
+        cash = cls(title="إدارة الخزينة", icon="fa-money-bill-wave", is_dropdown=True, order=7)
+        db.session.add(cash)
+        db.session.flush()
+        
+        cash_items = [
+            cls(title="لوحة التحكم", icon="fa-tachometer-alt", url="/cash/dashboard", parent_id=cash.id, order=1),
+            cls(title="الحسابات", icon="fa-wallet", url="/cash/accounts", parent_id=cash.id, order=2),
+            cls(title="المعاملات", icon="fa-exchange-alt", url="/cash/transactions", parent_id=cash.id, order=3),
+            cls(title="التحويلات", icon="fa-random", url="/cash/transfers", parent_id=cash.id, order=4),
+            cls(title="جرد الخزينة", icon="fa-balance-scale", url="/cash/reconciliations", parent_id=cash.id, order=5),
+            cls(title="دفعات الموردين", icon="fa-truck", url="/cash/supplier-payments", parent_id=cash.id, order=6),
+            cls(title="التقارير", icon="fa-chart-bar", url="/cash/reports", parent_id=cash.id, order=7)
+        ]
+        db.session.add_all(cash_items)
+        
+        # Distribution Management
+        distribution = cls(title="إدارة التوزيع", icon="fa-truck-loading", is_dropdown=True, order=8)
+        db.session.add(distribution)
+        db.session.flush()
+        
+        distribution_items = [
+            cls(title="لوحة التحكم", icon="fa-tachometer-alt", url="/distribution/dashboard", parent_id=distribution.id, order=1),
+            cls(title="المركبات", icon="fa-truck", url="/distribution/vehicles", parent_id=distribution.id, order=2),
+            cls(title="الشحنات", icon="fa-shipping-fast", url="/distribution/shipments", parent_id=distribution.id, order=3),
+            cls(title="مسارات التوصيل", icon="fa-route", url="/distribution/routes", parent_id=distribution.id, order=4),
+            cls(title="تتبع الشحنات", icon="fa-map-marked-alt", url="/distribution/tracking", parent_id=distribution.id, order=5)
+        ]
+        db.session.add_all(distribution_items)
+        
+        # Transactions
+        transactions = cls(title="المعاملات", icon="fa-exchange-alt", url="/transactions-history", order=9)
+        db.session.add(transactions)
+        
+        # Admin Section
+        admin = cls(title="إدارة النظام", icon="fa-user-shield", is_dropdown=True, order=10, admin_only=True)
+        db.session.add(admin)
+        db.session.flush()
+        
+        admin_items = [
+            cls(title="المستخدمين", icon="fa-users", url="/admin/users", parent_id=admin.id, order=1, admin_only=True),
+            cls(title="الأدوار", icon="fa-user-tag", url="/admin/roles", parent_id=admin.id, order=2, admin_only=True),
+            cls(title="تذاكر الدعم", icon="fa-ticket-alt", url="/admin/support-tickets", parent_id=admin.id, order=3, admin_only=True),
+            cls(title="اقتراحات الذكاء الاصطناعي", icon="fa-robot", url="/ai-suggestions-dashboard", parent_id=admin.id, order=4, admin_only=True)
+        ]
+        db.session.add_all(admin_items)
+        
+        # Settings Section
+        settings = cls(title="إعدادات النظام", icon="fa-cogs", is_dropdown=True, order=11, admin_only=True)
+        db.session.add(settings)
+        db.session.flush()
+        
+        settings_items = [
+            cls(title="الإعدادات العامة", icon="fa-sliders-h", url="/settings/", parent_id=settings.id, order=1, admin_only=True),
+            cls(title="إعدادات النظام", icon="fa-cogs", url="/settings/system", parent_id=settings.id, order=2, admin_only=True),
+            cls(title="إعدادات المظهر", icon="fa-palette", url="/settings/themes", parent_id=settings.id, order=3, admin_only=True),
+            cls(title="مفاتيح API", icon="fa-key", url="/settings/api-keys", parent_id=settings.id, order=4, admin_only=True),
+            cls(title="قاعدة البيانات", icon="fa-database", url="/settings/database", parent_id=settings.id, order=5, admin_only=True),
+            cls(title="الصلاحيات", icon="fa-user-lock", url="/settings/permissions", parent_id=settings.id, order=6, admin_only=True),
+            cls(title="القائمة الجانبية", icon="fa-bars", url="/settings/sidebar", parent_id=settings.id, order=7, admin_only=True)
+        ]
+        db.session.add_all(settings_items)
+        
+        # Alerts
+        alerts = cls(title="التنبيهات", icon="fa-bell", url="/alerts", order=12)
+        db.session.add(alerts)
+
+        # Help Guide
+        help_guide = cls(title="دليل المستخدم", icon="fa-lightbulb", url="/tips", order=13)
+        db.session.add(help_guide)
+
+        # AI Assistant
+        ai_assistant = cls(title="المساعد الذكي", icon="fa-robot", url="/chat-assistant", order=14, admin_only=True)
+        db.session.add(ai_assistant)
+        
+        db.session.commit()
+        
+        return cls.query.order_by(cls.order).all()
+
+    @classmethod
+    def get_main_menu(cls, include_admin=False):
+        """Get all top-level menu items"""
+        query = cls.query.filter(cls.parent_id == None, cls.is_active == True)
+        
+        if not include_admin:
+            query = query.filter(cls.admin_only == False)
+            
+        return query.order_by(cls.order).all()
+    
+    
 
 class Role(db.Model):
     __tablename__ = 'roles'

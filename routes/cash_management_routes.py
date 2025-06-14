@@ -2,11 +2,12 @@ import os
 from flask import Blueprint, current_app, render_template, request, jsonify, redirect, send_file, url_for, flash
 from flask_login import login_required, current_user
 import pandas as pd
-from models import User, db, CashAccount, CashTransaction, CashTransferVoucher, CashReconciliation, Supplier, SupplierLedgerEntry
+from models import User, db, CashAccount, CashTransaction, CashTransferVoucher, CashReconciliation, Supplier, SupplierLedgerEntry, SupplierPayment
 from datetime import datetime, timedelta
 import uuid
 
 from utils.pdf_generator import PDFGenerator
+from utils.alerts_manager import add_money_transfer_alert
 
 cash_bp = Blueprint('cash', __name__, url_prefix='/cash')
 
@@ -262,6 +263,16 @@ def add_transfer():
             db.session.add(ledger_entry)
 
         db.session.commit()
+
+        # Add alert for money transfer
+        try:
+            from_account_name = from_account.name
+            to_account_name = to_account.name if to_account else (supplier.name if supplier else "مورد")
+            add_money_transfer_alert(from_account_name, to_account_name, amount, voucher_number)
+        except Exception as e:
+            # Don't fail the transaction if alert creation fails
+            print(f"Failed to create alert: {e}")
+
         flash('تم إنشاء سند التحويل بنجاح', 'success')
         return redirect(url_for('cash.transfers'))
 
@@ -876,25 +887,75 @@ def add_supplier_payment():
 
         db.session.add(from_transaction)
 
-        # Create supplier ledger entry
+        # Create supplier payment record
         supplier = Supplier.query.get(supplier_id)
+        supplier_payment = SupplierPayment(
+            supplier_id=supplier_id,
+            amount=amount,
+            payment_date=payment_date,
+            payment_method=payment_method,
+            reference=reference or voucher_number,
+            notes=notes,
+            created_by=current_user.id
+        )
+
+        db.session.add(supplier_payment)
+        db.session.flush()  # Get the payment ID
+
+        # Create supplier ledger entry
         ledger_entry = SupplierLedgerEntry(
             supplier_id=supplier_id,
             entry_date=payment_date,
             description=f"دفعة نقدية - {voucher_number}",
             reference_type='payment',
-            reference_id=voucher.id,
+            reference_id=supplier_payment.id,  # Reference the payment record
             debit=0,
             credit=amount
         )
 
         db.session.add(ledger_entry)
+
+        # Also create a cash transfer ledger entry for tracking
+        cash_transfer_ledger = SupplierLedgerEntry(
+            supplier_id=supplier_id,
+            entry_date=payment_date,
+            description=f"تحويل نقدي - {voucher_number}",
+            reference_type='cash_transfer',
+            reference_id=voucher.id,  # Reference the voucher
+            debit=0,
+            credit=0  # This is just for tracking the cash transfer
+        )
+
+        db.session.add(cash_transfer_ledger)
         db.session.commit()
 
         flash(f'تم تسجيل دفعة بمبلغ {amount} للمورد {supplier.supplier_name} بنجاح', 'success')
         return redirect(url_for('cash.supplier_payments'))
 
     return render_template('cash/add_supplier_payment.html', accounts=accounts, suppliers=suppliers)
+
+# API endpoint for cash accounts (accessible globally)
+@cash_bp.route('/api/cash-accounts')
+@login_required
+def api_cash_accounts():
+    """API endpoint to get all active cash accounts"""
+    if not check_permission('view_cash_management'):
+        return jsonify({'error': 'Permission denied'}), 403
+
+    accounts = CashAccount.query.filter_by(is_active=True).all()
+
+    accounts_data = []
+    for account in accounts:
+        accounts_data.append({
+            'id': account.id,
+            'name': account.name,
+            'account_type': account.account_type,
+            'currency': account.currency,
+            'current_balance': account.current_balance,
+            'is_active': account.is_active
+        })
+
+    return jsonify(accounts_data)
 
 @cash_bp.route('/supplier-payments/view/<int:voucher_id>')
 @login_required

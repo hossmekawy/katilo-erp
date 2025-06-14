@@ -1,0 +1,724 @@
+{% extends "base.html" %}
+
+{% block title %}إعدادات القائمة الجانبية - نظام قاتيلو{% endblock %}
+
+{% block page_header %}إعدادات القائمة الجانبية{% endblock %}
+
+{% block content %}
+    <!-- Header with actions -->
+    <div x-data="sidebarManager">
+
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-800">تخصيص القائمة الجانبية</h2>
+        <div class="flex space-x-3 space-x-reverse">
+            <button type="button" @click="resetToDefault" class="btn bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">
+                <i class="fas fa-undo ml-1"></i>
+                إعادة تعيين الافتراضي
+            </button>
+
+            <button @click="showAddItemModal = true" class="btn btn-primary">
+                <i class="fas fa-plus ml-1"></i>
+                إضافة عنصر جديد
+            </button>
+        </div>
+    </div>
+
+    <!-- Sidebar Preview -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="md:col-span-1">
+            <div class="bg-gray-100 rounded-lg p-4">
+                <h3 class="font-semibold text-gray-700 mb-3">معاينة القائمة</h3>
+                <div class="bg-[#0A4DA2] text-white rounded-lg p-3 max-h-[500px] overflow-y-auto">
+                    <template x-for="item in topLevelItems" :key="item.id">
+                        <div class="mb-2">
+                            <!-- Top level item -->
+                            <div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-white/10 cursor-pointer"
+                                 :class="{'bg-white/15': item.is_active}">
+                                <div class="flex items-center">
+                                    <i :class="'fas ' + item.icon + ' w-5 text-center'"></i>
+                                    <span class="mr-2" x-text="item.title"></span>
+                                </div>
+                                <i class="fas fa-chevron-down text-xs" x-show="item.is_dropdown"></i>
+                            </div>
+                            
+                            <!-- Children -->
+                            <div x-show="item.is_dropdown" class="mr-4 pr-2 border-r border-white/20 mt-1">
+                                <template x-for="child in getChildren(item.id)" :key="child.id">
+                                    <div class="flex items-center py-1.5 px-3 rounded-lg hover:bg-white/10 cursor-pointer"
+                                         :class="{'opacity-50': !child.is_active}">
+                                        <i :class="'fas ' + child.icon + ' w-5 text-center'"></i>
+                                        <span class="mr-2" x-text="child.title"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu Items Management -->
+        <div class="md:col-span-2">
+            <div class="bg-gray-100 rounded-lg p-4">
+                <h3 class="font-semibold text-gray-700 mb-3">إدارة عناصر القائمة</h3>
+                
+                <!-- Top Level Items -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-gray-600 mb-2 border-r-2 border-green-500 pr-2">العناصر الرئيسية</h4>
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <ul class="divide-y divide-gray-100" id="top-level-items">
+                            <template x-for="item in topLevelItems" :key="item.id">
+                                <li class="p-3 hover:bg-gray-50 transition-colors" :class="{'bg-blue-50': item.id === selectedItem?.id}">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <div class="flex items-center justify-center w-8 h-8 rounded-md bg-blue-100 text-blue-600 ml-3">
+                                                <i :class="'fas ' + item.icon"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium" x-text="item.title"></div>
+                                                <div class="text-xs text-gray-500" x-text="item.is_dropdown ? 'قائمة منسدلة' : item.url"></div>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <button @click="editItem(item)" class="text-blue-600 hover:text-blue-800">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button @click="deleteItem(item.id)" class="text-red-600 hover:text-red-800">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Child Items -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-gray-600 mb-2 border-r-2 border-green-500 pr-2">العناصر الفرعية</h4>
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <ul class="divide-y divide-gray-100" id="child-items">
+                            <template x-for="item in filteredChildren" :key="item.id">
+                                <li class="p-3 hover:bg-gray-50 transition-colors" :class="{'bg-blue-50': item.id === selectedItem?.id}">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <div class="flex items-center justify-center w-8 h-8 rounded-md bg-green-100 text-green-600 ml-3">
+                                                <i :class="'fas ' + item.icon"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium" x-text="item.title"></div>
+                                                <div class="text-xs text-gray-500">
+                                                    <span x-text="getParentTitle(item.parent_id)"></span> » <span x-text="item.url"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <button @click="editItem(item)" class="text-blue-600 hover:text-blue-800">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button @click="deleteItem(item.id)" class="text-red-600 hover:text-red-800">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Suggested Routes Widget -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-gray-600 mb-2 border-r-2 border-purple-500 pr-2">الطرق المقترحة</h4>
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <div class="space-y-6">
+                            <!-- Unused Routes -->
+                            <div>
+                                <h5 class="text-sm font-medium text-gray-700 mb-3">طرق غير مستخدمة</h5>
+                                <div class="space-y-4">
+                                    <template x-for="(routes, blueprint) in unusedRoutes" :key="blueprint">
+                                        <div class="border rounded-lg overflow-hidden">
+                                            <div class="bg-gray-50 px-4 py-2 border-b">
+                                                <h6 class="font-medium text-gray-700" x-text="blueprint"></h6>
+                                            </div>
+                                            <div class="divide-y">
+                                                <template x-for="route in routes" :key="route.path">
+                                                    <div class="flex items-center justify-between p-3 hover:bg-gray-50">
+                                                        <div class="flex items-center">
+                                                            <i class="fas fa-route text-purple-500 ml-2"></i>
+                                                            <div>
+                                                                <div class="font-medium" x-text="route.name"></div>
+                                                                <div class="text-xs text-gray-500" x-text="route.path"></div>
+                                                                <div class="text-xs text-gray-400" x-text="route.methods.join(', ')"></div>
+                                                            </div>
+                                                        </div>
+                                                        <button @click="addRouteToSidebar(route)" 
+                                                                class="text-purple-600 hover:text-purple-800 px-3 py-1 rounded-md hover:bg-purple-50 transition-colors">
+                                                            <i class="fas fa-plus ml-1"></i>
+                                                            <span>إضافة</span>
+                                                        </button>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Missing Routes -->
+                            <div>
+                                <h5 class="text-sm font-medium text-gray-700 mb-3">طرق مفقودة في القائمة</h5>
+                                <div class="space-y-2">
+                                    <template x-for="route in missingRoutes" :key="route.path">
+                                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-exclamation-circle text-yellow-500 ml-2"></i>
+                                                <div>
+                                                    <div class="font-medium" x-text="route.name"></div>
+                                                    <div class="text-xs text-gray-500" x-text="route.path"></div>
+                                                    <template x-if="route.suggested_path">
+                                                        <div class="text-xs text-green-600 mt-1">
+                                                            <i class="fas fa-lightbulb ml-1"></i>
+                                                            <span x-text="'مسار مقترح: ' + route.suggested_path"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center space-x-2 space-x-reverse">
+                                                <template x-if="route.suggested_path">
+                                                    <button @click="updateRoutePath(route)" 
+                                                            class="text-green-600 hover:text-green-800 px-3 py-1 rounded-md hover:bg-green-50 transition-colors">
+                                                        <i class="fas fa-sync-alt ml-1"></i>
+                                                        <span>تحديث المسار</span>
+                                                    </button>
+                                                </template>
+                                                <button @click="deleteItem(route.path)" 
+                                                        class="text-red-600 hover:text-red-800 px-3 py-1 rounded-md hover:bg-red-50 transition-colors">
+                                                    <i class="fas fa-trash ml-1"></i>
+                                                    <span>حذف</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Item Modal -->
+    <div x-show="showAddItemModal || showEditItemModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+        <div @click.away="closeModals" class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+            <button @click="closeModals" class="absolute top-3 left-3 text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 class="text-lg font-bold mb-4" x-text="showEditItemModal ? 'تعديل عنصر القائمة' : 'إضافة عنصر جديد'"></h3>
+            
+            <form @submit.prevent="showEditItemModal ? updateItem() : addItem()">
+                <div class="space-y-4">
+                    <!-- Title -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">العنوان</label>
+                        <input type="text" x-model="formData.title" class="w-full p-2 border rounded-md" required>
+                    </div>
+                    
+                    <!-- Icon -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الأيقونة</label>
+                        <div class="relative">
+                            <select x-model="formData.icon" class="w-full p-2 border rounded-md appearance-none">
+                                {% for icon in icons %}
+                                <option value="{{ icon }}">{{ icon }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                <i :class="'fas ' + formData.icon"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Is Dropdown -->
+                    <div class="flex items-center">
+                        <input type="checkbox" id="is_dropdown" x-model="formData.is_dropdown" class="ml-2">
+                        <label for="is_dropdown" class="text-sm font-medium text-gray-700">قائمة منسدلة</label>
+                    </div>
+                    
+                    <!-- URL (only if not dropdown) -->
+                    <div x-show="!formData.is_dropdown">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الرابط</label>
+                        <input type="text" x-model="formData.url" class="w-full p-2 border rounded-md" :required="!formData.is_dropdown">
+                    </div>
+                    
+                    <!-- Parent (only for child items) -->
+                    <div x-show="!formData.is_dropdown">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">القائمة الأم</label>
+                        <select x-model="formData.parent_id" class="w-full p-2 border rounded-md">
+                            <option value="">-- بدون قائمة أم --</option>
+                            <template x-for="item in dropdownItems" :key="item.id">
+                                <option :value="item.id" x-text="item.title"></option>
+                            </template>
+                        </select>
+                    </div>
+                    
+                    <!-- Admin Only -->
+                    <div class="flex items-center">
+                        <input type="checkbox" id="admin_only" x-model="formData.admin_only" class="ml-2">
+                        <label for="admin_only" class="text-sm font-medium text-gray-700">للمشرف فقط</label>
+                    </div>
+                    
+                    <!-- Is Active -->
+                    <div class="flex items-center">
+                        <input type="checkbox" id="is_active" x-model="formData.is_active" class="ml-2">
+                        <label for="is_active" class="text-sm font-medium text-gray-700">نشط</label>
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex justify-end space-x-3 space-x-reverse">
+                    <button type="button" @click="closeModals" class="btn bg-gray-100 text-gray-700 hover:bg-gray-200">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" x-text="showEditItemModal ? 'تحديث' : 'إضافة'"></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+        <div @click.away="showDeleteModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+            <h3 class="text-lg font-bold mb-4">تأكيد الحذف</h3>
+            <p class="text-gray-600 mb-6">هل أنت متأكد من رغبتك في حذف هذا العنصر؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            
+            <div class="flex justify-end space-x-3 space-x-reverse">
+                <button @click="showDeleteModal = false" class="btn bg-gray-100 text-gray-700 hover:bg-gray-200">إلغاء</button>
+                <button @click="deleteItem()" class="btn bg-red-600 text-white hover:bg-red-700">حذف</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Confirmation Modal -->
+    <div x-show="showResetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+        <div @click.away="showResetModal = false" class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+            <h3 class="text-lg font-bold mb-4">تأكيد إعادة التعيين</h3>
+            <p class="text-gray-600 mb-6">هل أنت متأكد من رغبتك في إعادة تعيين القائمة الجانبية إلى الإعدادات الافتراضية؟ سيتم حذف جميع التخصيصات التي قمت بها.</p>
+            
+            <div class="flex justify-end space-x-3 space-x-reverse">
+                <button @click="showResetModal = false" class="btn bg-gray-100 text-gray-700 hover:bg-gray-200">إلغاء</button>
+                <button @click="confirmReset()" class="btn bg-red-600 text-white hover:bg-red-700">إعادة تعيين</button>
+            </div>
+        </div>
+    </div>
+
+    </div> <!-- End of x-data="sidebarManager" -->
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('sidebarManager', () => ({
+                items: [],
+                topLevelItems: [],
+                dropdownItems: [],
+                filteredChildren: [],
+                selectedItem: null,
+                selectedParentId: null,
+                loading: true,
+                
+                // Modals
+                showAddItemModal: false,
+                showEditItemModal: false,
+                showDeleteModal: false,
+                showResetModal: false,
+                
+                // Form data
+                formData: {
+                    title: '',
+                    icon: 'fa-circle',
+                    url: '',
+                    parent_id: '',
+                    is_dropdown: false,
+                    admin_only: false,
+                    is_active: true
+                },
+                
+                unusedRoutes: {},
+                missingRoutes: [],
+                
+                init() {
+                    console.log('Sidebar manager initialized');
+                    this.fetchItems();
+                    this.loadSuggestedRoutes();
+                },
+                
+                async fetchItems() {
+                    try {
+                        this.loading = true;
+                        console.log('Fetching sidebar items...');
+                        
+                        const response = await fetch('/settings/api/sidebar-items');
+                        const data = await response.json();
+                        
+                        console.log('Fetched items:', data);
+                        
+                        this.items = data;
+                        this.topLevelItems = this.items.filter(item => !item.parent_id);
+                        this.dropdownItems = this.items.filter(item => item.is_dropdown);
+                        this.filteredChildren = this.items.filter(item => item.parent_id);
+                        
+                        this.loading = false;
+                    } catch (error) {
+                        console.error('Error fetching sidebar items:', error);
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: 'حدث خطأ أثناء جلب عناصر القائمة الجانبية', 
+                                type: 'error' 
+                            }
+                        }));
+                        this.loading = false;
+                    }
+                },
+                
+                resetToDefault() {
+                    console.log('Reset to default clicked');
+                    this.showResetModal = true;
+                },
+                
+                async confirmReset() {
+                    console.log('Confirming reset...');
+                    try {
+                        const response = await fetch('/settings/api/sidebar-items/reset', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        
+                        const data = await response.json();
+                        console.log('Reset response:', data);
+                        
+                        if (data.success) {
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { 
+                                    message: data.message || 'تم إعادة تعيين القائمة الجانبية بنجاح', 
+                                    type: 'success' 
+                                }
+                            }));
+                            
+                            this.fetchItems();
+                            this.showResetModal = false;
+                        } else {
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { 
+                                    message: data.error || 'حدث خطأ أثناء إعادة تعيين القائمة الجانبية', 
+                                    type: 'error' 
+                                }
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error resetting sidebar:', error);
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: 'حدث خطأ أثناء إعادة تعيين القائمة الجانبية', 
+                                type: 'error' 
+                            }
+                        }));
+                    }
+                },
+                
+                getChildren(parentId) {
+                    return this.items.filter(item => item.parent_id === parentId);
+                },
+                
+                getParentTitle(parentId) {
+                    const parent = this.items.find(item => item.id === parentId);
+                    return parent ? parent.title : '';
+                },
+                
+                filterChildren(parentId) {
+                    if (parentId) {
+                        this.filteredChildren = this.items.filter(item => item.parent_id === parentId);
+                        this.selectedParentId = parentId;
+                    } else {
+                        this.filteredChildren = this.items.filter(item => item.parent_id);
+                        this.selectedParentId = null;
+                    }
+                },
+                
+                editItem(item) {
+                    console.log('Editing item:', item);
+                    this.selectedItem = item;
+                    this.formData = { ...item };
+                    this.showEditItemModal = true;
+                },
+                
+                async updateItem() {
+                    try {
+                        console.log('Updating item:', this.formData);
+                        
+                        const response = await fetch(`/settings/api/sidebar-items/${this.selectedItem.id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify(this.formData)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { 
+                                    message: 'تم تحديث العنصر بنجاح', 
+                                    type: 'success' 
+                                }
+                            }));
+                            
+                            this.fetchItems();
+                            this.closeModals();
+                        } else {
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { 
+                                    message: data.error || 'حدث خطأ أثناء تحديث العنصر', 
+                                    type: 'error' 
+                                }
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error updating item:', error);
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: 'حدث خطأ أثناء تحديث العنصر', 
+                                type: 'error' 
+                            }
+                        }));
+                    }
+                },
+                
+                async addItem() {
+                    try {
+                        console.log('Adding new item:', this.formData);
+                        
+                        const response = await fetch('/settings/api/sidebar-items', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify(this.formData)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { 
+                                    message: 'تم إضافة العنصر بنجاح', 
+                                    type: 'success' 
+                                }
+                            }));
+                            
+                            this.fetchItems();
+                            this.closeModals();
+                        } else {
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { 
+                                    message: data.error || 'حدث خطأ أثناء إضافة العنصر', 
+                                    type: 'error' 
+                                }
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error adding item:', error);
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: 'حدث خطأ أثناء إضافة العنصر', 
+                                type: 'error' 
+                            }
+                        }));
+                    }
+                },
+                
+                confirmDelete(item) {
+                    this.selectedItem = item;
+                    this.showDeleteModal = true;
+                },
+                
+                async deleteItem() {
+                    try {
+                        console.log('Deleting item:', this.selectedItem);
+                        
+                        const response = await fetch(`/settings/api/sidebar-items/${this.selectedItem.id}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { 
+                                    message: 'تم حذف العنصر بنجاح', 
+                                    type: 'success' 
+                                }
+                            }));
+                            
+                            this.fetchItems();
+                            this.showDeleteModal = false;
+                        } else {
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { 
+                                    message: data.error || 'حدث خطأ أثناء حذف العنصر', 
+                                    type: 'error' 
+                                }
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error deleting item:', error);
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: 'حدث خطأ أثناء حذف العنصر', 
+                                type: 'error' 
+                            }
+                        }));
+                    }
+                },
+                
+                async moveItem(item, direction) {
+                    try {
+                        console.log(`Moving item ${item.id} ${direction}`);
+                        
+                        const response = await fetch(`/settings/api/sidebar-items/${item.id}/move`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({ direction })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.fetchItems();
+                        } else {
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { 
+                                    message: data.error || 'حدث خطأ أثناء نقل العنصر', 
+                                    type: 'error' 
+                                }
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error moving item:', error);
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { 
+                                message: 'حدث خطأ أثناء نقل العنصر', 
+                                type: 'error' 
+                            }
+                        }));
+                    }
+                },
+                
+                isFirstItem(item) {
+                    const items = this.topLevelItems;
+                    return items.indexOf(item) === 0;
+                },
+                
+                isLastItem(item, items) {
+                    return items.indexOf(item) === items.length - 1;
+                },
+                
+                isFirstChildItem(item) {
+                    const children = this.items.filter(i => i.parent_id === item.parent_id);
+                    return children.findIndex(i => i.id === item.id) === 0;
+                },
+                
+                isLastChildItem(item) {
+                    const children = this.items.filter(i => i.parent_id === item.parent_id);
+                    return children.findIndex(i => i.id === item.id) === children.length - 1;
+                },
+                
+                closeModals() {
+                    this.showAddItemModal = false;
+                    this.showEditItemModal = false;
+                    this.selectedItem = null;
+                    this.formData = {
+                        title: '',
+                        icon: 'fa-circle',
+                        url: '',
+                        parent_id: '',
+                        is_dropdown: false,
+                        admin_only: false,
+                        is_active: true
+                    };
+                },
+                
+                async loadSuggestedRoutes() {
+                    try {
+                        const response = await fetch('/api/settings/suggested-routes');
+                        const data = await response.json();
+                        this.unusedRoutes = data.unused_routes;
+                        this.missingRoutes = data.missing_routes;
+                    } catch (error) {
+                        console.error('Error loading suggested routes:', error);
+                    }
+                },
+                
+                async addRouteToSidebar(route) {
+                    try {
+                        const response = await fetch('/api/sidebar-items', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                title: route.name,
+                                icon: 'fa-route',
+                                url: route.path,
+                                order: this.items.length + 1,
+                                is_active: true
+                            })
+                        });
+
+                        if (response.ok) {
+                            await this.loadItems();
+                            this.loadSuggestedRoutes();
+                        }
+                    } catch (error) {
+                        console.error('Error adding route to sidebar:', error);
+                    }
+                },
+
+                async updateRoutePath(route) {
+                    try {
+                        // Find the sidebar item with the old path
+                        const item = this.items.find(i => i.url === route.path);
+                        if (!item) return;
+
+                        const response = await fetch(`/api/sidebar-items/${item.id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                ...item,
+                                url: route.suggested_path
+                            })
+                        });
+
+                        if (response.ok) {
+                            await this.loadItems();
+                            this.loadSuggestedRoutes();
+                        }
+                    } catch (error) {
+                        console.error('Error updating route path:', error);
+                    }
+                }
+            }));
+        });
+    </script>
+{% endblock %}
