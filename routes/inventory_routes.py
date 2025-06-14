@@ -30,21 +30,22 @@ def update_item_weight_volume(item_id):
         volume = data.get('volume', 0)
 
         # Check if there's already a record for this item in the item_weights table
+        from sqlalchemy import text
         result = db.session.execute(
-            "SELECT id FROM item_weights WHERE item_id = :item_id",
+            text("SELECT id FROM item_weights WHERE item_id = :item_id"),
             {"item_id": item_id}
         ).fetchone()
 
         if result:
             # Update the existing record
             db.session.execute(
-                "UPDATE item_weights SET weight = :weight, volume = :volume WHERE item_id = :item_id",
+                text("UPDATE item_weights SET weight = :weight, volume = :volume WHERE item_id = :item_id"),
                 {"weight": weight, "volume": volume, "item_id": item_id}
             )
         else:
             # Insert a new record
             db.session.execute(
-                "INSERT INTO item_weights (item_id, weight, volume) VALUES (:item_id, :weight, :volume)",
+                text("INSERT INTO item_weights (item_id, weight, volume) VALUES (:item_id, :weight, :volume)"),
                 {"item_id": item_id, "weight": weight, "volume": volume}
             )
 
@@ -72,8 +73,9 @@ def get_items():
     # Get all item weights in a single query
     item_weights_data = {}
     try:
+        from sqlalchemy import text
         results = db.session.execute(
-            "SELECT item_id, weight, volume FROM item_weights"
+            text("SELECT item_id, weight, volume FROM item_weights")
         ).fetchall()
 
         for row in results:

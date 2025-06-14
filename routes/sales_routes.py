@@ -154,11 +154,10 @@ def create_order():
     # Get payment information
     payment_method = data.get('payment_method', 'cash')
     cash_account_id = data.get('cash_account_id')
-    payment_status = 'Unpaid'
 
-    # If payment method is cash and cash account is provided, set status to Paid
-    if payment_method == 'cash' and cash_account_id:
-        payment_status = 'Paid'
+    # FIXED: Do not automatically set payment status to 'Paid' for sales orders
+    # Payment status should only be updated when actual payments are received through invoices
+    payment_status = 'Unpaid'
 
     # Create sales order
     order = SalesOrder(
@@ -198,26 +197,9 @@ def create_order():
         )
         db.session.add(detail)
 
-    # If payment is cash and cash account is provided, record the transaction
-    if payment_method == 'cash' and cash_account_id:
-        # Get the cash account
-        cash_account = CashAccount.query.get(cash_account_id)
-        if cash_account:
-            # Update the cash account balance
-            cash_account.current_balance += order.total_amount
-
-            # Create a cash transaction record
-            transaction = CashTransaction(
-                account_id=cash_account_id,
-                transaction_type='deposit',
-                amount=order.total_amount,
-                reference_type='sales_order',
-                reference_id=order.id,
-                description=f"Sales payment for order #{order.id}",
-                transaction_date=datetime.now(),
-                created_by=current_user.id
-            )
-            db.session.add(transaction)
+    # FIXED: Remove automatic cash booking for sales orders
+    # Cash should only be booked when invoices are paid, not when orders are created
+    # This prevents double-counting of revenue
 
     db.session.commit()
 

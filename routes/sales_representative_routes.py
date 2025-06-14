@@ -443,7 +443,7 @@ def assign_orders_to_route(route_id):
         customer_ids = [visit.customer_id for visit in visits]
         orders = SalesOrder.query.filter(
             SalesOrder.customer_id.in_(customer_ids),
-            SalesOrder.status.in_(['Draft', 'Pending'])
+            SalesOrder.status.in_(['Pending', 'Processing'])
         ).all()
 
         # Serialize the data

@@ -21,7 +21,7 @@ from models_helper import (
     SalesRepresentative, SalesInvoice, SalesPayment, SalesActivityLog,
     SalesReturnItem, CashAccount, CashTransaction, CashTransferVoucher, CashReconciliation,
     RepresentativeRoute, CustomerVisit, RepresentativePerformance, VisitPhoto,
-    WorkerProductivity,AISuggestion
+    WorkerProductivity,AISuggestion,
 )
 
 # Re-export all imported models

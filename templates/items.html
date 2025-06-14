@@ -214,7 +214,7 @@
                                         </template>
                                     </optgroup>
                                     <optgroup label="مواد التعبئة">
-                                        <template x-for="category in getCategoriesByType('PackagingMaterial')" :key="category.id">
+                                        <template x-for="category in getCategoriesByType('Packaging')" :key="category.id">
                                             <option :value="category.id" x-text="category.name"></option>
                                         </template>
                                     </optgroup>
@@ -736,7 +736,7 @@ document.addEventListener('alpine:init', () => {
                             case 'FinalProduct': prefix = 'FP'; break;
                             case 'IntermediateProduct': prefix = 'IP'; break;
                             case 'RawMaterial': prefix = 'RM'; break;
-                            case 'PackagingMaterial': prefix = 'PM'; break;
+                            case 'Packaging': prefix = 'PM'; break;
                             default: prefix = 'OT'; break;
                         }
                     } else if (category.name) {

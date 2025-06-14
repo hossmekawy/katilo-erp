@@ -369,39 +369,94 @@
         <div class="p-6">
             <div class="space-y-4">
                 <div>
+                    <label for="payment-account" class="block text-sm font-medium text-gray-700 mb-1">
+                        الحساب
+                        <span class="text-xs text-blue-600">(يُفضل استخدام الخزينة الآمنة)</span>
+                    </label>
+                    <select
+                        id="payment-account"
+                        x-model="newPayment.accountId"
+                        @change="updateAccountInfo"
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    >
+                        <option value="">اختر الحساب</option>
+
+                        <!-- Safe/Cash Accounts First -->
+                        <template x-for="account in cashAccounts.filter(acc => acc.account_type === 'cash')" :key="account.id">
+                            <option :value="account.id"
+                                    :data-balance="account.current_balance"
+                                    :data-currency="account.currency"
+                                    :data-type="account.account_type">
+                                🔒 <span x-text="account.name"></span> (<span x-text="account.current_balance.toFixed(2)"></span> <span x-text="account.currency"></span>)
+                            </option>
+                        </template>
+
+                        <!-- Bank Accounts -->
+                        <template x-for="account in cashAccounts.filter(acc => acc.account_type === 'bank')" :key="account.id">
+                            <option :value="account.id"
+                                    :data-balance="account.current_balance"
+                                    :data-currency="account.currency"
+                                    :data-type="account.account_type">
+                                🏦 <span x-text="account.name"></span> (<span x-text="account.current_balance.toFixed(2)"></span> <span x-text="account.currency"></span>)
+                            </option>
+                        </template>
+
+                        <!-- Other Accounts -->
+                        <template x-for="account in cashAccounts.filter(acc => acc.account_type !== 'cash' && acc.account_type !== 'bank')" :key="account.id">
+                            <option :value="account.id"
+                                    :data-balance="account.current_balance"
+                                    :data-currency="account.currency"
+                                    :data-type="account.account_type">
+                                💼 <span x-text="account.name"></span> (<span x-text="account.current_balance.toFixed(2)"></span> <span x-text="account.currency"></span>)
+                            </option>
+                        </template>
+                    </select>
+                    <p x-show="selectedAccountInfo.balance !== null" class="mt-1 text-xs text-gray-500">
+                        الرصيد المتاح: <span x-text="selectedAccountInfo.balance"></span> <span x-text="selectedAccountInfo.currency"></span>
+                    </p>
+                    <p x-show="selectedAccountInfo.type" class="mt-1 text-xs"
+                       :class="selectedAccountInfo.type === 'cash' ? 'text-green-600' : 'text-blue-600'">
+                        <span x-show="selectedAccountInfo.type === 'cash'">✅ خزينة نقدية - مُوصى بها للدفعات النقدية</span>
+                        <span x-show="selectedAccountInfo.type === 'bank'">🏦 حساب بنكي - مناسب للتحويلات البنكية</span>
+                    </p>
+                </div>
+
+                <div>
                     <label for="payment-amount" class="block text-sm font-medium text-gray-700 mb-1">المبلغ</label>
-                    <input 
-                        type="number" 
-                        id="payment-amount" 
+                    <input
+                        type="number"
+                        id="payment-amount"
                         x-model="newPayment.amount"
                         min="0"
                         step="0.01"
+                        @input="validateAmount"
                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     >
+                    <p x-show="amountError" class="mt-1 text-xs text-red-600" x-text="amountError"></p>
                 </div>
-                
+
                 <div>
                     <label for="payment-date" class="block text-sm font-medium text-gray-700 mb-1">تاريخ الدفع</label>
-                    <input 
-                        type="date" 
-                        id="payment-date" 
+                    <input
+                        type="date"
+                        id="payment-date"
                         x-model="newPayment.date"
                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     >
                 </div>
-                
+
                 <div>
                     <label for="payment-method" class="block text-sm font-medium text-gray-700 mb-1">طريقة الدفع</label>
-                    <select 
-                        id="payment-method" 
+                    <select
+                        id="payment-method"
                         x-model="newPayment.method"
                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     >
                         <option value="">اختر طريقة الدفع</option>
-                        <option value="Cash">نقدي</option>
-                        <option value="Bank Transfer">تحويل بنكي</option>
-                        <option value="Check">شيك</option>
-                        <option value="Credit Card">بطاقة ائتمان</option>
+                        <option value="cash">نقدي</option>
+                        <option value="bank_transfer">تحويل بنكي</option>
+                        <option value="check">شيك</option>
+                        <option value="other">أخرى</option>
                     </select>
                 </div>
                 
@@ -468,28 +523,40 @@ function supplierAccountDetailsApp(supplierId) {
         statementFrom: '',
         statementTo: '',
         
+        cashAccounts: [],
+        selectedAccountInfo: {
+            balance: null,
+            currency: '',
+            type: ''
+        },
+        amountError: '',
+
         newPayment: {
             amount: '',
             date: new Date().toISOString().split('T')[0],
             method: '',
             reference: '',
-            notes: ''
+            notes: '',
+            accountId: ''
         },
-        
+
         get isPaymentFormValid() {
-            return this.newPayment.amount > 0 && 
-                   this.newPayment.date && 
-                   this.newPayment.method;
+            return this.newPayment.amount > 0 &&
+                   this.newPayment.date &&
+                   this.newPayment.method &&
+                   this.newPayment.accountId &&
+                   !this.amountError;
         },
         
         init() {
             this.fetchSupplierAccountDetails();
-            
+            this.fetchCashAccounts();
+
             // Set default date range for statement (last 30 days)
             const today = new Date();
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(today.getDate() - 30);
-            
+
             this.statementTo = today.toISOString().split('T')[0];
             this.statementFrom = thirtyDaysAgo.toISOString().split('T')[0];
         },
@@ -498,18 +565,67 @@ function supplierAccountDetailsApp(supplierId) {
             try {
                 const response = await fetch(`/api/supplier-accounts/${this.supplierId}`);
                 if (!response.ok) throw new Error('Failed to fetch supplier account details');
-                
+
                 const data = await response.json();
                 this.supplier = data.supplier;
                 this.financialSummary = data.financial_summary;
                 this.purchaseOrders = data.purchase_orders;
                 this.payments = data.payments;
-                
+
                 // Generate initial statement
                 this.generateStatement();
             } catch (error) {
                 console.error('Error fetching supplier account details:', error);
                 showNotification(error.message, 'error');
+            }
+        },
+
+        async fetchCashAccounts() {
+            try {
+                const response = await fetch('/api/cash-accounts');
+                if (!response.ok) throw new Error('Failed to fetch cash accounts');
+
+                const data = await response.json();
+                this.cashAccounts = data.filter(account => account.is_active);
+            } catch (error) {
+                console.error('Error fetching cash accounts:', error);
+                // If cash accounts API doesn't exist, create a fallback
+                this.cashAccounts = [];
+            }
+        },
+
+        updateAccountInfo() {
+            const accountId = this.newPayment.accountId;
+            if (!accountId) {
+                this.selectedAccountInfo = { balance: null, currency: '', type: '' };
+                return;
+            }
+
+            const account = this.cashAccounts.find(acc => acc.id == accountId);
+            if (account) {
+                this.selectedAccountInfo = {
+                    balance: account.current_balance.toFixed(2),
+                    currency: account.currency,
+                    type: account.account_type
+                };
+            }
+
+            // Validate amount against balance
+            this.validateAmount();
+        },
+
+        validateAmount() {
+            this.amountError = '';
+
+            if (!this.newPayment.amount || !this.newPayment.accountId) {
+                return;
+            }
+
+            const amount = parseFloat(this.newPayment.amount);
+            const account = this.cashAccounts.find(acc => acc.id == this.newPayment.accountId);
+
+            if (account && amount > account.current_balance) {
+                this.amountError = 'المبلغ أكبر من الرصيد المتاح';
             }
         },
         
@@ -574,34 +690,46 @@ function supplierAccountDetailsApp(supplierId) {
         
         async addPayment() {
             if (!this.isPaymentFormValid) return;
-            
+
             try {
-                const response = await fetch(`/api/supplier-accounts/${this.supplierId}/payments`, {
+                // Use the cash management system for supplier payments
+                const response = await fetch('/cash/supplier-payments/add', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/x-www-form-urlencoded',
                     },
-                    body: JSON.stringify(this.newPayment)
+                    body: new URLSearchParams({
+                        supplier_id: this.supplierId,
+                        account_id: this.newPayment.accountId,
+                        amount: this.newPayment.amount,
+                        payment_date: this.newPayment.date,
+                        payment_method: this.newPayment.method,
+                        reference: this.newPayment.reference || '',
+                        notes: this.newPayment.notes || ''
+                    })
                 });
-                
+
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.message || 'Failed to add payment');
+                    throw new Error('Failed to add payment');
                 }
-                
+
                 // Reset form and close modal
                 this.newPayment = {
                     amount: '',
                     date: new Date().toISOString().split('T')[0],
                     method: '',
                     reference: '',
-                    notes: ''
+                    notes: '',
+                    accountId: ''
                 };
+                this.selectedAccountInfo = { balance: null, currency: '', type: '' };
+                this.amountError = '';
                 this.showAddPaymentModal = false;
-                
+
                 // Refresh data
                 this.fetchSupplierAccountDetails();
-                
+                this.fetchCashAccounts(); // Refresh account balances
+
                 showNotification('تمت إضافة الدفعة بنجاح', 'success');
             } catch (error) {
                 console.error('Error adding payment:', error);

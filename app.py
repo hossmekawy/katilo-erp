@@ -24,6 +24,7 @@ from routes.inventory_routes import inventory_bp
 from routes.distribution_routes import distribution_bp
 from routes.ai_suggestions_routes import ai_suggestions_bp
 from routes.settings_routes import settings_bp
+from routes.alerts_routes import alerts_bp
 
 
 from flask_migrate import Migrate
@@ -140,6 +141,30 @@ app.register_blueprint(inventory_bp)  # Register the inventory blueprint
 app.register_blueprint(distribution_bp)  # Register the distribution blueprint
 app.register_blueprint(ai_suggestions_bp)  # Register the AI suggestions blueprint
 app.register_blueprint(settings_bp)  # Register the settings blueprint
+app.register_blueprint(alerts_bp)  # Register the alerts blueprint
+
+# Global API routes
+@app.route('/api/cash-accounts')
+@login_required
+def global_api_cash_accounts():
+    """Global API endpoint to get all active cash accounts"""
+    from models import CashAccount
+    from flask import jsonify
+
+    accounts = CashAccount.query.filter_by(is_active=True).all()
+
+    accounts_data = []
+    for account in accounts:
+        accounts_data.append({
+            'id': account.id,
+            'name': account.name,
+            'account_type': account.account_type,
+            'currency': account.currency,
+            'current_balance': account.current_balance,
+            'is_active': account.is_active
+        })
+
+    return jsonify(accounts_data)
 
 
 """
@@ -158,7 +183,7 @@ migrate = Migrate(app, db)
 with app.app_context():
     db.create_all()
 
-    
+
 
     default_permissions = [
         # User Management
@@ -527,6 +552,32 @@ def get_permissions():
         'permission_name': p.permission_name,
         'description': permission_descriptions.get(p.permission_name, p.permission_name.replace('_', ' ').title())
     } for p in permissions])
+
+# Add this to your app.py or wherever you define your template context processors
+@app.context_processor
+def inject_sidebar_menu():
+    """Inject sidebar menu items into all templates"""
+    if current_user.is_authenticated:
+        try:
+            from models_helper import SidebarItem
+            menu_items = SidebarItem.get_main_menu(include_admin=current_user.role and current_user.role.name == 'admin')
+            return {'sidebar_menu': menu_items}
+        except:
+            return {'sidebar_menu': []}
+    return {'sidebar_menu': []}
+
+@app.context_processor
+def inject_alerts_count():
+    """Inject unread alerts count into all templates"""
+    if current_user.is_authenticated:
+        try:
+            from utils.alerts_manager import alerts_manager
+            unread_count = alerts_manager.get_unread_count()
+            return {'unread_alerts_count': unread_count}
+        except:
+            return {'unread_alerts_count': 0}
+    return {'unread_alerts_count': 0}
+
 
 @app.route('/api/roles/<int:role_id>/permissions', methods=['POST'])
 @login_required
@@ -1255,6 +1306,37 @@ def update_inventory():
 
     try:
         db.session.commit()
+
+        # Add alerts for inventory movements and low stock
+        try:
+            from utils.alerts_manager import add_inventory_movement_alert, add_low_stock_alert
+
+            # Check if this is a transfer between warehouses (indicated by reference containing "transfer")
+            if reference and "transfer" in reference.lower():
+                item_name = Item.query.get(item_id).name
+                warehouse_name = Warehouse.query.get(warehouse_id).name
+
+                if transaction_type == 'OUT':
+                    # This is the source warehouse - we'll create the alert when processing the destination
+                    pass
+                elif transaction_type == 'IN':
+                    # This is the destination warehouse - create movement alert
+                    # Try to extract source warehouse from reference or use a generic message
+                    add_inventory_movement_alert(item_name, "مستودع آخر", warehouse_name, abs(quantity))
+
+            # Check for low stock after any transaction
+            if transaction_type == 'OUT':
+                item = Item.query.get(item_id)
+                warehouse = Warehouse.query.get(warehouse_id)
+
+                # Check if current quantity is at or below reorder level
+                if inventory.quantity <= item.reorder_level:
+                    add_low_stock_alert(item.name, inventory.quantity, item.reorder_level, warehouse.name)
+
+        except Exception as e:
+            # Don't fail the transaction if alert creation fails
+            print(f"Failed to create alerts: {e}")
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Database error: {str(e)}'}), 500
@@ -1517,7 +1599,7 @@ def get_dashboard_stats():
             # Query to get total quantity sold for each product
             top_products_query = db.session.query(
                 SalesOrderDetail.item_id,
-                func.sum(SalesOrderDetail.quantity).label('total_sold')
+                func.sum(SalesOrderDetail.quantity_ordered).label('total_sold')
             ).group_by(SalesOrderDetail.item_id).order_by(desc('total_sold')).limit(5).all()
 
             top_products = []
@@ -1567,11 +1649,11 @@ def get_dashboard_stats():
         production_efficiency = 0
         try:
             efficiency_records = ProductionEfficiency.query.order_by(
-                ProductionEfficiency.date.desc()
+                ProductionEfficiency.id.desc()
             ).limit(30).all()
 
             if efficiency_records:
-                production_efficiency = sum(record.efficiency_percentage for record in efficiency_records) / len(efficiency_records)
+                production_efficiency = sum(record.efficiency_score for record in efficiency_records) / len(efficiency_records)
         except Exception as e:
             app.logger.error(f"Error calculating production efficiency: {str(e)}")
 
@@ -1603,7 +1685,7 @@ def get_dashboard_stats():
                 account = CashAccount.query.get(txn.account_id)
                 recent_cash_transactions.append({
                     'id': txn.id,
-                    'account': account.account_name if account else 'Unknown',
+                    'account': account.name if account else 'Unknown',
                     'amount': txn.amount,
                     'type': txn.transaction_type,
                     'description': txn.description,
@@ -3188,10 +3270,10 @@ if __name__ == '__main__':
     else:
         print("No internet connection (required for Gemini)") # Warn about Gemini
 
-    port = 5000
+    port = 5005
     url = f"http://{local_ip}:{port}"
     print(f" * Katilo System running on {url}")
     context = ('cert.pem', 'key.pem')
 
     # webbrowser.open(url) # Keep or remove auto-open as preferred
-    app.run(host='0.0.0.0', port=port,  ssl_context=context)
+    app.run(host='0.0.0.0', port=port,  ssl_context=context  ,debug=True)

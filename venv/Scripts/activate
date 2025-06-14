@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="E:\projects\katilo-system(new-version)\katilo-system\katilo-system\venv"
+VIRTUAL_ENV="E:\projects\katilo-system-postgrsql\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

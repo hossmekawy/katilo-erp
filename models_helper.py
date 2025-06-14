@@ -114,4 +114,5 @@ CustomerVisit = models_module.CustomerVisit
 RepresentativePerformance = models_module.RepresentativePerformance
 VisitPhoto = models_module.VisitPhoto
 AISuggestion = models_module.AISuggestion
+SidebarItem = models_module.SidebarItem
 

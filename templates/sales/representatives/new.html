@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}إضافة مندوب مبيعات جديد | نظام قاتيلو{% endblock %}
+
+{% block page_header %}إضافة مندوب مبيعات جديد{% endblock %}
+
+{% block breadcrumbs %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('sales.sales_dashboard') }}" class="text-blue-600 hover:text-blue-800">المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <a href="{{ url_for('rep_routes.list_representatives') }}" class="text-blue-600 hover:text-blue-800">مندوبي المبيعات</a>
+</li>
+<li class="flex items-center">
+    <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
+    <span class="text-gray-600 font-medium">إضافة مندوب جديد</span>
+</li>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .form-group {
+        @apply mb-4;
+    }
+    .form-label {
+        @apply block text-sm font-medium text-gray-700 mb-2;
+    }
+    .form-input {
+        @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors;
+    }
+    .form-select {
+        @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white;
+    }
+    .error-message {
+        @apply text-red-500 text-sm mt-1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="newRepresentativeApp()" class="mb-10">
+    <!-- Header Section -->
+    <div class="mb-6 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">إضافة مندوب مبيعات جديد</h1>
+        <div class="flex space-x-2 rtl:space-x-reverse">
+            <button @click="saveRepresentative()" class="btn btn-primary" :disabled="isLoading">
+                <i class="fas fa-save ml-2"></i>
+                <span x-text="isLoading ? 'جاري الحفظ...' : 'حفظ المندوب'"></span>
+            </button>
+            <a href="{{ url_for('rep_routes.list_representatives') }}" class="btn btn-secondary">
+                <i class="fas fa-times ml-2"></i>
+                <span>إلغاء</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Form Card -->
+    <div class="card">
+        <!-- Basic Information Section -->
+        <div class="p-6 border-b border-gray-100">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">المعلومات الأساسية</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- User Selection -->
+                <div class="form-group">
+                    <label for="user_id" class="form-label">المستخدم</label>
+                    <select id="user_id" x-model="formData.user_id" class="form-select">
+                        <option value="">اختر المستخدم</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+                        {% endfor %}
+                    </select>
+                    <div x-show="errors.user_id" class="error-message" x-text="errors.user_id"></div>
+                </div>
+
+                <!-- Territory -->
+                <div class="form-group">
+                    <label for="territory" class="form-label">المنطقة</label>
+                    <input type="text" id="territory" x-model="formData.territory" class="form-input" placeholder="أدخل المنطقة المخصصة للمندوب">
+                    <div x-show="errors.territory" class="error-message" x-text="errors.territory"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Commission and Status Section -->
+        <div class="p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">العمولة والحالة</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Commission Rate -->
+                <div class="form-group">
+                    <label for="commission_rate" class="form-label">معدل العمولة (%)</label>
+                    <input type="number" id="commission_rate" x-model="formData.commission_rate" 
+                           class="form-input" placeholder="0.00" step="0.01" min="0" max="100">
+                    <div x-show="errors.commission_rate" class="error-message" x-text="errors.commission_rate"></div>
+                </div>
+
+                <!-- Status -->
+                <div class="form-group">
+                    <label for="is_active" class="form-label">الحالة</label>
+                    <select id="is_active" x-model="formData.is_active" class="form-select">
+                        <option value="true">نشط</option>
+                        <option value="false">غير نشط</option>
+                    </select>
+                    <div x-show="errors.is_active" class="error-message" x-text="errors.is_active"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function newRepresentativeApp() {
+    return {
+        isLoading: false,
+        formData: {
+            user_id: '',
+            territory: '',
+            commission_rate: 0.0,
+            is_active: 'true'
+        },
+        errors: {},
+
+        validateForm() {
+            this.errors = {};
+
+            if (!this.formData.user_id) {
+                this.errors.user_id = 'يرجى اختيار المستخدم';
+            }
+
+            if (!this.formData.territory.trim()) {
+                this.errors.territory = 'يرجى إدخال المنطقة';
+            }
+
+            if (this.formData.commission_rate < 0 || this.formData.commission_rate > 100) {
+                this.errors.commission_rate = 'معدل العمولة يجب أن يكون بين 0 و 100';
+            }
+
+            return Object.keys(this.errors).length === 0;
+        },
+
+        saveRepresentative() {
+            if (!this.validateForm()) {
+                return;
+            }
+
+            this.isLoading = true;
+
+            // Prepare data for API
+            const data = {
+                user_id: parseInt(this.formData.user_id),
+                territory: this.formData.territory.trim(),
+                commission_rate: parseFloat(this.formData.commission_rate),
+                is_active: this.formData.is_active === 'true'
+            };
+
+            // Send create request
+            fetch('/sales/representatives/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => Promise.reject(err));
+                }
+                return response.json();
+            })
+            .then(data => {
+                showNotification('تم إنشاء المندوب بنجاح', 'success');
+
+                // Redirect to representatives list
+                setTimeout(() => {
+                    window.location.href = '/sales/representatives/';
+                }, 1000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                if (error.message) {
+                    showNotification(error.message, 'error');
+                } else {
+                    showNotification('حدث خطأ أثناء إنشاء المندوب', 'error');
+                }
+            })
+            .finally(() => {
+                this.isLoading = false;
+            });
+        }
+    };
+}
+
+// Helper function to show notifications
+function showNotification(message, type = 'info') {
+    const event = new CustomEvent('show-notification', {
+        detail: { message, type }
+    });
+    window.dispatchEvent(event);
+}
+</script>
+{% endblock %}
